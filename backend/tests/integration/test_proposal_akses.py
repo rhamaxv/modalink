@@ -13,6 +13,16 @@ async def test_proposal_submitted_tidak_terlihat_publik(client, submitted_propos
     ).status_code == 404
 
 
+async def test_proposal_yang_sungguh_tidak_ada_dikembalikan_404(client):
+    """Cabang `if proposal is None` belum pernah dieksekusi test lain (C-22):
+    test di atas hanya menguji proposal yang ada tapi tersembunyi dari
+    viewer, bukan id yang sama sekali tidak ada baris-nya."""
+    hantu = uuid4()
+    res = await client.get(f"/api/v1/proposals/{hantu}")
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "proposal_tidak_ada"
+
+
 async def test_proposal_submitted_terlihat_oleh_pemiliknya(
     client, umkm, submitted_proposal
 ):
