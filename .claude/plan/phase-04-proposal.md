@@ -228,8 +228,9 @@ def body_proposal(**ubah):
         "business_profile": "Warung kopi rumahan di Jakarta Timur, berjalan 3 tahun, "
                             "2 pekerja, omzet rata-rata Rp12 juta per bulan.",
         "requested_amount": 10_000_000,
-        "fund_usage_plan": "Rp6 juta mesin kopi, Rp3 juta bahan baku 3 bulan, "
-                           "Rp1 juta perbaikan etalase.",
+        "fund_usage_plan": "Rp6 juta untuk mesin kopi semi-otomatis, Rp3 juta untuk "
+                           "bahan baku biji dan susu selama tiga bulan, dan Rp1 juta "
+                           "untuk memperbaiki etalase depan yang sudah lapuk.",
         "business_projection": "Omzet diperkirakan naik ke Rp18 juta per bulan "
                                "dalam 6 bulan setelah mesin baru dipakai.",
         "milestones": [
