@@ -154,13 +154,15 @@ def test_token_membawa_sub_dan_role():
 def test_token_kedaluwarsa_ditolak():
     uid = uuid4()
     kedaluwarsa = issue_token(uid, "investor", ttl_hours=-1)
-    with pytest.raises(ValueError, match="kedaluwarsa"):
+    with pytest.raises(TokenKedaluwarsa) as err:
         decode_token(kedaluwarsa)
+    assert err.value.status == 401
 
 def test_token_dengan_tanda_tangan_lain_ditolak():
     import jwt
-    palsu = jwt.encode({"sub": str(uuid4()), "role": "investor"}, "kunci-lain", algorithm="HS256")
-    with pytest.raises(ValueError):
+    palsu = jwt.encode({"sub": str(uuid4()), "role": "investor"},
+                       "kunci-lain-yang-panjangnya-cukup-32-byte", algorithm="HS256")
+    with pytest.raises(TokenTidakSah):
         decode_token(palsu)
 ```
 
@@ -194,9 +196,12 @@ def hash_password(raw: str) -> str:
     return _hasher.hash(raw)
 
 def verify_password(raw: str, hashed: str) -> bool:
+    # VerificationError dan InvalidHashError ikut ditangkap: hash yang rusak atau
+    # berasal dari algoritma lain berarti kredensial tidak cocok, bukan alasan
+    # untuk meledak dengan 500.
     try:
         return _hasher.verify(hashed, raw)
-    except VerifyMismatchError:
+    except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
 
 def issue_token(user_id: UUID, role: str, ttl_hours: int | None = None) -> str:
@@ -208,13 +213,27 @@ def issue_token(user_id: UUID, role: str, ttl_hours: int | None = None) -> str:
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
+class TokenKedaluwarsa(DomainError):
+    """Token masih sah tanda tangannya, tetapi masa berlakunya habis."""
+    status = 401
+
+
+class TokenTidakSah(DomainError):
+    """Tanda tangan tidak cocok, bentuknya rusak, atau klaimnya tidak lengkap."""
+    status = 401
+
+
 def decode_token(token: str) -> TokenClaims:
+    # Melempar DomainError, bukan ValueError: kalau sebuah ValueError lolos tanpa
+    # diterjemahkan di lapisan HTTP, FastAPI membalas 500 dengan bentuk di luar
+    # amplop error yang seragam. Melempar tipe yang sudah membawa status
+    # menghilangkan ketergantungan pada penerjemahan itu sama sekali.
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
-        raise ValueError("Token kedaluwarsa.") from None
+        raise TokenKedaluwarsa("token_kedaluwarsa", "Sesi Anda sudah berakhir, silakan masuk lagi.") from None
     except jwt.InvalidTokenError:
-        raise ValueError("Token tidak sah.") from None
+        raise TokenTidakSah("token_tidak_sah", "Token tidak sah.") from None
     return TokenClaims(sub=UUID(payload["sub"]), role=payload["role"])
 ```
 
@@ -404,10 +423,9 @@ async def current_user(
 ) -> User:
     if not authorization or not authorization.startswith("Bearer "):
         raise TidakTerautentikasi("tidak_terautentikasi", "Token tidak ada.")
-    try:
-        claims = decode_token(authorization.removeprefix("Bearer "))
-    except ValueError as exc:
-        raise TidakTerautentikasi("token_tidak_sah", str(exc)) from None
+    # Tidak ada penerjemahan di sini: decode_token sudah melempar TokenKedaluwarsa
+    # atau TokenTidakSah, keduanya DomainError berstatus 401.
+    claims = decode_token(authorization.removeprefix("Bearer "))
 
     user = await session.get(User, claims.sub)
     if user is None:
