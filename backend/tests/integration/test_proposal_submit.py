@@ -10,6 +10,20 @@ async def test_umkm_bisa_submit_proposal(client, umkm, campaign, body_proposal):
     assert data["scoring_status"] in {"pending", "processing", "done"}
 
 
+async def test_br10_fund_usage_plan_di_bawah_100_karakter_ditolak(
+    client, umkm, campaign, body_proposal
+):
+    """04-feature-umkm.md menetapkan minimal 100 karakter (BR-10). Rubrik
+    skoring AI menilai kelengkapan isian di field ini, jadi minimumnya
+    tidak boleh diam-diam dilonggarkan demi fixture test."""
+    res = await client.post(
+        f"/api/v1/campaigns/{campaign.id}/proposals",
+        headers=umkm.headers,
+        json=body_proposal(fund_usage_plan="x" * 99),
+    )
+    assert res.status_code == 422
+
+
 async def test_br11_dana_melebihi_target_campaign_ditolak(
     client, umkm, campaign, body_proposal
 ):
