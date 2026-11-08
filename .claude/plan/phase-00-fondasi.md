@@ -81,7 +81,7 @@ dari `db` supaya data dev tidak terhapus oleh test ([D-10](../docs/decisions.md)
 
 ```toml
 [project]
-name = "logicodix-backend"
+name = "modalink-backend"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115", "uvicorn[standard]>=0.32", "sqlmodel>=0.0.22",
@@ -189,7 +189,7 @@ from fastapi import FastAPI
 from app.api.v1 import health
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Logicodix API", version="0.1.0")
+    app = FastAPI(title="Modalink API", version="0.1.0")
     app.include_router(health.router)
     return app
 

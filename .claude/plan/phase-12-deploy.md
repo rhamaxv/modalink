@@ -71,12 +71,12 @@ dihasilkan dan tahap runner gagal.
 
 - [ ] **Step 3: Uji build lokal**
 
-Run: `docker build -t logicodix-backend ./backend && docker build -t logicodix-frontend ./frontend`
+Run: `docker build -t modalink-backend ./backend && docker build -t modalink-frontend ./frontend`
 Expected: keduanya sukses
 
 - [ ] **Step 4: Uji image backend benar-benar jalan**
 
-Run: `docker run --rm -e DATABASE_URL=... -p 8000:8000 logicodix-backend` lalu `curl localhost:8000/health`
+Run: `docker run --rm -e DATABASE_URL=... -p 8000:8000 modalink-backend` lalu `curl localhost:8000/health`
 Expected: `{"status":"ok","database":"ok"}`
 
 - [ ] **Step 5: Commit**
