@@ -7,6 +7,7 @@ from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
+from app.domain.clock import Clock, SystemClock
 from app.errors import DomainError, ForbiddenError
 from app.models.user import Role, User
 from app.services.auth import decode_token
@@ -14,6 +15,12 @@ from app.services.auth import decode_token
 
 class TidakTerautentikasi(DomainError):
     status = 401
+
+
+def get_clock() -> Clock:
+    # Dependency, bukan import langsung: test fase 09 mengganti ini lewat
+    # dependency_overrides tanpa menyentuh satu pun pemanggilnya.
+    return SystemClock()
 
 
 async def current_user(

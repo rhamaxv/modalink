@@ -10,6 +10,13 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     ("GET", "/api/v1/auth/me", "investor", 200),
     ("GET", "/api/v1/auth/me", "umkm", 200),
     ("GET", "/api/v1/auth/me", "community", 200),
+    # POST tanpa token: peran belum diketahui, jadi 401 lebih dulu dari validasi body.
+    ("POST", "/api/v1/campaigns", None, 401),
+    ("POST", "/api/v1/campaigns", "umkm", 403),
+    ("POST", "/api/v1/campaigns", "community", 403),
+    # Investor lolos pagar peran; 422 di sini membuktikan itu, bukan body kosong.
+    ("POST", "/api/v1/campaigns", "investor", 422),
+    ("GET", "/api/v1/campaigns", None, 200),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

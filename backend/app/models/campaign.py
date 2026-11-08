@@ -69,6 +69,7 @@ class Campaign(SQLModel, table=True):
     funding_deadline: datetime
     score_threshold: int = 60
     status: CampaignStatus = Field(
+        default=CampaignStatus.OPEN,
         sa_column=Column(
             SAEnum(
                 CampaignStatus,
@@ -76,8 +77,7 @@ class Campaign(SQLModel, table=True):
                 values_callable=lambda enum_cls: [e.value for e in enum_cls],
             ),
             nullable=False,
-            default=CampaignStatus.OPEN,
             index=True,
-        )
+        ),
     )
     created_at: datetime = Field(default_factory=lambda: SystemClock().now())
