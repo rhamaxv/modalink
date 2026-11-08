@@ -4,8 +4,13 @@ from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlmodel import SQLModel
 
 from alembic import context
+
+# Import diperlukan agar model terdaftar ke SQLModel.metadata sebelum
+# autogenerate membandingkannya dengan skema database.
+from app import models  # noqa: F401
 from app.config import settings
 
 # this is the Alembic Config object, which provides
@@ -21,11 +26,7 @@ if config.config_file_name is not None:
 # exactly one place (app.config.settings) and never in the repository.
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+target_metadata = SQLModel.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

@@ -15,7 +15,13 @@ async def db():
             yield session
         finally:
             await session.close()
-            await trans.rollback()
+            # Flush yang gagal (misal IntegrityError dari constraint unik)
+            # sudah membuat Postgres mengabort transaksinya sendiri, sehingga
+            # transaksi ini sudah lepas dari koneksi sebelum baris ini
+            # tercapai. Rollback kedua pada transaksi yang sudah lepas hanya
+            # memicu SAWarning, bukan kebocoran data, jadi dilewati.
+            if trans.is_active:
+                await trans.rollback()
 
 
 @pytest.fixture
