@@ -6,6 +6,7 @@ tidak pernah dikirim ke Gemini.
 
 import re
 
+from app.ai.engine import CampaignLike, ProposalLike
 from app.ai.models import Brief, ProposalScore, RedFlag
 
 PENANDA_SKOR = re.compile(r"\[\[SCORE:(\d+)\]\]")
@@ -16,7 +17,9 @@ class MockScoringEngine:
     name = "mock"
     model = "mock-v1"
 
-    async def score(self, proposal, campaign) -> ProposalScore:
+    async def score(
+        self, proposal: ProposalLike, campaign: CampaignLike
+    ) -> ProposalScore:
         # f-string, bukan " ".join([...]) seperti di draft brief: isinya sama,
         # tapi gerbang ruff proyek ini menandai join daftar literal (FLY002).
         teks = (
@@ -46,8 +49,13 @@ class MockScoringEngine:
                 brief=self._brief(proposal),
             )
 
-        # Skor dasar dari kelengkapan isian, dibatasi rentangnya.
-        fit = 40 if proposal.sector == campaign.sector else 22
+        # Skor dasar dari kelengkapan isian, dibatasi rentangnya. Kecocokan
+        # diukur dari porsi dana yang diminta terhadap target campaign, bukan
+        # dari sektor: Proposal tidak punya kolom sector, hanya Campaign yang
+        # punya, sehingga membandingkan keduanya melempar AttributeError
+        # begitu baris Proposal sungguhan masuk (lihat plan fase ini).
+        porsi = proposal.requested_amount / campaign.target_amount
+        fit = 40 if porsi <= 0.5 else (30 if porsi <= 0.8 else 22)
         data = min(len(proposal.fund_usage_plan) // 10, 30)
         impact = min(len(proposal.business_projection) // 10, 30)
         return ProposalScore(
@@ -58,7 +66,7 @@ class MockScoringEngine:
             brief=self._brief(proposal),
         )
 
-    def _brief(self, proposal) -> Brief:
+    def _brief(self, proposal: ProposalLike) -> Brief:
         return Brief(
             strengths=[f"Profil usaha {proposal.business_name} terisi."],
             risks=["Penilaian ini berasal dari engine tiruan, bukan dari model AI."],

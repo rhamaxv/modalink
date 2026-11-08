@@ -1,17 +1,14 @@
 """Fixture proposal/campaign yang belum tersimpan, dipakai test engine skoring.
 
-Dataclass tersendiri, bukan model Proposal/Campaign dari app.models: proposal
-sungguhan belum punya kolom sector (lihat 04-feature-umkm.md, sector hanya ada
-di campaign), sementara MockScoringEngine di fase ini menilai kecocokan
-sektor. Unit test tidak boleh butuh Postgres, jadi draft di sini sengaja tidak
-disentuh ke database sama sekali.
+Dataclass tersendiri, bukan model Proposal/Campaign dari app.models: sengaja
+dibuat ringan agar unit test tidak butuh Postgres sama sekali. Field yang
+disertakan di sini dibatasi pada yang benar-benar dibaca MockScoringEngine
+(lihat ProposalLike/CampaignLike di app/ai/engine.py, C-25).
 """
 
 from dataclasses import dataclass
 
 import pytest
-
-from app.models.campaign import Sector
 
 
 @dataclass
@@ -20,17 +17,17 @@ class ProposalDraft:
     business_profile: str
     fund_usage_plan: str
     business_projection: str
-    sector: Sector
+    requested_amount: int
 
 
 @dataclass
 class CampaignDraft:
-    sector: Sector
+    target_amount: int
 
 
 @pytest.fixture
 def campaign_draft() -> CampaignDraft:
-    return CampaignDraft(sector=Sector.KULINER)
+    return CampaignDraft(target_amount=50_000_000)
 
 
 @pytest.fixture
@@ -52,18 +49,19 @@ def proposal_draft() -> ProposalDraft:
             "setelah mesin baru dipakai, didukung kenaikan kapasitas seduh "
             "harian."
         ),
-        sector=Sector.KULINER,
+        requested_amount=10_000_000,
     )
 
 
 @pytest.fixture
 def proposal_draft_tipis() -> ProposalDraft:
-    """Lawan proposal_draft: isian pendek dan sektor tidak cocok dengan
-    campaign_draft, dipakai membuktikan mock tidak memberi skor acak."""
+    """Lawan proposal_draft: isian pendek, dipakai membuktikan mock tidak
+    memberi skor acak. requested_amount sama dengan proposal_draft supaya
+    bedanya cuma kelengkapan isian, bukan porsi dana."""
     return ProposalDraft(
         business_name="Warung Tipis",
         business_profile="Warung kecil.",
         fund_usage_plan="Buat modal.",
         business_projection="Naik.",
-        sector=Sector.TEKNOLOGI,
+        requested_amount=10_000_000,
     )

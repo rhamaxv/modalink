@@ -45,4 +45,15 @@ def test_build_engine_scoring_engine_mock_mengembalikan_mock():
 
 def test_build_engine_scoring_engine_lain_belum_didukung():
     with pytest.raises(NotImplementedError):
-        build_engine(settings.model_copy(update={"scoring_engine": "gemini"}))
+        build_engine(settings.model_copy(update={"scoring_engine": "entah"}))
+
+
+def test_build_engine_scoring_engine_gemini_tanpa_kunci_menolak_jelas():
+    """build_engine membangun GeminiEngine lewat from_settings, yang menolak
+    dibuat tanpa GEMINI_API_KEY alih-alih gagal samar belakangan."""
+    with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
+        build_engine(
+            settings.model_copy(
+                update={"scoring_engine": "gemini", "gemini_api_key": None}
+            )
+        )
