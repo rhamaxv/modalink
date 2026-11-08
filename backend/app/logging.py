@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import Request
@@ -30,26 +31,33 @@ def redact_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def catat_request(request: Request, call_next: Any) -> Response:
-    mulai = time.perf_counter()
-    respons = await call_next(request)
-    baris = redact_payload({
+async def log_request(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    started_at = time.perf_counter()
+    response = await call_next(request)
+    line = redact_payload({
         "method": request.method,
         "path": request.url.path,
-        "status": respons.status_code,
-        "durasi_ms": round((time.perf_counter() - mulai) * 1000),
+        "status": response.status_code,
+        "durasi_ms": round((time.perf_counter() - started_at) * 1000),
         "user_id": getattr(request.state, "user_id", None),
     })
-    http_log.info(json.dumps(baris))
-    return respons
+    http_log.info(json.dumps(line))
+    return response
 
 
-def catat_panggilan_ai(model: str, durasi_ms: int, jumlah_token: int, valid: bool) -> None:
-    """Called by the scoring service from phase 05 onward; never passed proposal content."""
-    baris = redact_payload({
+def log_ai_call(model: str, duration_ms: int, token_count: int, valid: bool) -> None:
+    """Called by the scoring service from phase 05 onward; never passed proposal content.
+
+    Output keys stay in Indonesian (`durasi_ms`, `jumlah_token`) to match the
+    vocabulary the http logger already emits and the field names phase 05's
+    test asserts on; only the Python identifiers are English.
+    """
+    line = redact_payload({
         "model": model,
-        "durasi_ms": durasi_ms,
-        "jumlah_token": jumlah_token,
+        "durasi_ms": duration_ms,
+        "jumlah_token": token_count,
         "valid": valid,
     })
-    ai_log.info(json.dumps(baris))
+    ai_log.info(json.dumps(line))
