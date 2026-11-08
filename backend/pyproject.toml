@@ -29,3 +29,9 @@ extend-exclude = ["alembic/versions"]
 # FastAPI's `Depends()` in a default argument is the framework's own dependency-
 # injection idiom, not a defect.
 ignore = ["B008"]
+
+[tool.mypy]
+# Without this, mypy treats pydantic-settings fields with no default as
+# required constructor arguments, even though they are populated from the
+# environment at runtime.
+plugins = ["pydantic.mypy"]
