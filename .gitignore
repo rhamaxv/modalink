@@ -30,3 +30,6 @@ test-results/
 Thumbs.db
 .idea/
 .vscode/
+
+# Workspace subagent-driven-development (scratch, bukan bagian produk)
+.superpowers/

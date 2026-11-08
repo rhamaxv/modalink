@@ -1,4 +1,6 @@
-# Logicodix
+# Tumbuh Bareng
+
+Karya tim untuk Logicodix 2026, subtema Local MSME & Creative Economy.
 
 Platform crowdfunding UMKM: investor membuat campaign, UMKM mengajukan proposal, AI menilai,
 beberapa investor patungan mendanai, dan dana cair bertahap per milestone.

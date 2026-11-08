@@ -250,3 +250,17 @@ maupun di mata pemeliharaan.
 
 **Yang tidak dipangkas sama sekali:** deploy, README sesuai spesifikasi panitia, video demo, dan
 surat orisinalitas. Keempatnya menentukan submission diterima atau tidak.
+
+---
+
+## D-20. Nama aplikasi: Tumbuh Bareng
+
+Dipilih pemilik project. Nama repositori: `tumbuh-bareng`.
+
+**Kenapa:** menerjemahkan langsung mekanisme inti produk, yaitu co-funding, tanpa perlu
+dijelaskan. Investor dan UMKM tumbuh bersama-sama, dan dana yang terkumpul berasal dari banyak
+orang sekaligus.
+
+**Konsekuensi:** nama ini dipakai konsisten di `<title>`, navbar, README, nama repositori, dan
+judul video demo. Nama kode internal (paket Python, modul) tetap netral dan berbahasa Inggris,
+tidak diterjemahkan menjadi `tumbuh_bareng`.
