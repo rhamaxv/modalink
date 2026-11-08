@@ -48,8 +48,8 @@ Pertanyaan untuk memutuskan: **bisakah aturan ini diuji tanpa database?** Kalau 
 
 ## Penamaan
 
-- Kode, identifier, nama tabel, dan kolom: **bahasa Inggris**.
-- Nama test, pesan error untuk pengguna, dan komentar: **bahasa Indonesia**.
+- Identifier, nama tabel, nama kolom, dan pesan commit: **bahasa Inggris**.
+- Komentar, docstring, nama test, dan pesan error untuk pengguna: **bahasa Indonesia**.
 - Nama test menyebut nomor aturan: `test_br21_pledge_melebihi_sisa_ditolak`. Saat aturan berubah,
   testnya ketemu lewat grep.
 

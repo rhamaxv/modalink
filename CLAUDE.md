@@ -45,6 +45,20 @@ menjebak:
 | README.md wajib memuat diagram arsitektur, akun demonstrasi, dan dokumentasi penggunaan AI | Submission tidak memenuhi syarat |
 | Web wajib **sudah di-deploy** dan bisa diakses juri lewat browser | Submission tidak memenuhi syarat |
 
+### Bahasa di dalam kode
+
+| Bagian | Bahasa |
+| --- | --- |
+| Identifier, nama tabel, nama kolom | Inggris |
+| Pesan commit | Inggris |
+| **Komentar dan docstring** | **Indonesia** |
+| Nama fungsi test | Indonesia |
+| Pesan error yang dibaca pengguna | Indonesia |
+
+Komentar berbahasa Indonesia karena ia menjelaskan alasan aturan bisnis yang spec-nya juga
+berbahasa Indonesia. Menerjemahkannya menambah jarak antara kode dan dokumen tanpa menambah
+kejelasan bagi siapa pun yang membaca repositori ini.
+
 ### Format pesan commit
 
 Dipatok panitia, dan tidak boleh menyimpang:

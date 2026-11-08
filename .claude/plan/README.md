@@ -41,6 +41,7 @@ Berlaku untuk **setiap** task di seluruh fase. Tidak diulang di tiap task.
 | Bentuk error | `{"error": {"code", "message", "detail"}}` di semua endpoint ([10-api-contract](../prd/10-api-contract.md)) |
 | Urutan daftar | Deterministik. Seri diputus `created_at` lalu `id` |
 | Bahasa antarmuka | Indonesia. Istilah teknis dipakai apa adanya. Tidak ada tanda pisah em di teks antarmuka |
+| Bahasa di dalam kode | Identifier dan pesan commit Inggris; komentar, docstring, nama test, dan pesan error Indonesia |
 | Aksesibilitas | Kontras WCAG AA, seluruh UI bisa dioperasikan keyboard, indikator fokus terlihat |
 | antislop | Mode DURING. Setiap penyerahan UI ditutup Delivery Gate berupa laporan PASS/FAIL dengan bukti ([D-15](../docs/decisions.md)) |
 

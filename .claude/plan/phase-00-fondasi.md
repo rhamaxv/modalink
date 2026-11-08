@@ -430,12 +430,12 @@ jobs:
           # configured, override the placeholder.
           POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || 'ci' }}
           POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-placeholder' }}
-          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || 'logicodix_test' }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || 'modalink_test' }}
         ports: ["5433:5432"]
         options: >-
           --health-cmd "pg_isready -U ${{ secrets.CI_POSTGRES_USER || 'ci' }}" --health-interval 2s --health-retries 15
     env:
-      DATABASE_URL: postgresql+asyncpg://${{ secrets.CI_POSTGRES_USER || 'ci' }}:${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-placeholder' }}@localhost:5433/${{ secrets.CI_POSTGRES_DB || 'logicodix_test' }}
+      DATABASE_URL: postgresql+asyncpg://${{ secrets.CI_POSTGRES_USER || 'ci' }}:${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-placeholder' }}@localhost:5433/${{ secrets.CI_POSTGRES_DB || 'modalink_test' }}
       JWT_SECRET: ${{ secrets.CI_JWT_SECRET || 'ci-only-placeholder' }}
       GEMINI_API_KEY: ${{ secrets.CI_GEMINI_API_KEY || 'ci-only-placeholder' }}
     steps:
@@ -483,13 +483,13 @@ import json
 
 async def test_setiap_request_menghasilkan_satu_baris_json(client, caplog):
     await client.get("/health")
-    baris = [json.loads(r.message) for r in caplog.records if r.name == "logicodix.http"]
+    baris = [json.loads(r.message) for r in caplog.records if r.name == "modalink.http"]
     assert len(baris) == 1
     assert baris[0].keys() >= {"method", "path", "status", "durasi_ms"}
 
 async def test_log_memuat_user_id_untuk_request_terautentikasi(client, investor, caplog):
     await client.get("/api/v1/auth/me", headers=investor.headers)
-    baris = [json.loads(r.message) for r in caplog.records if r.name == "logicodix.http"]
+    baris = [json.loads(r.message) for r in caplog.records if r.name == "modalink.http"]
     assert baris[0]["user_id"] == str(investor.user.id)
 
 async def test_log_tidak_pernah_memuat_password_atau_token(client, caplog):
@@ -503,7 +503,7 @@ async def test_log_pemanggilan_ai_tidak_memuat_isi_proposal(db, submitted_propos
                                                             engine_mock, clock, caplog):
     from app.services.scoring import jalankan_scoring
     await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
-    baris = [json.loads(r.message) for r in caplog.records if r.name == "logicodix.ai"]
+    baris = [json.loads(r.message) for r in caplog.records if r.name == "modalink.ai"]
     assert baris[0].keys() >= {"model", "durasi_ms", "valid"}
     assert submitted_proposal.business_profile not in " ".join(
         r.message for r in caplog.records)
@@ -526,8 +526,8 @@ import logging
 import time
 from fastapi import Request
 
-http_log = logging.getLogger("logicodix.http")
-ai_log = logging.getLogger("logicodix.ai")
+http_log = logging.getLogger("modalink.http")
+ai_log = logging.getLogger("modalink.ai")
 
 async def catat_request(request: Request, call_next):
     mulai = time.perf_counter()
