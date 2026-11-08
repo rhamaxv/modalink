@@ -2,8 +2,8 @@
 
 # Local dev runs these targets without an activated venv, so tool names alone
 # are not on PATH. Relative to backend/, since every use below follows a
-# `cd backend &&`. CI installs into the job's own environment and sets this
-# empty to fall back to the bare command.
+# `cd backend &&`. CI never invokes make; it calls ruff, mypy, and pytest
+# directly from its own environment, so this default only matters locally.
 VENV_BIN ?= .venv/bin/
 
 up:
