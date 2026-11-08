@@ -369,8 +369,138 @@ Expected: PASS
 git commit -am "feat: add campaign update, close and threshold lock"
 ```
 
+---
+
+### Task 4: Pagar layering berbasis AST untuk seluruh router
+
+**Files:**
+- Create: `backend/tests/unit/test_pagar_layering.py`
+- Delete: pagar grep lama di `backend/tests/integration/test_auth.py`
+- Modify: `backend/app/services/auth.py`
+
+Pagar yang lahir di fase 02 hanya memeriksa satu berkas, dengan daftar string yang ditulis tangan:
+
+```python
+isi = pathlib.Path("app/api/v1/auth.py").read_text()
+for terlarang in ("session.scalar(", "session.add(", "select(User)"):
+```
+
+`select(Campaign)` di router fase ini akan lolos sepenuhnya, begitu pula impor model dengan alias
+atau query lewat fungsi pembantu. Pagar yang bisa dilewati sambil lalu lebih buruk daripada tidak
+ada pagar, karena ia memberi rasa aman yang keliru.
+
+Diganti dengan pemeriksaan AST yang berlaku untuk **setiap** berkas di `app/api/`, dan yang
+menyasar perbuatannya, bukan ejaannya: router memakai objek session, atau merakit query.
+
+- [ ] **Step 1: Tulis test yang gagal**
+
+```python
+# backend/tests/unit/test_pagar_layering.py
+"""Router hanya merangkai. Query dan orkestrasi milik services/."""
+import ast
+import pathlib
+
+import pytest
+
+API = pathlib.Path(__file__).parents[2] / "app" / "api"
+BERKAS_ROUTER = sorted(API.glob("**/*.py"))
+
+# Metode session yang berarti router sedang menyentuh database sendiri.
+METODE_SESSION = {
+    "scalar", "scalars", "execute", "exec", "add", "add_all",
+    "get", "flush", "commit", "refresh", "delete", "merge",
+}
+
+
+def _pelanggaran(pohon: ast.AST) -> list[str]:
+    temuan: list[str] = []
+    for node in ast.walk(pohon):
+        if not isinstance(node, ast.Call):
+            continue
+        fungsi = node.func
+        # session.<apa pun yang menyentuh database>
+        if (
+            isinstance(fungsi, ast.Attribute)
+            and isinstance(fungsi.value, ast.Name)
+            and fungsi.value.id == "session"
+            and fungsi.attr in METODE_SESSION
+        ):
+            temuan.append(f"baris {node.lineno}: session.{fungsi.attr}()")
+        # select(...) dirakit di router, apa pun modelnya
+        if isinstance(fungsi, ast.Name) and fungsi.id == "select":
+            temuan.append(f"baris {node.lineno}: select()")
+    return temuan
+
+
+@pytest.mark.parametrize("berkas", BERKAS_ROUTER, ids=lambda p: p.name)
+def test_router_tidak_menyentuh_database_sendiri(berkas: pathlib.Path) -> None:
+    temuan = _pelanggaran(ast.parse(berkas.read_text()))
+    assert not temuan, (
+        f"{berkas.name} menyentuh database langsung:\n  "
+        + "\n  ".join(temuan)
+        + "\nPindahkan ke services/. Router hanya merangkai."
+    )
+
+
+def test_pagar_ini_benar_benar_menangkap_sesuatu() -> None:
+    """Pagar yang tidak pernah terbukti bisa merah mungkin tidak memagari apa pun."""
+    contoh = ast.parse(
+        "async def r(session):\n"
+        "    return await session.scalar(select(Campaign))\n"
+    )
+    assert len(_pelanggaran(contoh)) == 2
+```
+
+Test terakhir menggantikan demonstrasi manual: pagar membuktikan dirinya sendiri setiap kali suite
+dijalankan, bukan sekali saat ditulis.
+
+- [ ] **Step 2: Jalankan test, pastikan gagal**
+
+Run: `make test-unit`
+Expected: FAIL pada `test_pagar_ini_benar_benar_menangkap_sesuatu` sebelum `_pelanggaran` ada.
+
+- [ ] **Step 3: Hapus pagar grep yang lama**
+
+Buang `test_router_auth_tidak_memuat_query_database` dari
+`backend/tests/integration/test_auth.py`. Pagar baru menggantikannya sepenuhnya dan mencakup
+seluruh router, bukan satu berkas.
+
+- [ ] **Step 4: Rapikan dua hal kecil di `services/auth.py`**
+
+Gantikan `raise DomainError("email_terpakai", ...)` dengan subclass bernama, selaras dengan
+`TokenKedaluwarsa`, `TokenTidakSah`, dan `KredensialSalah` yang sudah ada:
+
+```python
+class EmailTerpakai(DomainError):
+    """Email sudah dipakai akun lain."""
+    status = 400
+```
+
+Dan jangan terjemahkan **setiap** `IntegrityError` menjadi "email terpakai". Hari ini `email`
+satu-satunya kolom unik, tetapi begitu tabel `users` punya constraint kedua, pelanggaran yang tidak
+berhubungan akan salah dilaporkan:
+
+```python
+    except IntegrityError as exc:
+        if "users_email" not in str(exc.orig).lower() and "ix_users_email" not in str(exc.orig).lower():
+            raise
+        raise EmailTerpakai("email_terpakai", "Email ini sudah terdaftar.") from None
+```
+
+- [ ] **Step 5: Jalankan, pastikan hijau**
+
+Run: `make check`
+Expected: PASS
+
+- [ ] **Step 6: Commit**
+
+```bash
+git commit -am "feat: replace the substring layering guard with an ast check over all routers"
+```
+
 ## Gerbang keluar fase 03
 
 - [ ] `make test` dan `make test-regression` hijau
 - [ ] R5 memuat baris untuk keenam endpoint campaign, termasuk kasus bukan pemilik
 - [ ] Constraint `funding_deadline > apply_deadline` ada di database, bukan hanya di Python
+- [ ] Pagar layering berbasis AST berlaku untuk seluruh berkas di `app/api/`
