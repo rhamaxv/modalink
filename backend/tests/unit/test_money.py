@@ -1,4 +1,5 @@
 import pytest
+
 from app.domain.money import MAX_RUPIAH, format_rupiah, parse_rupiah
 
 
