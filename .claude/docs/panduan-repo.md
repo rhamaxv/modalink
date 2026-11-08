@@ -36,7 +36,19 @@ tidak ada di layar.
 - [ ] Nyalakan **Push protection**
 
 Push protection menolak push yang memuat API key sebelum sampai ke GitHub. Ini jaring pengaman
-sungguhan untuk larangan hardcode kredensial, dan gratis untuk repo publik.
+sungguhan untuk larangan hardcode kredensial.
+
+**Belum bisa sekarang.** Keduanya tidak tersedia untuk repo private di paket gratis; percobaan
+menyalakannya pada 9 November 2026 ditolak dengan `422 Secret scanning is not available for this
+repository`. Fitur ini baru muncul saat repo dijadikan Public, jadi dinyalakan bersamaan dengan
+perubahan visibility menjelang submission.
+
+Sampai saat itu, jaring pengamannya manual: `.gitignore` sudah menutup `.env`, dan riwayat
+diperiksa sebelum setiap push dengan
+
+```bash
+git log -p | grep -inE 'AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9]{20,}|gh[pos]_[A-Za-z0-9]{20,}'
+```
 
 **Yang sebaiknya tidak dinyalakan:** branch protection yang mewajibkan pull request atau review.
 Tim kecil dengan tenggat lima hari akan terhambat, dan aturan lomba tidak memintanya.
@@ -99,6 +111,10 @@ Panitia menilai **keberkalaan** commit, dan melarang bulk upload di akhir.
 
 ## Sebelum submission
 
+- [ ] **Ubah visibility menjadi Public** (`gh repo edit rhamaxv/modalink --visibility public`).
+      Repo sengaja dibuat private selama pengerjaan supaya spec dan rencana tidak terbaca tim lain;
+      panitia hanya mewajibkan Public sejak submission
+- [ ] Segera setelah Public, nyalakan **Secret scanning** dan **Push protection**
 - [ ] README memuat seluruh poin wajib, termasuk **diagram arsitektur**, **akun demonstrasi**, dan
       **dokumentasi penggunaan AI**. Tiga ini yang paling sering terlewat
 - [ ] `.env` tidak pernah ada di riwayat: `git log --all --full-history -- .env` harus kosong
@@ -122,3 +138,18 @@ Panitia menilai **keberkalaan** commit, dan melarang bulk upload di akhir.
 
 Kalau ada commit yang salah, perbaiki dengan **commit baru**. Riwayat yang berantakan tapi jujur
 jauh lebih aman daripada riwayat rapi yang ditulis ulang.
+
+
+## Status repositori, 9 November 2026
+
+| Hal | Keadaan |
+| --- | --- |
+| URL | `https://github.com/rhamaxv/modalink` |
+| Visibility | **Private**, sengaja. Diubah menjadi Public menjelang submission |
+| Default branch | `main` |
+| Allow squash merging | **Mati** |
+| Allow rebase merging | **Mati** |
+| Allow merge commits | Hidup |
+| Secret scanning | Belum tersedia, menunggu repo Public |
+| Commit terdorong | 8, seluruhnya dokumentasi |
+| Atribusi commit | Seluruhnya tertaut ke akun GitHub `rhamaxv`, diverifikasi lewat API |
