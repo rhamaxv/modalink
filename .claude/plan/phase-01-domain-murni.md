@@ -654,6 +654,159 @@ git add backend/tests/unit/test_domain_murni.py
 git commit -m "feat: add architecture guard for pure domain layer"
 ```
 
+---
+
+### Task 7: Tiga mesin status yang tersisa
+
+**Files:**
+- Modify: `backend/app/domain/transitions.py`
+- Modify: `backend/tests/regression/test_r1_transitions.py`
+
+**Interfaces:**
+- Produces: `ReportStatus`, `ReportEvent`, `CampaignStatus`, `CampaignEvent`, `ScoringStatus`,
+  `ScoringEvent`; `REPORT_MAP`, `CAMPAIGN_MAP`, `SCORING_MAP`; `apply_report()`,
+  `apply_campaign()`, `apply_scoring()`.
+
+`08-state-machines.md` mendefinisikan **empat** mesin status plus `scoring_status`, dan
+`regression-checklist.md` menjanjikan R1 berlaku untuk semuanya. Task 3 baru mengerjakan proposal
+dan milestone. Tiga sisanya dikerjakan di sini, sebelum ada service yang memakainya, supaya tidak
+ada fase yang menambahkan enum status sendiri secara ad hoc di luar `transitions.py`.
+
+`ScoringStatus` sengaja **terpisah** dari `ProposalStatus`. Keduanya tidak boleh dicampur:
+`scoring_status = failed` berarti penilaian gagal dijalankan, bukan proposal ditolak
+([D-09](../docs/decisions.md)).
+
+- [ ] **Step 1: Tulis test yang gagal**
+
+```python
+# backend/tests/unit/test_transitions.py (tambahan)
+import pytest
+from app.domain.transitions import (
+    CampaignEvent, CampaignStatus, IllegalTransition, ReportEvent, ReportStatus,
+    ScoringEvent, ScoringStatus, apply_campaign, apply_report, apply_scoring,
+)
+
+def test_t30_approve_menandai_laporan_approved():
+    assert apply_report(ReportStatus.PENDING, ReportEvent.APPROVE) is ReportStatus.APPROVED
+
+def test_t31_reject_menandai_laporan_rejected():
+    assert apply_report(ReportStatus.PENDING, ReportEvent.REJECT) is ReportStatus.REJECTED
+
+def test_laporan_yang_sudah_dinilai_tidak_bisa_dinilai_ulang():
+    with pytest.raises(IllegalTransition):
+        apply_report(ReportStatus.APPROVED, ReportEvent.REJECT)
+
+def test_t40_campaign_ditutup_manual():
+    assert apply_campaign(CampaignStatus.OPEN, CampaignEvent.TUTUP_MANUAL) \
+        is CampaignStatus.CLOSED
+
+def test_t41_campaign_tertutup_karena_apply_deadline_lewat():
+    assert apply_campaign(CampaignStatus.OPEN, CampaignEvent.APPLY_DEADLINE_LEWAT) \
+        is CampaignStatus.CLOSED
+
+def test_campaign_tertutup_tidak_bisa_ditutup_lagi():
+    with pytest.raises(IllegalTransition):
+        apply_campaign(CampaignStatus.CLOSED, CampaignEvent.TUTUP_MANUAL)
+
+def test_t50_sampai_t53_alur_scoring():
+    assert apply_scoring(ScoringStatus.PENDING, ScoringEvent.AMBIL) is ScoringStatus.PROCESSING
+    assert apply_scoring(ScoringStatus.PROCESSING, ScoringEvent.SELESAI) is ScoringStatus.DONE
+    assert apply_scoring(ScoringStatus.PROCESSING, ScoringEvent.GAGAL) is ScoringStatus.FAILED
+    assert apply_scoring(ScoringStatus.FAILED, ScoringEvent.NILAI_ULANG) is ScoringStatus.PENDING
+
+def test_scoring_yang_sudah_done_adalah_terminal():
+    with pytest.raises(IllegalTransition):
+        apply_scoring(ScoringStatus.DONE, ScoringEvent.AMBIL)
+```
+
+- [ ] **Step 2: Jalankan test, pastikan gagal**
+
+Run: `make test-unit`
+Expected: FAIL dengan `ImportError: cannot import name 'ReportStatus'`
+
+- [ ] **Step 3: Implementasi minimal**
+
+```python
+# backend/app/domain/transitions.py (tambahan)
+
+class ReportStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+class ReportEvent(StrEnum):
+    APPROVE = "approve"
+    REJECT = "reject"
+
+class CampaignStatus(StrEnum):
+    OPEN = "open"
+    CLOSED = "closed"
+
+class CampaignEvent(StrEnum):
+    TUTUP_MANUAL = "tutup_manual"
+    APPLY_DEADLINE_LEWAT = "apply_deadline_lewat"
+
+class ScoringStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    DONE = "done"
+    FAILED = "failed"
+
+class ScoringEvent(StrEnum):
+    AMBIL = "ambil"
+    SELESAI = "selesai"
+    GAGAL = "gagal"
+    NILAI_ULANG = "nilai_ulang"
+
+REPORT_MAP: dict[tuple[ReportStatus, ReportEvent], ReportStatus] = {
+    (ReportStatus.PENDING, ReportEvent.APPROVE): ReportStatus.APPROVED,   # T-30
+    (ReportStatus.PENDING, ReportEvent.REJECT):  ReportStatus.REJECTED,   # T-31
+}
+
+CAMPAIGN_MAP: dict[tuple[CampaignStatus, CampaignEvent], CampaignStatus] = {
+    (CampaignStatus.OPEN, CampaignEvent.TUTUP_MANUAL):         CampaignStatus.CLOSED,  # T-40
+    (CampaignStatus.OPEN, CampaignEvent.APPLY_DEADLINE_LEWAT): CampaignStatus.CLOSED,  # T-41
+}
+
+SCORING_MAP: dict[tuple[ScoringStatus, ScoringEvent], ScoringStatus] = {
+    (ScoringStatus.PENDING, ScoringEvent.AMBIL):         ScoringStatus.PROCESSING,  # T-50
+    (ScoringStatus.PROCESSING, ScoringEvent.SELESAI):    ScoringStatus.DONE,        # T-51
+    (ScoringStatus.PROCESSING, ScoringEvent.GAGAL):      ScoringStatus.FAILED,      # T-52
+    (ScoringStatus.FAILED, ScoringEvent.NILAI_ULANG):    ScoringStatus.PENDING,     # T-53
+}
+```
+
+Ketiga fungsi `apply_*` mengikuti bentuk `apply_proposal` yang sudah ada: cari di peta, lempar
+`IllegalTransition` bila tidak ketemu.
+
+- [ ] **Step 4: Perluas R1 ke keempat mesin**
+
+`test_r1_transitions.py` menambah tiga blok parametrize dengan bentuk yang sama persis seperti
+dua yang sudah ada, serta tiga penguncian jumlah:
+
+```python
+def test_r1_jumlah_transisi_laporan_sesuai_spec():
+    assert len(REPORT_MAP) == 2    # T-30, T-31
+
+def test_r1_jumlah_transisi_campaign_sesuai_spec():
+    assert len(CAMPAIGN_MAP) == 2  # T-40, T-41
+
+def test_r1_jumlah_transisi_scoring_sesuai_spec():
+    assert len(SCORING_MAP) == 4   # T-50 sampai T-53
+```
+
+- [ ] **Step 5: Jalankan, pastikan hijau**
+
+Run: `make test`
+Expected: PASS. R1 kini mencakup empat mesin seperti yang dijanjikan
+[regression-checklist.md](regression-checklist.md).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git commit -am "feat: add report, campaign and scoring status machines"
+```
+
 ## Gerbang keluar fase 01
 
 - [ ] `make test-unit` hijau, seluruhnya berjalan di bawah 1 detik
@@ -661,3 +814,4 @@ git commit -m "feat: add architecture guard for pure domain layer"
 - [ ] Tidak ada file di `app/domain/` yang mengimpor sqlmodel, sqlalchemy, atau fastapi
 - [ ] Peta transisi di `transitions.py` cocok satu-satu dengan tabel di
       [08-state-machines](../prd/08-state-machines.md)
+- [ ] Keempat mesin status ada di `transitions.py`, dan R1 mencakup keempatnya
