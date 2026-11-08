@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 
 from app.api.v1 import health
+from app.errors import register_error_handlers
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Modalink API", version="0.1.0")
     app.include_router(health.router)
+    register_error_handlers(app)
     return app
 
 
