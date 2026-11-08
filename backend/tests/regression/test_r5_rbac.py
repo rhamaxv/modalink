@@ -37,6 +37,21 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     ),  # bukan pemilik
     ("POST", "/api/v1/campaigns/{campaign_id}/close", "investor", 200),
     ("GET", "/api/v1/campaigns/{campaign_id}/proposals", None, 200),
+    ("POST", "/api/v1/campaigns/{campaign_id}/proposals", None, 401),
+    (
+        "POST",
+        "/api/v1/campaigns/{campaign_id}/proposals",
+        "investor",
+        403,
+    ),  # peran salah
+    # 422 karena body kosong, sama seperti POST /campaigns; umkm lolos pagar peran.
+    ("POST", "/api/v1/campaigns/{campaign_id}/proposals", "umkm", 422),
+    ("GET", "/api/v1/proposals", None, 200),
+    # Matriks ini cuma mengganti {campaign_id}, bukan {proposal_id}; literal
+    # "{proposal_id}" gagal di-parse sebagai UUID sebelum dependency apa pun
+    # jalan, jadi 422 di sini untuk peran manapun. Cakupan aturan akses baca
+    # proposal yang sesungguhnya ada di tests/integration/test_proposal_akses.py.
+    ("GET", "/api/v1/proposals/{proposal_id}", None, 422),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

@@ -117,6 +117,27 @@ async def campaign(db, investor):
     return c
 
 
+@pytest.fixture
+async def campaign_kedaluwarsa(db, investor):
+    """Campaign dengan apply_deadline yang sudah lewat, dipakai menguji BR-17."""
+    mulai = SystemClock().now()
+    c = Campaign(
+        investor_id=investor.user.id,
+        title="Modal warung yang sudah tutup pendaftaran",
+        description="Mendanai warung kopi skala rumahan." * 2,
+        sector=Sector.KULINER,
+        target_amount=50_000_000,
+        apply_deadline=mulai - timedelta(days=1),
+        funding_deadline=mulai + timedelta(days=21),
+        score_threshold=60,
+        status=CampaignStatus.OPEN,
+        created_at=mulai - timedelta(days=10),
+    )
+    db.add(c)
+    await db.flush()
+    return c
+
+
 def _isi_proposal_minimal(campaign_id, umkm_id, status: ProposalStatus) -> Proposal:
     """Baris proposal lengkap secara kolom, dipakai fixture status manapun.
 
