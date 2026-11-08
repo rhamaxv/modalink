@@ -7,8 +7,8 @@ from typing import Any
 from fastapi import Request
 from starlette.responses import Response
 
-http_log = logging.getLogger("logicodix.http")
-ai_log = logging.getLogger("logicodix.ai")
+http_log = logging.getLogger("modalink.http")
+ai_log = logging.getLogger("modalink.ai")
 
 # Set explicitly rather than relying on root: the root logger defaults to
 # WARNING, which would silently drop every INFO-level structured log line.
