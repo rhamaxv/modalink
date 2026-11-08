@@ -24,6 +24,20 @@ async def test_br10_fund_usage_plan_di_bawah_100_karakter_ditolak(
     assert res.status_code == 422
 
 
+async def test_c26_fund_usage_plan_tepat_100_karakter_diterima(
+    client, umkm, campaign, body_proposal
+):
+    """Batas tepat di 100 belum pernah diuji sebelumnya: 99 ditolak dan 162
+    (fixture) diterima, tapi off-by-one di validator bisa lolos tanpa
+    kasus batas ini."""
+    res = await client.post(
+        f"/api/v1/campaigns/{campaign.id}/proposals",
+        headers=umkm.headers,
+        json=body_proposal(fund_usage_plan="x" * 100),
+    )
+    assert res.status_code == 201
+
+
 async def test_br11_dana_melebihi_target_campaign_ditolak(
     client, umkm, campaign, body_proposal
 ):
