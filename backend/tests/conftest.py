@@ -86,6 +86,12 @@ async def investor_lain(db):
 
 
 @pytest.fixture
+async def umkm_lain(db):
+    """UMKM kedua: bukan pemilik proposal manapun di test, dipakai BR-13 dan akses baca."""
+    return await _buat_akun(db, "umkm-lain-teruji@contoh.id", Role.UMKM)
+
+
+@pytest.fixture
 async def akun(investor, umkm, community, investor_lain):
     """Peta peran ke akun teruji, dipakai RBAC_MATRIX untuk memilih header."""
     return {
@@ -158,9 +164,37 @@ def _isi_proposal_minimal(campaign_id, umkm_id, status: ProposalStatus) -> Propo
 
 
 @pytest.fixture
-async def listed_proposal(db, campaign, umkm):
-    """Satu proposal lolos skoring untuk campaign fixture, demi BR-77."""
-    p = _isi_proposal_minimal(campaign.id, umkm.user.id, ProposalStatus.LISTED)
+async def listed_proposal(db, campaign, umkm_lain):
+    """Satu proposal lolos skoring untuk campaign fixture, demi BR-77.
+
+    Dimiliki umkm_lain, bukan umkm: submitted_proposal di bawah ini juga
+    aktif menurut BR-13 pada campaign yang sama, dan partial unique index
+    hanya mengizinkan satu proposal aktif per pasangan campaign-umkm. Test
+    yang butuh keduanya sekaligus (daftar proposal per campaign) akan gagal
+    dengan IntegrityError kalau kedua fixture berbagi umkm yang sama.
+    """
+    p = _isi_proposal_minimal(campaign.id, umkm_lain.user.id, ProposalStatus.LISTED)
+    db.add(p)
+    await db.flush()
+    return p
+
+
+@pytest.fixture
+async def submitted_proposal(db, campaign, umkm):
+    """Proposal yang belum dinilai, dimiliki `umkm` karena test kepemilikan
+    (test_proposal_submitted_terlihat_oleh_pemiliknya) memverifikasi lewat akun ini."""
+    p = _isi_proposal_minimal(campaign.id, umkm.user.id, ProposalStatus.SUBMITTED)
+    db.add(p)
+    await db.flush()
+    return p
+
+
+@pytest.fixture
+async def rejected_proposal(db, campaign, umkm):
+    """Proposal yang sudah mati. Status rejected dikecualikan dari partial
+    unique index (BR-13), sehingga aman berbagi umkm dengan submitted_proposal
+    pada campaign yang sama."""
+    p = _isi_proposal_minimal(campaign.id, umkm.user.id, ProposalStatus.REJECTED)
     db.add(p)
     await db.flush()
     return p
