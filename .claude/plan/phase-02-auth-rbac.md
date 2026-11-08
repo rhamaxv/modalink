@@ -282,6 +282,32 @@ async def test_br03_password_hash_tidak_pernah_dikembalikan(client):
     assert "password_hash" not in res.text
     assert "rahasia123" not in res.text
 
+async def test_login_tidak_membocorkan_email_lewat_lama_respons(client, monkeypatch):
+    """Status dan body yang identik belum cukup. Kalau email tak dikenal melewati
+    verifikasi argon2 sementara email dikenal menjalankannya, selisih waktunya
+    terukur dan jadi oracle untuk menebak email mana yang terdaftar."""
+    dipanggil: list[str] = []
+    asli = auth_service.verify_password
+
+    def catat(raw: str, hashed: str) -> bool:
+        dipanggil.append(hashed)
+        return asli(raw, hashed)
+
+    monkeypatch.setattr(auth_service, "verify_password", catat)
+
+    await client.post("/api/v1/auth/register", json={
+        "email": "ada@contoh.id", "password": "rahasia123", "name": "Ada", "role": "umkm",
+    })
+    await client.post("/api/v1/auth/login",
+                      json={"email": "ada@contoh.id", "password": "salah"})
+    await client.post("/api/v1/auth/login",
+                      json={"email": "tidak-ada@contoh.id", "password": "salah"})
+
+    assert len(dipanggil) == 2, (
+        "verifikasi password harus tetap dijalankan untuk email yang tidak dikenal, "
+        "memakai hash umpan, supaya lama responsnya tidak membedakan keduanya"
+    )
+
 async def test_login_salah_password_tidak_membocorkan_apakah_email_ada(client):
     await client.post("/api/v1/auth/register", json={
         "email": "a@contoh.id", "password": "rahasia123", "name": "A", "role": "umkm",
@@ -339,9 +365,15 @@ async def register(body: RegisterIn, session: AsyncSession = Depends(get_session
 @router.post("/login", response_model=TokenOut)
 async def login(body: LoginIn, session: AsyncSession = Depends(get_session)) -> TokenOut:
     user = await session.scalar(select(User).where(User.email == body.email.lower()))
-    # Pesan yang sama untuk email tak dikenal maupun password salah, supaya tidak
-    # membocorkan email mana yang terdaftar.
-    if user is None or not verify_password(body.password, user.password_hash):
+
+    # Hash umpan dipakai saat email tidak dikenal supaya argon2 tetap berjalan.
+    # Tanpa itu, jalur "email tidak ada" selesai jauh lebih cepat daripada jalur
+    # "password salah", dan selisih waktunya cukup untuk menebak email mana yang
+    # terdaftar meski status dan body-nya identik.
+    hash_diperiksa = user.password_hash if user else HASH_UMPAN
+    cocok = verify_password(body.password, hash_diperiksa)
+
+    if user is None or not cocok:
         raise KredensialSalah("kredensial_salah", "Email atau password salah.")
     return TokenOut(access_token=issue_token(user.id, user.role))
 ```
