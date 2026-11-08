@@ -12,7 +12,8 @@ from app.domain.clock import Clock, SystemClock
 from app.errors import DomainError, ForbiddenError, NotFoundError
 from app.models.campaign import Campaign
 from app.models.user import Role, User
-from app.services.auth import decode_token
+from app.services.auth import ambil_user, decode_token
+from app.services.campaign import ambil_campaign
 
 
 class TidakTerautentikasi(DomainError):
@@ -35,7 +36,7 @@ async def current_user(
     # atau TokenTidakSah, keduanya DomainError berstatus 401.
     claims = decode_token(authorization.removeprefix("Bearer "))
 
-    user = await session.get(User, claims.sub)
+    user = await ambil_user(session, claims.sub)
     if user is None:
         raise TidakTerautentikasi("token_tidak_sah", "Akun tidak ditemukan.")
     return user
@@ -57,7 +58,7 @@ async def pengguna_opsional(
         claims = decode_token(authorization.removeprefix("Bearer "))
     except DomainError:
         return None
-    return await session.get(User, claims.sub)
+    return await ambil_user(session, claims.sub)
 
 
 def require_role(*roles: Role) -> Callable[[User], User]:
@@ -79,7 +80,7 @@ async def ambil_campaign_milik_sendiri(
 ) -> Campaign:
     # Peran dan kepemilikan adalah dua pemeriksaan berbeda: require_role di atas
     # hanya membuktikan jenis penggunanya, bukan bahwa campaign ini miliknya.
-    campaign = await session.get(Campaign, campaign_id)
+    campaign = await ambil_campaign(session, campaign_id)
     if campaign is None:
         raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")
     if campaign.investor_id != user.id:

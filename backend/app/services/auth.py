@@ -34,6 +34,12 @@ class KredensialSalah(DomainError):
     status = 401
 
 
+class EmailTerpakai(DomainError):
+    """Email sudah dipakai akun lain."""
+
+    status = 400
+
+
 @dataclass(frozen=True, slots=True)
 class TokenClaims:
     sub: UUID
@@ -93,11 +99,23 @@ async def register_user(session: AsyncSession, body: RegisterIn) -> User:
     session.add(user)
     try:
         await session.flush()
-    except IntegrityError:
+    except IntegrityError as exc:
         # Constraint database yang menangkapnya, bukan pemeriksaan di Python:
-        # pemeriksaan lebih dulu punya celah balapan, constraint tidak.
-        raise DomainError("email_terpakai", "Email ini sudah terdaftar.") from None
+        # pemeriksaan lebih dulu punya celah balapan, constraint tidak. Dicek
+        # dulu constraint mana yang melanggar: email satu-satunya kolom unik
+        # hari ini, tapi begitu users punya constraint kedua, pelanggaran yang
+        # tidak berhubungan akan salah dilaporkan sebagai email terpakai.
+        if (
+            "users_email" not in str(exc.orig).lower()
+            and "ix_users_email" not in str(exc.orig).lower()
+        ):
+            raise
+        raise EmailTerpakai("email_terpakai", "Email ini sudah terdaftar.") from None
     return user
+
+
+async def ambil_user(session: AsyncSession, user_id: UUID) -> User | None:
+    return await session.get(User, user_id)
 
 
 async def authenticate_user(session: AsyncSession, body: LoginIn) -> User:

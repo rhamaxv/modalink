@@ -81,10 +81,14 @@ def _tutup(campaign: Campaign, event: CampaignEvent) -> None:
     campaign.status = CampaignStatus(baru.value)
 
 
+async def ambil_campaign(session: AsyncSession, campaign_id: UUID) -> Campaign | None:
+    return await session.get(Campaign, campaign_id)
+
+
 async def ambil_campaign_detail(
     session: AsyncSession, campaign_id: UUID, clock: Clock
 ) -> Campaign | None:
-    campaign = await session.get(Campaign, campaign_id)
+    campaign = await ambil_campaign(session, campaign_id)
     if campaign is None:
         return None
     if campaign.status is CampaignStatus.OPEN and clock.now() > campaign.apply_deadline:

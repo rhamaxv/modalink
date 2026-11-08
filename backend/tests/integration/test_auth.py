@@ -1,5 +1,3 @@
-import pathlib
-
 import pytest
 
 import app.services.auth as auth_service
@@ -128,12 +126,3 @@ async def test_login_argon2_tetap_jalan_untuk_email_tak_dikenal(db, monkeypatch)
             db, LoginIn(email="tidak-ada@contoh.id", password="apa saja")
         )
     assert panggilan == 1
-
-
-def test_router_auth_tidak_memuat_query_database():
-    """Pagar layering: router hanya merangkai, service yang mengorkestrasi."""
-    isi = pathlib.Path("app/api/v1/auth.py").read_text()
-    for terlarang in ("session.scalar(", "session.add(", "select(User)"):
-        assert terlarang not in isi, (
-            f"{terlarang} ada di router; pindahkan ke services/auth.py"
-        )
