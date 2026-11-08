@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_ttl_hours: int = 24
     scoring_engine: str = "mock"      # "mock" atau "gemini"
-    gemini_api_key: str
+    # No default placeholder either: only GeminiEngine (phase 05) reads this,
+    # and mock mode never does, so leaving it unset must not block startup.
+    gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     gemini_timeout_s: int = 20
 
