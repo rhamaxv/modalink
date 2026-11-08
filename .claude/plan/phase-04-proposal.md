@@ -403,6 +403,51 @@ async def test_proposal_submitted_tidak_terlihat_umkm_lain(client, umkm_lain, su
                            headers=umkm_lain.headers)
     assert res.status_code == 404
 
+async def test_daftar_proposal_campaign_menyembunyikan_yang_belum_listed(
+    client, investor, listed_proposal, submitted_proposal, rejected_proposal
+):
+    """Filter visibilitas di endpoint daftar proposal campaign lahir di fase 03
+    tanpa satu pun test. Refactor yang menghapus klausa .where() akan lolos semua
+    test lain, dan kebocorannya baru terlihat saat proposal yang ditolak sudah
+    terbaca publik."""
+    campaign_id = listed_proposal.campaign_id
+
+    publik = await client.get(f"/api/v1/campaigns/{campaign_id}/proposals")
+    terlihat = {p["id"] for p in publik.json()["items"]}
+    assert str(listed_proposal.id) in terlihat
+    assert str(submitted_proposal.id) not in terlihat
+    assert str(rejected_proposal.id) not in terlihat
+
+    pemilik = await client.get(f"/api/v1/campaigns/{campaign_id}/proposals",
+                               headers=investor.headers)
+    semua = {p["id"] for p in pemilik.json()["items"]}
+    assert {str(listed_proposal.id), str(submitted_proposal.id),
+            str(rejected_proposal.id)} <= semua
+
+
+async def test_campaign_yang_sudah_closed_menolak_proposal_baru(
+    client, investor, campaign, umkm
+):
+    """Ditunda dari fase 03 karena endpoint POST proposal baru lahir di sini."""
+    await client.post(f"/api/v1/campaigns/{campaign.id}/close", headers=investor.headers)
+    res = await client.post(f"/api/v1/campaigns/{campaign.id}/proposals",
+                            headers=umkm.headers, json=body_proposal())
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "pengajuan_ditutup"
+
+
+async def test_patch_dan_close_campaign_yang_tidak_ada_mengembalikan_404(
+    client, investor
+):
+    """Satu-satunya cabang di dependency kepemilikan yang belum pernah dieksekusi."""
+    from uuid import uuid4
+    hantu = uuid4()
+    assert (await client.patch(f"/api/v1/campaigns/{hantu}",
+            headers=investor.headers, json={"title": "x"})).status_code == 404
+    assert (await client.post(f"/api/v1/campaigns/{hantu}/close",
+            headers=investor.headers)).status_code == 404
+
+
 async def test_daftar_publik_hanya_memuat_listed_ke_atas(
     client, listed_proposal, submitted_proposal, rejected_proposal
 ):
@@ -452,4 +497,6 @@ git commit -am "feat: add proposal read access rules"
 - [ ] `make test` dan `make test-regression` hijau
 - [ ] `alembic downgrade -1 && alembic upgrade head` berhasil
 - [ ] Partial unique index terpasang dan terbukti menolak proposal kedua
+- [ ] Filter visibilitas proposal punya test yang membuktikan ia benar-benar menyaring
+- [ ] Model `Proposal` minimal dari fase 03 **diperluas lewat migrasi baru**, bukan dirancang ulang
 - [ ] Tidak ada endpoint PATCH atau PUT untuk proposal
