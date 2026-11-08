@@ -1,8 +1,13 @@
 """R5: setiap endpoint kali setiap peran, plus kasus peran benar tapi bukan pemilik."""
 
+from typing import Any
+
 import pytest
 
 # (method, path, peran atau None, status yang diharapkan)
+# {campaign_id} di path diganti id campaign fixture sungguhan saat dikirim;
+# campaign itu selalu milik akun "investor", jadi "investor_lain" di baris
+# manapun berarti peran benar tapi bukan pemilik.
 RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     ("POST", "/api/v1/auth/register", None, 422),  # 422 karena body kosong
     ("POST", "/api/v1/auth/login", None, 422),  # 422 karena body kosong
@@ -17,18 +22,52 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # Investor lolos pagar peran; 422 di sini membuktikan itu, bukan body kosong.
     ("POST", "/api/v1/campaigns", "investor", 422),
     ("GET", "/api/v1/campaigns", None, 200),
+    ("GET", "/api/v1/campaigns/{campaign_id}", None, 200),
+    ("PATCH", "/api/v1/campaigns/{campaign_id}", None, 401),
+    ("PATCH", "/api/v1/campaigns/{campaign_id}", "umkm", 403),  # peran salah
+    ("PATCH", "/api/v1/campaigns/{campaign_id}", "investor_lain", 403),  # bukan pemilik
+    ("PATCH", "/api/v1/campaigns/{campaign_id}", "investor", 200),
+    ("POST", "/api/v1/campaigns/{campaign_id}/close", None, 401),
+    ("POST", "/api/v1/campaigns/{campaign_id}/close", "umkm", 403),  # peran salah
+    (
+        "POST",
+        "/api/v1/campaigns/{campaign_id}/close",
+        "investor_lain",
+        403,
+    ),  # bukan pemilik
+    ("POST", "/api/v1/campaigns/{campaign_id}/close", "investor", 200),
+    ("GET", "/api/v1/campaigns/{campaign_id}/proposals", None, 200),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 
 
 @pytest.mark.parametrize("method,path,peran,harapan", RBAC_MATRIX)
-async def test_r5_matriks_rbac(client, akun, method, path, peran, harapan):
+async def test_r5_matriks_rbac(client, akun, campaign, method, path, peran, harapan):
     headers = akun[peran].headers if peran else {}
-    res = await client.request(method, path, headers=headers, json={})
+    url = path.replace("{campaign_id}", str(campaign.id))
+    res = await client.request(method, url, headers=headers, json={})
     assert res.status_code == harapan, (
         f"{method} {path} sebagai {peran or 'anonim'}: "
         f"dapat {res.status_code}, harusnya {harapan}"
     )
+
+
+def _semua_route(routes: list[Any]) -> list[Any]:
+    """Masuk ke dalam setiap sub-router yang disertakan lewat include_router.
+
+    Starlette membungkus router yang disertakan sebagai objek pembungkus yang
+    tidak punya `.methods` sendiri; tanpa turun ke `original_router`, test di
+    bawah ini memeriksa kumpulan route yang selalu kosong dan tidak pernah bisa
+    merah, apa pun yang ditambahkan ke RBAC_MATRIX.
+    """
+    hasil: list[Any] = []
+    for route in routes:
+        if getattr(route, "methods", None):
+            hasil.append(route)
+        sub_router = getattr(route, "original_router", None)
+        if sub_router is not None:
+            hasil.extend(_semua_route(getattr(sub_router, "routes", [])))
+    return hasil
 
 
 def test_r5_setiap_route_punya_baris_di_matriks(app):
@@ -42,8 +81,7 @@ def test_r5_setiap_route_punya_baris_di_matriks(app):
     }
     terdaftar = {
         (metode, route.path)
-        for route in app.routes
-        if getattr(route, "methods", None)
+        for route in _semua_route(app.routes)
         for metode in route.methods
         if metode not in {"HEAD", "OPTIONS"} and route.path not in DIKECUALIKAN
     }

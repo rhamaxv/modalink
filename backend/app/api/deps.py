@@ -2,13 +2,15 @@
 
 from collections.abc import Callable
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
 from app.domain.clock import Clock, SystemClock
-from app.errors import DomainError, ForbiddenError
+from app.errors import DomainError, ForbiddenError, NotFoundError
+from app.models.campaign import Campaign
 from app.models.user import Role, User
 from app.services.auth import decode_token
 
@@ -39,6 +41,25 @@ async def current_user(
     return user
 
 
+async def pengguna_opsional(
+    authorization: Annotated[str | None, Header()] = None,
+    session: AsyncSession = Depends(get_session),
+) -> User | None:
+    """Seperti current_user, tapi None untuk request tanpa token.
+
+    Dipakai endpoint publik yang perlu tahu siapa pemanggilnya hanya untuk
+    memperluas apa yang terlihat (pembuat campaign melihat proposal rejected),
+    bukan untuk menolak request.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    try:
+        claims = decode_token(authorization.removeprefix("Bearer "))
+    except DomainError:
+        return None
+    return await session.get(User, claims.sub)
+
+
 def require_role(*roles: Role) -> Callable[[User], User]:
     def guard(user: User = Depends(current_user)) -> User:
         # Peran dibaca dari baris database, bukan dari klaim token (BR-04).
@@ -49,3 +70,18 @@ def require_role(*roles: Role) -> Callable[[User], User]:
         return user
 
     return guard
+
+
+async def ambil_campaign_milik_sendiri(
+    campaign_id: UUID,
+    user: User = Depends(require_role(Role.INVESTOR)),
+    session: AsyncSession = Depends(get_session),
+) -> Campaign:
+    # Peran dan kepemilikan adalah dua pemeriksaan berbeda: require_role di atas
+    # hanya membuktikan jenis penggunanya, bukan bahwa campaign ini miliknya.
+    campaign = await session.get(Campaign, campaign_id)
+    if campaign is None:
+        raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")
+    if campaign.investor_id != user.id:
+        raise ForbiddenError("bukan_pemilik", "Campaign ini bukan milik Anda.")
+    return campaign
