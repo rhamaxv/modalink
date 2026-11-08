@@ -57,6 +57,11 @@ Aturan turunan untuk project ini:
 - **Tidak ada awalan `test:`.** Test dan implementasinya masuk satu commit `feat:`, yang memang
   bentuk yang benar untuk TDD.
 - **Tidak ada baris `Co-Authored-By`.** Seluruh commit harus terbaca sebagai karya anggota tim.
+  Larangan ini mutlak dan tanpa pengecualian: tidak untuk AI, dan tidak untuk sesama anggota.
+  Aturan yang tidak punya pengecualian tidak bisa disalahgunakan. Larangan ini mengikat agen dan
+  subagent; anggota tim yang benar-benar pair programming boleh menambahkan trailernya sendiri
+  secara manual, dan itu keputusan mereka. Co-author yang direkayasa masuk kategori manipulasi
+  bukti pengembangan, yang hukumannya diskualifikasi.
 
 ## Orisinalitas
 
