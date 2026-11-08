@@ -49,27 +49,27 @@ Makefile
 
 - [ ] **Step 1: Siapkan Postgres dan dependency**
 
-`docker-compose.yml`:
+`docker-compose.yml`, sebagaimana akhirnya terpasang:
 
 ```yaml
 services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     ports: ["5432:5432"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER is required}"]
       interval: 2s
       retries: 15
   db-test:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}_test
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_TEST_DB:?POSTGRES_TEST_DB is required}
     ports: ["5433:5432"]
     tmpfs: ["/var/lib/postgresql/data"]
 ```
@@ -416,7 +416,6 @@ demo:            ; SCORING_ENGINE=mock $(MAKE) up
 - [ ] **Step 2: Tulis workflow CI**
 
 ```yaml
-# .github/workflows/ci.yml
 name: ci
 on: [push, pull_request]
 jobs:
@@ -426,12 +425,19 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'modalink' }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'modalink' }}
-          POSTGRES_DB: modalink_test
+          # Throwaway credentials for this job's ephemeral service container
+          # only; never reused by any other environment. Repo secrets, if
+          # configured, override the placeholder.
+          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || 'ci' }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-placeholder' }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || 'logicodix_test' }}
         ports: ["5433:5432"]
         options: >-
-          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-retries 15
+          --health-cmd "pg_isready -U ${{ secrets.CI_POSTGRES_USER || 'ci' }}" --health-interval 2s --health-retries 15
+    env:
+      DATABASE_URL: postgresql+asyncpg://${{ secrets.CI_POSTGRES_USER || 'ci' }}:${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-placeholder' }}@localhost:5433/${{ secrets.CI_POSTGRES_DB || 'logicodix_test' }}
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET || 'ci-only-placeholder' }}
+      GEMINI_API_KEY: ${{ secrets.CI_GEMINI_API_KEY || 'ci-only-placeholder' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -439,7 +445,7 @@ jobs:
       - run: pip install -e "backend[dev]"
       - run: cd backend && alembic upgrade head
       - run: cd backend && ruff check . && mypy app
-      - run: cd backend && pytest tests/unit tests/integration tests/regression -q
+      - run: cd backend && pytest $(ls -d tests/unit tests/integration tests/regression 2>/dev/null) -q
 ```
 
 CI tidak menjalankan `tests/contract` karena butuh API key dan jaringan.
@@ -549,6 +555,10 @@ Expected: PASS
 ```bash
 git commit -am "feat: add structured request logging without secrets"
 ```
+
+> Blok `docker-compose.yml` dan `ci.yml` di atas adalah salinan berkas sungguhan pada saat fase
+> ini selesai. Kalau keduanya berbeda di kemudian hari, **berkas sungguhan yang berlaku**, bukan
+> salinan di dokumen ini.
 
 ## Gerbang keluar fase 00
 
