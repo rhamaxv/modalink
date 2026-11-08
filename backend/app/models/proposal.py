@@ -18,8 +18,10 @@ from sqlalchemy import (
     BigInteger,
     CheckConstraint,
     Column,
+    Index,
     SmallInteger,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
@@ -55,6 +57,19 @@ class Proposal(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint(
             "requested_amount > 0", name="ck_proposal_requested_amount_positif"
+        ),
+        # Mirror dari index partial di migrasi b7d1fab085fd (BR-13). Index itu
+        # sendiri sudah ada di database; baris ini hanya supaya metadata
+        # SQLAlchemy tahu soal dia, karena tanpa ini `alembic revision
+        # --autogenerate` berikutnya akan mengusulkan drop_index dalam migrasi
+        # yang kelihatan rutin, dan itu diam-diam menghapus satu-satunya
+        # penjaga "satu proposal aktif per UMKM per campaign".
+        Index(
+            "uq_proposal_aktif_per_umkm_per_campaign",
+            "campaign_id",
+            "umkm_id",
+            unique=True,
+            postgresql_where=text("status NOT IN ('rejected', 'failed')"),
         ),
     )
 
