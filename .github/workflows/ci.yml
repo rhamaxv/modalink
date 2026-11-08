@@ -12,12 +12,12 @@ jobs:
           # configured, override the placeholder.
           POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || 'ci' }}
           POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-placeholder' }}
-          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || 'logicodix_test' }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || 'modalink_test' }}
         ports: ["5433:5432"]
         options: >-
           --health-cmd "pg_isready -U ${{ secrets.CI_POSTGRES_USER || 'ci' }}" --health-interval 2s --health-retries 15
     env:
-      DATABASE_URL: postgresql+asyncpg://${{ secrets.CI_POSTGRES_USER || 'ci' }}:${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-placeholder' }}@localhost:5433/${{ secrets.CI_POSTGRES_DB || 'logicodix_test' }}
+      DATABASE_URL: postgresql+asyncpg://${{ secrets.CI_POSTGRES_USER || 'ci' }}:${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-placeholder' }}@localhost:5433/${{ secrets.CI_POSTGRES_DB || 'modalink_test' }}
       JWT_SECRET: ${{ secrets.CI_JWT_SECRET || 'ci-only-placeholder' }}
       GEMINI_API_KEY: ${{ secrets.CI_GEMINI_API_KEY || 'ci-only-placeholder' }}
     steps:
