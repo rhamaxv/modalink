@@ -3,7 +3,8 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from fastapi.utils import is_body_allowed_for_status_code
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
@@ -60,9 +61,15 @@ def register_error_handlers(app: FastAPI) -> None:
     # that never reach application code, so this has to catch the base class
     # rather than only fastapi.HTTPException.
     @app.exception_handler(StarletteHTTPException)
-    async def handle_http_exception(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+    async def handle_http_exception(_: Request, exc: StarletteHTTPException) -> Response:
+        # Mirrors fastapi's own http_exception_handler: a caller-supplied
+        # header (e.g. WWW-Authenticate on a 401) must survive, and 204/304/1xx
+        # responses are illegal with a body.
+        if not is_body_allowed_for_status_code(exc.status_code):
+            return Response(status_code=exc.status_code, headers=exc.headers)
         return JSONResponse(
             status_code=exc.status_code,
+            headers=exc.headers,
             content={
                 "error": {
                     "code": "kesalahan_permintaan",

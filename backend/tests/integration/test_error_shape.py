@@ -51,3 +51,31 @@ async def test_http_exception_jadi_bentuk_seragam(client, app):
             "detail": {},
         }
     }
+
+
+async def test_http_exception_meneruskan_header(client, app):
+    from fastapi import HTTPException
+
+    @app.get("/_unauthorized_header")
+    async def unauthorized() -> None:
+        raise HTTPException(
+            status_code=401,
+            detail="Token tidak valid.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    res = await client.get("/_unauthorized_header")
+    assert res.status_code == 401
+    assert res.headers["WWW-Authenticate"] == "Bearer"
+
+
+async def test_http_exception_204_tidak_memuat_body(client, app):
+    from fastapi import HTTPException
+
+    @app.get("/_no_content")
+    async def no_content() -> None:
+        raise HTTPException(status_code=204)
+
+    res = await client.get("/_no_content")
+    assert res.status_code == 204
+    assert res.content == b""
