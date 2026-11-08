@@ -1,4 +1,4 @@
-# Tumbuh Bareng
+# Modalink
 
 Karya tim untuk Logicodix 2026, subtema Local MSME & Creative Economy.
 

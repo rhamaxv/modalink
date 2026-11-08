@@ -253,14 +253,20 @@ surat orisinalitas. Keempatnya menentukan submission diterima atau tidak.
 
 ---
 
-## D-20. Nama aplikasi: Tumbuh Bareng
+## D-20. Nama aplikasi: Modalink
 
-Dipilih pemilik project. Nama repositori: `tumbuh-bareng`.
+Dipilih pemilik project. Nama repositori: `modalink`.
 
-**Kenapa:** menerjemahkan langsung mekanisme inti produk, yaitu co-funding, tanpa perlu
-dijelaskan. Investor dan UMKM tumbuh bersama-sama, dan dana yang terkumpul berasal dari banyak
-orang sekaligus.
+**Arti:** modal dan link. Menghubungkan UMKM dengan investor melalui satu ekosistem pendanaan.
+
+**Kenapa:** nama ini menyebut peran platformnya, bukan hasil yang dijanjikannya. Produk ini tidak
+memberi modal, ia mempertemukan pihak yang punya modal dengan pihak yang membutuhkannya, lalu
+menjaga perjalanan dana di antara keduanya. Satu kata, mudah diucapkan, dan tetap terbaca jelas
+oleh dua audiens yang berbeda: investor mengenali "modal", pemilik usaha mengenali bahwa ada yang
+menghubungkan.
+
+**Ditolak:** `Tumbuh Bareng` (sempat dipilih lalu diganti). Menggambarkan hasil yang diharapkan,
+bukan mekanisme produknya, dan dua kata membuatnya canggung di navbar serta nama repositori.
 
 **Konsekuensi:** nama ini dipakai konsisten di `<title>`, navbar, README, nama repositori, dan
-judul video demo. Nama kode internal (paket Python, modul) tetap netral dan berbahasa Inggris,
-tidak diterjemahkan menjadi `tumbuh_bareng`.
+judul video demo. Nama kode internal (paket Python, modul) tetap netral dan berbahasa Inggris.

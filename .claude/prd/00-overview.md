@@ -1,5 +1,9 @@
 # 00. Ringkasan Produk
 
+**Modalink** menghubungkan UMKM dengan investor melalui satu ekosistem pendanaan: dari pengajuan
+proposal, penyaringan oleh AI, pendanaan gotong royong, sampai pencairan dana bertahap yang
+diawasi.
+
 ## Masalah
 
 UMKM kesulitan mendapat modal karena investor sulit melakukan screening manual terhadap banyak

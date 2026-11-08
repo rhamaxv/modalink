@@ -1,4 +1,4 @@
-# Panduan repositori Tumbuh Bareng
+# Panduan repositori Modalink
 
 Disusun dari ketentuan di [aturan-lomba.md](aturan-lomba.md). Tujuannya satu: membuat pelanggaran
 aturan **sulit dilakukan secara tidak sengaja**, bukan sekadar diingat-ingat.
@@ -9,7 +9,7 @@ aturan **sulit dilakukan secara tidak sengaja**, bukan sekadar diingat-ingat.
 
 | Hal | Nilai | Alasan |
 | --- | --- | --- |
-| Nama | `tumbuh-bareng` | Nama produk, bukan nama lomba. `logicodix` adalah nama kompetisi dan akan membingungkan juri yang membuka puluhan repo serupa |
+| Nama | `modalink` | Nama produk, bukan nama lomba. `logicodix` adalah nama kompetisi dan akan membingungkan juri yang membuka puluhan repo serupa |
 | Visibility | **Public** | Diwajibkan sejak submission sampai penilaian selesai |
 | Default branch | `main` | |
 | Description | `Platform crowdfunding UMKM dengan AI scoring, co-funding, dan pencairan dana bertahap per milestone.` | Satu kalimat ini yang terbaca juri sebelum mereka klik apa pun |
@@ -70,7 +70,7 @@ Panitia membolehkan backend dan frontend dalam satu repo, **asal nama foldernya 
 dan dijelaskan di README**.
 
 ```
-tumbuh-bareng/
+modalink/
 ├─ README.md              wajib, di direktori utama
 ├─ .env.example           wajib, nama variabel tanpa nilai
 ├─ .gitignore             .env sudah ditutup

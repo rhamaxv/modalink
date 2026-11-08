@@ -1,4 +1,4 @@
-# PRD Logicodix
+# PRD Modalink
 
 Spesifikasi produk, dipecah per topik supaya tiap file muat dibaca sekali duduk dan bisa diubah
 tanpa menyentuh yang lain.

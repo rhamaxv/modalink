@@ -1,4 +1,4 @@
-# Rencana Implementasi Logicodix
+# Rencana Implementasi Modalink
 
 > **Untuk pekerja agentik:** SUB-SKILL WAJIB. Pakai `superpowers:subagent-driven-development`
 > (disarankan) atau `superpowers:executing-plans` untuk mengerjakan rencana ini task demi task.
