@@ -1,32 +1,4 @@
-def body_proposal(**ubah):
-    isi = {
-        "business_name": "Warung Kopi Mbak Sri",
-        "business_profile": "Warung kopi rumahan di Jakarta Timur, berjalan 3 tahun, "
-        "2 pekerja, omzet rata-rata Rp12 juta per bulan.",
-        "requested_amount": 10_000_000,
-        "fund_usage_plan": "Rp6 juta mesin kopi, Rp3 juta bahan baku 3 bulan, "
-        "Rp1 juta perbaikan etalase.",
-        "business_projection": "Omzet diperkirakan naik ke Rp18 juta per bulan "
-        "dalam 6 bulan setelah mesin baru dipakai.",
-        "milestones": [
-            {
-                "seq": 1,
-                "title": "Beli mesin",
-                "description": "x" * 20,
-                "amount": 5_000_000,
-            },
-            {
-                "seq": 2,
-                "title": "Bahan baku",
-                "description": "x" * 20,
-                "amount": 5_000_000,
-            },
-        ],
-    }
-    return isi | ubah
-
-
-async def test_umkm_bisa_submit_proposal(client, umkm, campaign):
+async def test_umkm_bisa_submit_proposal(client, umkm, campaign, body_proposal):
     res = await client.post(
         f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
@@ -38,7 +10,9 @@ async def test_umkm_bisa_submit_proposal(client, umkm, campaign):
     assert data["scoring_status"] in {"pending", "processing", "done"}
 
 
-async def test_br11_dana_melebihi_target_campaign_ditolak(client, umkm, campaign):
+async def test_br11_dana_melebihi_target_campaign_ditolak(
+    client, umkm, campaign, body_proposal
+):
     res = await client.post(
         f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
@@ -59,7 +33,7 @@ async def test_br11_dana_melebihi_target_campaign_ditolak(client, umkm, campaign
 
 
 async def test_br14_jumlah_milestone_tidak_pas_ditolak_dengan_selisih(
-    client, umkm, campaign
+    client, umkm, campaign, body_proposal
 ):
     res = await client.post(
         f"/api/v1/campaigns/{campaign.id}/proposals",
@@ -75,7 +49,9 @@ async def test_br14_jumlah_milestone_tidak_pas_ditolak_dengan_selisih(
     assert "Rp1.000.000" in res.json()["error"]["message"]
 
 
-async def test_br12_dana_di_bawah_minimum_ditolak(client, umkm, campaign):
+async def test_br12_dana_di_bawah_minimum_ditolak(
+    client, umkm, campaign, body_proposal
+):
     res = await client.post(
         f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
@@ -91,7 +67,9 @@ async def test_br12_dana_di_bawah_minimum_ditolak(client, umkm, campaign):
     assert res.json()["error"]["code"] == "dana_di_bawah_minimum"
 
 
-async def test_br13_proposal_kedua_ke_campaign_sama_ditolak_409(client, umkm, campaign):
+async def test_br13_proposal_kedua_ke_campaign_sama_ditolak_409(
+    client, umkm, campaign, body_proposal
+):
     await client.post(
         f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
@@ -107,7 +85,7 @@ async def test_br13_proposal_kedua_ke_campaign_sama_ditolak_409(client, umkm, ca
 
 
 async def test_br17_campaign_yang_apply_deadline_nya_lewat_menolak(
-    client, umkm, campaign_kedaluwarsa
+    client, umkm, campaign_kedaluwarsa, body_proposal
 ):
     res = await client.post(
         f"/api/v1/campaigns/{campaign_kedaluwarsa.id}/proposals",

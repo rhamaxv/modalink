@@ -1,34 +1,6 @@
 from uuid import uuid4
 
 
-def body_proposal(**ubah):
-    isi = {
-        "business_name": "Warung Kopi Mbak Sri",
-        "business_profile": "Warung kopi rumahan di Jakarta Timur, berjalan 3 tahun, "
-        "2 pekerja, omzet rata-rata Rp12 juta per bulan.",
-        "requested_amount": 10_000_000,
-        "fund_usage_plan": "Rp6 juta mesin kopi, Rp3 juta bahan baku 3 bulan, "
-        "Rp1 juta perbaikan etalase.",
-        "business_projection": "Omzet diperkirakan naik ke Rp18 juta per bulan "
-        "dalam 6 bulan setelah mesin baru dipakai.",
-        "milestones": [
-            {
-                "seq": 1,
-                "title": "Beli mesin",
-                "description": "x" * 20,
-                "amount": 5_000_000,
-            },
-            {
-                "seq": 2,
-                "title": "Bahan baku",
-                "description": "x" * 20,
-                "amount": 5_000_000,
-            },
-        ],
-    }
-    return isi | ubah
-
-
 async def test_proposal_listed_terlihat_publik(client, listed_proposal):
     assert (
         await client.get(f"/api/v1/proposals/{listed_proposal.id}")
@@ -95,7 +67,7 @@ async def test_daftar_proposal_campaign_menyembunyikan_yang_belum_listed(
 
 
 async def test_campaign_yang_sudah_closed_menolak_proposal_baru(
-    client, investor, campaign, umkm
+    client, investor, campaign, umkm, body_proposal
 ):
     """Ditunda dari fase 03 karena endpoint POST proposal baru lahir di sini."""
     await client.post(
