@@ -1,0 +1,18 @@
+[project]
+name = "logicodix-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115", "uvicorn[standard]>=0.32", "sqlmodel>=0.0.22",
+  "asyncpg>=0.30", "alembic>=1.14", "pydantic-settings>=2.6",
+  "argon2-cffi>=23.1", "pyjwt>=2.10",
+  "instructor>=1.7", "google-genai>=0.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "httpx>=0.28", "ruff>=0.8", "mypy>=1.13"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["live: memanggil Gemini sungguhan, di-skip default"]
