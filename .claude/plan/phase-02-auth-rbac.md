@@ -585,9 +585,136 @@ git add backend/tests/regression/test_r5_rbac.py backend/tests/conftest.py
 git commit -m "feat: add RBAC matrix regression suite with route coverage check"
 ```
 
+---
+
+### Task 6: Pindahkan logika bisnis auth keluar dari router
+
+**Files:**
+- Modify: `backend/app/services/auth.py`, `backend/app/api/v1/auth.py`
+- Test: `backend/tests/integration/test_auth.py`
+
+Task 3 menulis query database, aturan duplikasi email, dan konstruksi entitas **di dalam router**.
+Itu melanggar batasan layering project ini sendiri, dan `auth.py` adalah router pertama di repo,
+sehingga setiap router fase berikutnya akan meniru bentuknya. Dibereskan sekarang, sebelum ada
+yang menyalinnya.
+
+**Interfaces:**
+- Produces: `register_user(session, body) -> User`, `authenticate_user(session, body) -> User`.
+  Keduanya di `services/auth.py`, melempar `DomainError`, tidak tahu apa pun soal HTTP.
+
+- [ ] **Step 1: Tulis test yang gagal**
+
+```python
+# backend/tests/integration/test_auth.py (tambahan)
+
+async def test_me_mengembalikan_profil_tanpa_password_hash(client):
+    await client.post("/api/v1/auth/register", json={
+        "email": "sari@contoh.id", "password": "rahasia123",
+        "name": "Sari", "role": "investor",
+    })
+    masuk = await client.post("/api/v1/auth/login",
+                              json={"email": "sari@contoh.id", "password": "rahasia123"})
+    token = masuk.json()["access_token"]
+
+    res = await client.get("/api/v1/auth/me",
+                           headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    isi = res.json()
+    assert isi["email"] == "sari@contoh.id"
+    assert isi["role"] == "investor"
+    assert "password_hash" not in res.text
+    assert "rahasia123" not in res.text
+
+
+async def test_br02_email_duplikat_ditolak_400_bukan_500(client):
+    """Menutup celah balapan: pemeriksaan di Python bisa dilewati dua registrasi
+    bersamaan, dan constraint database yang menangkapnya harus diterjemahkan
+    menjadi error yang rapi, bukan bocor sebagai 500."""
+    isi = {"email": "kembar@contoh.id", "password": "rahasia123",
+           "name": "Kembar", "role": "umkm"}
+    assert (await client.post("/api/v1/auth/register", json=isi)).status_code == 201
+    kedua = await client.post("/api/v1/auth/register", json=isi)
+    assert kedua.status_code == 400
+    assert kedua.json()["error"]["code"] == "email_terpakai"
+
+
+def test_router_auth_tidak_memuat_query_database():
+    """Pagar layering: router hanya merangkai, service yang mengorkestrasi."""
+    import pathlib
+    isi = pathlib.Path("app/api/v1/auth.py").read_text()
+    for terlarang in ("session.scalar(", "session.add(", "select(User)"):
+        assert terlarang not in isi, (
+            f"{terlarang} ada di router; pindahkan ke services/auth.py"
+        )
+```
+
+- [ ] **Step 2: Jalankan test, pastikan gagal**
+
+Run: `make test`
+Expected: FAIL. `/me` belum diuji jalur suksesnya, registrasi kedua membalas 500, dan pagar
+layering menemukan `select(User)` di router.
+
+- [ ] **Step 3: Pindahkan logikanya**
+
+```python
+# backend/app/services/auth.py (tambahan)
+
+async def register_user(session: AsyncSession, body: RegisterIn) -> User:
+    user = User(
+        email=body.email, password_hash=hash_password(body.password),
+        name=body.name, role=body.role,
+    )
+    session.add(user)
+    try:
+        await session.flush()
+    except IntegrityError:
+        # Constraint database yang menangkapnya, bukan pemeriksaan di Python:
+        # pemeriksaan lebih dulu punya celah balapan, constraint tidak.
+        raise DomainError("email_terpakai", "Email ini sudah terdaftar.") from None
+    return user
+
+
+async def authenticate_user(session: AsyncSession, body: LoginIn) -> User:
+    user = await session.scalar(select(User).where(User.email == body.email.lower()))
+
+    # Hash umpan dipakai saat email tidak dikenal supaya argon2 tetap berjalan dan
+    # lama responsnya tidak membedakan "email tidak ada" dari "password salah".
+    cocok = verify_password(body.password, user.password_hash if user else HASH_UMPAN)
+    if user is None or not cocok:
+        raise KredensialSalah("kredensial_salah", "Email atau password salah.")
+    return user
+```
+
+Router menyusut jadi perangkai murni:
+
+```python
+@router.post("/register", status_code=201, response_model=UserOut)
+async def register(body: RegisterIn, session: AsyncSession = Depends(get_session)) -> User:
+    return await register_user(session, body)
+
+
+@router.post("/login", response_model=TokenOut)
+async def login(body: LoginIn, session: AsyncSession = Depends(get_session)) -> TokenOut:
+    user = await authenticate_user(session, body)
+    return TokenOut(access_token=issue_token(user.id, user.role))
+```
+
+- [ ] **Step 4: Jalankan, pastikan hijau**
+
+Run: `make check`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -am "refactor: move auth business logic out of the router into the service"
+```
+
 ## Gerbang keluar fase 02
 
 - [ ] `make test` hijau
 - [ ] `make test-regression` hijau, R1 dan R5 keduanya
 - [ ] Tidak ada respons yang memuat `password_hash` (diuji oleh grep di test)
 - [ ] Pesan login salah identik untuk email tak dikenal maupun password salah
+- [ ] Lama respons login tidak membedakan email tak dikenal dari password salah
+- [ ] Router `auth.py` tidak memuat query database; pagar layering mengujinya
