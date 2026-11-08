@@ -3,6 +3,7 @@
 Menambah status berarti menambah entri di sini DAN baris di regression test R1.
 Suite akan merah sampai keduanya dilakukan. Itu disengaja.
 """
+
 from enum import StrEnum
 
 
@@ -44,23 +45,23 @@ S, E = ProposalStatus, ProposalEvent
 # (keduanya variabel biasa, bukan TypeAlias); isi peta tetap pakai alias
 # pendek agar kolom T-xx di sebelah kanan tetap sejajar.
 PROPOSAL_MAP: dict[tuple[ProposalStatus, ProposalEvent], ProposalStatus] = {
-    (S.SUBMITTED, E.SCORING_LULUS):         S.LISTED,             # T-01
-    (S.SUBMITTED, E.SCORING_GAGAL):         S.REJECTED,           # T-02
-    (S.LISTED, E.PLEDGE_SEBAGIAN):          S.PARTIALLY_FUNDED,   # T-03
-    (S.LISTED, E.PLEDGE_PENUH):             S.FUNDED,             # T-04
-    (S.LISTED, E.DEADLINE_LEWAT):           S.FAILED,             # T-05
-    (S.PARTIALLY_FUNDED, E.PLEDGE_PENUH):   S.FUNDED,             # T-06
-    (S.PARTIALLY_FUNDED, E.PLEDGE_KOSONG):  S.LISTED,             # T-07
-    (S.PARTIALLY_FUNDED, E.DEADLINE_LEWAT): S.FAILED,             # T-08
-    (S.FUNDED, E.SEMUA_MILESTONE_CAIR):     S.COMPLETED,          # T-09
+    (S.SUBMITTED, E.SCORING_LULUS): S.LISTED,  # T-01
+    (S.SUBMITTED, E.SCORING_GAGAL): S.REJECTED,  # T-02
+    (S.LISTED, E.PLEDGE_SEBAGIAN): S.PARTIALLY_FUNDED,  # T-03
+    (S.LISTED, E.PLEDGE_PENUH): S.FUNDED,  # T-04
+    (S.LISTED, E.DEADLINE_LEWAT): S.FAILED,  # T-05
+    (S.PARTIALLY_FUNDED, E.PLEDGE_PENUH): S.FUNDED,  # T-06
+    (S.PARTIALLY_FUNDED, E.PLEDGE_KOSONG): S.LISTED,  # T-07
+    (S.PARTIALLY_FUNDED, E.DEADLINE_LEWAT): S.FAILED,  # T-08
+    (S.FUNDED, E.SEMUA_MILESTONE_CAIR): S.COMPLETED,  # T-09
 }
 
 M, ME = MilestoneStatus, MilestoneEvent
 MILESTONE_MAP: dict[tuple[MilestoneStatus, MilestoneEvent], MilestoneStatus] = {
-    (M.PENDING, ME.LAPOR):                  M.REPORTED,    # T-20
-    (M.PENDING, ME.APPROVE_TANPA_LAPORAN):  M.DISBURSED,   # T-21
-    (M.REPORTED, ME.APPROVE):               M.DISBURSED,   # T-22
-    (M.REPORTED, ME.REJECT):                M.PENDING,     # T-23
+    (M.PENDING, ME.LAPOR): M.REPORTED,  # T-20
+    (M.PENDING, ME.APPROVE_TANPA_LAPORAN): M.DISBURSED,  # T-21
+    (M.REPORTED, ME.APPROVE): M.DISBURSED,  # T-22
+    (M.REPORTED, ME.REJECT): M.PENDING,  # T-23
 }
 
 
@@ -100,20 +101,23 @@ class ScoringEvent(StrEnum):
 
 
 REPORT_MAP: dict[tuple[ReportStatus, ReportEvent], ReportStatus] = {
-    (ReportStatus.PENDING, ReportEvent.APPROVE): ReportStatus.APPROVED,   # T-30
-    (ReportStatus.PENDING, ReportEvent.REJECT):  ReportStatus.REJECTED,   # T-31
+    (ReportStatus.PENDING, ReportEvent.APPROVE): ReportStatus.APPROVED,  # T-30
+    (ReportStatus.PENDING, ReportEvent.REJECT): ReportStatus.REJECTED,  # T-31
 }
 
 CAMPAIGN_MAP: dict[tuple[CampaignStatus, CampaignEvent], CampaignStatus] = {
-    (CampaignStatus.OPEN, CampaignEvent.TUTUP_MANUAL):         CampaignStatus.CLOSED,  # T-40
-    (CampaignStatus.OPEN, CampaignEvent.APPLY_DEADLINE_LEWAT): CampaignStatus.CLOSED,  # T-41
+    (CampaignStatus.OPEN, CampaignEvent.TUTUP_MANUAL): CampaignStatus.CLOSED,  # T-40
+    (
+        CampaignStatus.OPEN,
+        CampaignEvent.APPLY_DEADLINE_LEWAT,
+    ): CampaignStatus.CLOSED,  # T-41
 }
 
 SCORING_MAP: dict[tuple[ScoringStatus, ScoringEvent], ScoringStatus] = {
-    (ScoringStatus.PENDING, ScoringEvent.AMBIL):         ScoringStatus.PROCESSING,  # T-50
-    (ScoringStatus.PROCESSING, ScoringEvent.SELESAI):    ScoringStatus.DONE,        # T-51
-    (ScoringStatus.PROCESSING, ScoringEvent.GAGAL):      ScoringStatus.FAILED,      # T-52
-    (ScoringStatus.FAILED, ScoringEvent.NILAI_ULANG):    ScoringStatus.PENDING,     # T-53
+    (ScoringStatus.PENDING, ScoringEvent.AMBIL): ScoringStatus.PROCESSING,  # T-50
+    (ScoringStatus.PROCESSING, ScoringEvent.SELESAI): ScoringStatus.DONE,  # T-51
+    (ScoringStatus.PROCESSING, ScoringEvent.GAGAL): ScoringStatus.FAILED,  # T-52
+    (ScoringStatus.FAILED, ScoringEvent.NILAI_ULANG): ScoringStatus.PENDING,  # T-53
 }
 
 
@@ -126,7 +130,9 @@ class IllegalTransition(Exception):
     """
 
     def __init__(self, current: StrEnum, event: StrEnum) -> None:
-        super().__init__(f"Transisi tidak sah: {current.value} tidak menerima {event.value}.")
+        super().__init__(
+            f"Transisi tidak sah: {current.value} tidak menerima {event.value}."
+        )
         self.current = current
         self.event = event
 

@@ -40,7 +40,7 @@ test-e2e:
 	@if [ -d frontend ]; then cd frontend && npx playwright test; else echo "frontend not yet scaffolded, skipping until phase 10"; fi
 
 check:
-	cd backend && $(VENV_BIN)ruff check . && $(VENV_BIN)mypy app
+	cd backend && $(VENV_BIN)ruff check . && $(VENV_BIN)ruff format --check . && $(VENV_BIN)mypy app
 	@if [ -d frontend ]; then cd frontend && npx tsc --noEmit && npm run lint; fi
 	$(MAKE) test
 	$(MAKE) test-fe

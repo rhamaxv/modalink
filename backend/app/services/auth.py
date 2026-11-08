@@ -1,4 +1,5 @@
 """Hash password dan terbitkan/verifikasi JWT (BR-03, BR-04)."""
+
 from dataclasses import dataclass
 from datetime import timedelta
 from uuid import UUID

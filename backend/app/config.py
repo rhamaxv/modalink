@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     database_url: str
     jwt_secret: str
     jwt_ttl_hours: int = 24
-    scoring_engine: str = "mock"      # "mock" atau "gemini"
+    scoring_engine: str = "mock"  # "mock" atau "gemini"
     # No default placeholder either: only GeminiEngine (phase 05) reads this,
     # and mock mode never does, so leaving it unset must not block startup.
     gemini_api_key: str | None = None

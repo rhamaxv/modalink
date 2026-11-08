@@ -35,10 +35,12 @@ class _JamDasarBergerak:
 
 
 def test_virtual_clock_ikut_bergerak_saat_jam_dasar_berubah():
-    dasar = _JamDasarBergerak([
-        datetime(2026, 11, 7, tzinfo=UTC),
-        datetime(2026, 11, 8, tzinfo=UTC),
-    ])
+    dasar = _JamDasarBergerak(
+        [
+            datetime(2026, 11, 7, tzinfo=UTC),
+            datetime(2026, 11, 8, tzinfo=UTC),
+        ]
+    )
     virtual = VirtualClock(dasar, offset=timedelta(days=30))
     assert virtual.now() == datetime(2026, 12, 7, tzinfo=UTC)
     assert virtual.now() == datetime(2026, 12, 8, tzinfo=UTC)

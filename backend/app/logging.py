@@ -36,13 +36,15 @@ async def log_request(
 ) -> Response:
     started_at = time.perf_counter()
     response = await call_next(request)
-    line = redact_payload({
-        "method": request.method,
-        "path": request.url.path,
-        "status": response.status_code,
-        "durasi_ms": round((time.perf_counter() - started_at) * 1000),
-        "user_id": getattr(request.state, "user_id", None),
-    })
+    line = redact_payload(
+        {
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+            "durasi_ms": round((time.perf_counter() - started_at) * 1000),
+            "user_id": getattr(request.state, "user_id", None),
+        }
+    )
     http_log.info(json.dumps(line))
     return response
 
@@ -54,10 +56,12 @@ def log_ai_call(model: str, duration_ms: int, token_count: int, valid: bool) -> 
     vocabulary the http logger already emits and the field names phase 05's
     test asserts on; only the Python identifiers are English.
     """
-    line = redact_payload({
-        "model": model,
-        "durasi_ms": duration_ms,
-        "jumlah_token": token_count,
-        "valid": valid,
-    })
+    line = redact_payload(
+        {
+            "model": model,
+            "durasi_ms": duration_ms,
+            "jumlah_token": token_count,
+            "valid": valid,
+        }
+    )
     ai_log.info(json.dumps(line))

@@ -1,4 +1,5 @@
 """Model pengguna: satu tabel untuk seluruh peran (BR-02)."""
+
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
@@ -28,7 +29,11 @@ class User(SQLModel, table=True):
     # secara default dan bertentangan dengan 09-data-model.md serta role di JWT.
     role: Role = Field(
         sa_column=Column(
-            SAEnum(Role, name="role", values_callable=lambda enum_cls: [e.value for e in enum_cls]),
+            SAEnum(
+                Role,
+                name="role",
+                values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            ),
             nullable=False,
         )
     )

@@ -1,4 +1,5 @@
 """Penentuan status funding. Satu-satunya tempat status ini dihitung (D-05)."""
+
 from datetime import datetime
 
 from app.domain.money import Rupiah
@@ -7,6 +8,7 @@ from app.domain.transitions import ProposalStatus
 
 def remaining_amount(total_pledged: Rupiah, requested: Rupiah) -> Rupiah:
     return max(requested - total_pledged, 0)
+
 
 def compute_funding_status(
     total_pledged: Rupiah,

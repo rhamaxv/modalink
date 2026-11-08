@@ -1,4 +1,5 @@
 """Lead investor adalah pemilik total pledge aktif terbesar (BR-23)."""
+
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ class PledgeRingkas:
     investor_id: UUID
     amount: Rupiah
     created_at: datetime
+
 
 def pick_lead_investor(pledges: Sequence[PledgeRingkas]) -> UUID | None:
     if not pledges:

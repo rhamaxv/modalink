@@ -1,4 +1,5 @@
 """BR-02: email unik lintas peran, disimpan lowercase."""
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 

@@ -8,11 +8,13 @@ def test_redact_payload_menyamarkan_password():
 
 
 def test_redact_payload_menyamarkan_authorization_dan_token():
-    baris = redact_payload({
-        "path": "/me",
-        "Authorization": "Bearer abc.def.ghi",
-        "token": "abc.def.ghi",
-    })
+    baris = redact_payload(
+        {
+            "path": "/me",
+            "Authorization": "Bearer abc.def.ghi",
+            "token": "abc.def.ghi",
+        }
+    )
     assert "Bearer abc.def.ghi" not in str(baris)
     assert baris["token"] != "abc.def.ghi"
 

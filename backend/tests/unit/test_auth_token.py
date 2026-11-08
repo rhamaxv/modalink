@@ -1,4 +1,5 @@
 """BR-03: hash argon2, BR-04: JWT membawa role dan ditolak jika kedaluwarsa atau palsu."""
+
 from uuid import uuid4
 
 import pytest
@@ -36,7 +37,9 @@ def test_token_dengan_tanda_tangan_lain_ditolak():
     import jwt
 
     palsu = jwt.encode(
-        {"sub": str(uuid4()), "role": "investor"}, "kunci-lain-yang-sama-sekali-berbeda-32-byte", algorithm="HS256"
+        {"sub": str(uuid4()), "role": "investor"},
+        "kunci-lain-yang-sama-sekali-berbeda-32-byte",
+        algorithm="HS256",
     )
     with pytest.raises(ValueError):
         decode_token(palsu)

@@ -11,7 +11,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 class DomainError(Exception):
     status = 400
 
-    def __init__(self, code: str, message: str, detail: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, code: str, message: str, detail: dict[str, Any] | None = None
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
@@ -41,11 +43,19 @@ def register_error_handlers(app: FastAPI) -> None:
     async def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status,
-            content={"error": {"code": exc.code, "message": exc.message, "detail": exc.detail}},
+            content={
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message,
+                    "detail": exc.detail,
+                }
+            },
         )
 
     @app.exception_handler(RequestValidationError)
-    async def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+    async def handle_validation_error(
+        _: Request, exc: RequestValidationError
+    ) -> JSONResponse:
         return JSONResponse(
             status_code=422,
             content={
@@ -61,7 +71,9 @@ def register_error_handlers(app: FastAPI) -> None:
     # that never reach application code, so this has to catch the base class
     # rather than only fastapi.HTTPException.
     @app.exception_handler(StarletteHTTPException)
-    async def handle_http_exception(_: Request, exc: StarletteHTTPException) -> Response:
+    async def handle_http_exception(
+        _: Request, exc: StarletteHTTPException
+    ) -> Response:
         # Mirrors fastapi's own http_exception_handler: a caller-supplied
         # header (e.g. WWW-Authenticate on a 401) must survive, and 204/304/1xx
         # responses are illegal with a body.

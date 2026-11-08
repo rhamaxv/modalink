@@ -9,7 +9,7 @@ async def test_fixture_db_dirollback_antar_test(db):
 
 
 async def test_fixture_db_bersih_di_test_berikutnya(db):
-    exists = (await db.execute(
-        text("SELECT to_regclass('pg_temp.jejak') IS NOT NULL")
-    )).scalar()
+    exists = (
+        await db.execute(text("SELECT to_regclass('pg_temp.jejak') IS NOT NULL"))
+    ).scalar()
     assert exists is False

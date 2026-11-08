@@ -1,4 +1,5 @@
 """R1: setiap kombinasi status kali event diuji, yang legal maupun yang harus ditolak."""
+
 import itertools
 
 import pytest
@@ -82,7 +83,7 @@ def test_r1_scoring_setiap_kombinasi_sesuai_peta(status, event):
 def test_r1_jumlah_transisi_proposal_sesuai_spec():
     """Mengunci jumlahnya ke spec. Menambah transisi tanpa memperbarui
     08-state-machines.md akan membuat test ini merah."""
-    assert len(PROPOSAL_MAP) == 9   # T-01 sampai T-09
+    assert len(PROPOSAL_MAP) == 9  # T-01 sampai T-09
 
 
 def test_r1_jumlah_transisi_milestone_sesuai_spec():
@@ -90,7 +91,7 @@ def test_r1_jumlah_transisi_milestone_sesuai_spec():
 
 
 def test_r1_jumlah_transisi_laporan_sesuai_spec():
-    assert len(REPORT_MAP) == 2    # T-30, T-31
+    assert len(REPORT_MAP) == 2  # T-30, T-31
 
 
 def test_r1_jumlah_transisi_campaign_sesuai_spec():
@@ -98,11 +99,16 @@ def test_r1_jumlah_transisi_campaign_sesuai_spec():
 
 
 def test_r1_jumlah_transisi_scoring_sesuai_spec():
-    assert len(SCORING_MAP) == 4   # T-50 sampai T-53
+    assert len(SCORING_MAP) == 4  # T-50 sampai T-53
 
 
-@pytest.mark.parametrize("terminal", [
-    ProposalStatus.REJECTED, ProposalStatus.FAILED, ProposalStatus.COMPLETED,
-])
+@pytest.mark.parametrize(
+    "terminal",
+    [
+        ProposalStatus.REJECTED,
+        ProposalStatus.FAILED,
+        ProposalStatus.COMPLETED,
+    ],
+)
 def test_r1_status_terminal_tidak_punya_jalan_keluar(terminal):
     assert not any(s is terminal for s, _ in PROPOSAL_MAP)

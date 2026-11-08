@@ -2,6 +2,7 @@
 
 Memanggil datetime.now() di luar modul ini dilarang. Ada test yang memeriksanya.
 """
+
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
