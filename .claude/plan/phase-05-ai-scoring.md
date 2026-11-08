@@ -276,7 +276,12 @@ class MockScoringEngine:
                                  red_flags=flags, brief=self._brief(proposal))
 
         # Skor dasar dari kelengkapan isian, dibatasi rentangnya.
-        fit = 40 if proposal.sector == campaign.sector else 22
+        # Kecocokan diukur dari proporsi dana yang diminta terhadap target campaign,
+        # bukan dari sektor: `Proposal` tidak punya kolom sector, hanya `Campaign`
+        # yang punya, sehingga membandingkan keduanya akan melempar AttributeError
+        # begitu baris Proposal sungguhan masuk.
+        porsi = proposal.requested_amount / campaign.target_amount
+        fit = 40 if porsi <= 0.5 else (30 if porsi <= 0.8 else 22)
         data = min(len(proposal.fund_usage_plan) // 10, 30)
         impact = min(len(proposal.business_projection) // 10, 30)
         return ProposalScore(fit_score=fit, data_quality_score=data, impact_score=impact,
