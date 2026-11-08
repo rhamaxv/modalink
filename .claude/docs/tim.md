@@ -24,21 +24,43 @@ dibandingkan dengan data pendaftaran saat verifikasi.
 
 ## Akun GitHub
 
-Panitia mewajibkan **seluruh commit berasal dari akun GitHub anggota terdaftar**. Commit dari akun
-di luar daftar ini dibaca sebagai keterlibatan pihak luar tim, dan itu bentuk pelanggaran.
+Panitia mewajibkan **seluruh commit berasal dari akun GitHub anggota terdaftar**.
 
-| Nama | Username GitHub | Email yang dipakai commit |
+**Yang melakukan commit dan push: Rhama Damarwijaya seorang**, lewat akun `rhamaxv`.
+Terverifikasi dengan `gh auth status` pada 9 November 2026.
+
+| Nama | Username GitHub | Peran di repositori |
 | --- | --- | --- |
-| Janzen Firdaus Al Zam Zami | belum dicatat | belum dicatat |
-| Rhama Damarwijaya | belum dicatat | `rhamaxv@gmail.com` (dugaan, perlu dipastikan) |
-| Moch Hanafi Gus Ageng Manik | belum dicatat | belum dicatat |
-| Naufal Ardallah Budianto | belum dicatat | belum dicatat |
+| Rhama Damarwijaya | `rhamaxv` | Satu-satunya yang commit dan push |
+| Janzen Firdaus Al Zam Zami | tidak dipakai | Tidak commit |
+| Moch Hanafi Gus Ageng Manik | tidak dipakai | Tidak commit |
+| Naufal Ardallah Budianto | tidak dipakai | Tidak commit |
 
-Git lokal saat ini memakai `rhamaxv <rhamaxv@gmail.com>`. Email itu harus terdaftar di Settings
-lalu Emails pada akun GitHub pemiliknya, kalau tidak commit-nya tidak akan tertaut ke akun mana
-pun dan asalnya sulit dibuktikan saat verifikasi.
+Ini **memenuhi aturan**. Yang dipatok panitia adalah asal commit, bukan sebarannya, dan `rhamaxv`
+adalah akun anggota terdaftar. Tim satu orang pun sah menurut ketentuan umum.
 
-Periksa kapan saja:
+### Konsekuensi yang harus ditangani
+
+Empat nama di README dengan satu akun di riwayat commit adalah hal yang wajar ditanyakan juri,
+dan panitia memang berhak meminta klarifikasi. Dua langkah yang menutupnya:
+
+1. **README wajib memuat pembagian peran**, bukan sekadar daftar nama. Siapa mengerjakan ideasi
+   dan pemetaan masalah, siapa desain UI/UX, siapa pengujian dan video, siapa menulis kode.
+   Guidebook menyatakan ide, riset, wireframe, dan desain UI/UX boleh disiapkan sebelum Hacking
+   Week, jadi kontribusi itu nyata meski tidak muncul sebagai commit. Menjelaskannya lebih dulu
+   lebih kuat daripada menunggu ditanya.
+2. **Seluruh anggota harus bisa menjelaskan implementasi teknisnya** saat Grand Final, karena ada
+   3 menit Q&A di depan juri industri dan panitia mewajibkan tim mampu mempertanggungjawabkan
+   seluruh implementasi. Ini risiko yang sesungguhnya, bukan riwayat commit.
+
+### Yang dilarang untuk "meratakan" riwayat
+
+- Menambahkan `Co-Authored-By` anggota yang tidak ikut mengerjakan commit itu
+- Meminta anggota lain membuat commit kosong atau kosmetik
+
+Keduanya masuk kategori memanipulasi bukti pengembangan, yang hukumannya diskualifikasi.
+
+Periksa asal commit kapan saja:
 
 ```bash
 git log --format='%an <%ae>' | sort -u
@@ -46,7 +68,7 @@ git log --format='%an <%ae>' | sort -u
 
 ## Ketua Tim
 
-**Belum ditentukan.** Dibutuhkan untuk tanda tangan di Surat Pernyataan Orisinalitas Karya, yang
-wajib bermaterai Rp10.000 atau e-meterai dan dikumpulkan dalam format PDF.
+**Rhama Damarwijaya.**
 
-Tidak mendesak sekarang, tetapi dibutuhkan sebelum submission 14 November 2026.
+Menandatangani Surat Pernyataan Orisinalitas Karya, yang wajib bermaterai Rp10.000 atau e-meterai
+dan dikumpulkan dalam format PDF bersama submission, paling lambat 14 November 2026 pukul 23.59 WIB.
