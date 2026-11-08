@@ -43,28 +43,38 @@ async def client(app):
 
 
 @dataclass
-class PenggunaTeruji:
+class Akun:
     """Pengguna yang sudah ada di `db` beserta header Authorization-nya."""
 
     user: User
     headers: dict[str, str]
 
 
-async def _pengguna_teruji(db: AsyncSession, role: Role, email: str) -> PenggunaTeruji:
+async def _buat_akun(db: AsyncSession, email: str, role: Role) -> Akun:
     user = User(
         email=email, password_hash=hash_password("rahasia123"), name="Test", role=role
     )
     db.add(user)
     await db.flush()
-    token = issue_token(user.id, user.role)
-    return PenggunaTeruji(user=user, headers={"Authorization": f"Bearer {token}"})
+    return Akun(user, {"Authorization": f"Bearer {issue_token(user.id, role)}"})
 
 
 @pytest.fixture
 async def investor(db):
-    return await _pengguna_teruji(db, Role.INVESTOR, "investor-teruji@contoh.id")
+    return await _buat_akun(db, "investor-teruji@contoh.id", Role.INVESTOR)
 
 
 @pytest.fixture
 async def umkm(db):
-    return await _pengguna_teruji(db, Role.UMKM, "umkm-teruji@contoh.id")
+    return await _buat_akun(db, "umkm-teruji@contoh.id", Role.UMKM)
+
+
+@pytest.fixture
+async def community(db):
+    return await _buat_akun(db, "warga-teruji@contoh.id", Role.COMMUNITY)
+
+
+@pytest.fixture
+async def akun(investor, umkm, community):
+    """Peta peran ke akun teruji, dipakai RBAC_MATRIX untuk memilih header."""
+    return {"investor": investor, "umkm": umkm, "community": community}
