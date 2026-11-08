@@ -1,0 +1,32 @@
+# Kredensial. Wajib tidak pernah ter-push (aturan lomba, keamanan kredensial).
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.vercel
+
+# Playwright
+playwright-report/
+test-results/
+
+# OS dan editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

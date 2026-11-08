@@ -1,0 +1,520 @@
+# Fase 07. Milestone dan pencairan
+
+**Hasil:** flow `funded` sampai `completed` berjalan end-to-end. Regression R3 hijau.
+
+**Spec terkait:** [BR-40..BR-48](../prd/07-business-rules.md), [T-20..T-31](../prd/08-state-machines.md), [D-13](../docs/decisions.md)
+
+## Struktur file
+
+```
+backend/app/
+  models/milestone_report.py
+  domain/milestone_rules.py    # prasyarat pelaporan dan pencairan, murni
+  services/milestone.py
+  api/v1/milestones.py
+backend/tests/
+  unit/test_milestone_rules.py
+  integration/test_milestone_lapor.py
+  integration/test_milestone_cair.py
+  regression/test_r3_happy_path.py
+```
+
+---
+
+### Task 1: Prasyarat milestone sebagai fungsi murni
+
+**Files:**
+- Create: `backend/app/domain/milestone_rules.py`
+- Test: `backend/tests/unit/test_milestone_rules.py`
+
+**Interfaces:**
+- Produces: `boleh_dilaporkan(seq, status_sebelumnya) -> bool`,
+  `butuh_laporan(seq) -> bool`, `prasyarat_pencairan(...) -> None` yang melempar `ValueError`.
+
+- [ ] **Step 1: Tulis test yang gagal**
+
+```python
+# backend/tests/unit/test_milestone_rules.py
+import pytest
+from app.domain.milestone_rules import boleh_dilaporkan, butuh_laporan, prasyarat_pencairan
+from app.domain.transitions import MilestoneStatus as M
+
+def test_d13_milestone_pertama_tidak_butuh_laporan():
+    assert butuh_laporan(seq=1) is False
+
+@pytest.mark.parametrize("seq", [2, 3, 7])
+def test_br42_milestone_berikutnya_butuh_laporan(seq):
+    assert butuh_laporan(seq) is True
+
+def test_br41_milestone_pertama_tidak_bisa_dilaporkan():
+    assert boleh_dilaporkan(seq=1, status_sebelumnya=None) is False
+
+def test_br43_milestone_kedua_bisa_dilaporkan_setelah_pertama_cair():
+    assert boleh_dilaporkan(seq=2, status_sebelumnya=M.DISBURSED) is True
+
+@pytest.mark.parametrize("status", [M.PENDING, M.REPORTED])
+def test_br43_milestone_kedua_belum_bisa_dilaporkan_kalau_pertama_belum_cair(status):
+    assert boleh_dilaporkan(seq=2, status_sebelumnya=status) is False
+
+def test_br43_prasyarat_pencairan_menolak_lompatan():
+    with pytest.raises(ValueError, match="milestone sebelumnya"):
+        prasyarat_pencairan(seq=3, status_sebelumnya=M.PENDING, proposal_funded=True)
+
+def test_br40_prasyarat_pencairan_menolak_proposal_belum_funded():
+    with pytest.raises(ValueError, match="belum funded"):
+        prasyarat_pencairan(seq=1, status_sebelumnya=None, proposal_funded=False)
+```
+
+- [ ] **Step 2: Jalankan test, pastikan gagal**
+
+Run: `pytest tests/unit/test_milestone_rules.py -v`
+Expected: FAIL dengan `ModuleNotFoundError`
+
+- [ ] **Step 3: Implementasi minimal**
+
+```python
+# backend/app/domain/milestone_rules.py
+"""Prasyarat pelaporan dan pencairan milestone. Murni, tanpa database."""
+from app.domain.transitions import MilestoneStatus
+
+def butuh_laporan(seq: int) -> bool:
+    """Milestone pertama cair tanpa laporan, tetap butuh approve lead investor (D-13)."""
+    return seq > 1
+
+def boleh_dilaporkan(seq: int, status_sebelumnya: MilestoneStatus | None) -> bool:
+    if not butuh_laporan(seq):
+        return False
+    return status_sebelumnya is MilestoneStatus.DISBURSED
+
+def prasyarat_pencairan(
+    seq: int, status_sebelumnya: MilestoneStatus | None, proposal_funded: bool
+) -> None:
+    if not proposal_funded:
+        raise ValueError("Proposal belum funded, pencairan belum bisa dilakukan.")
+    if seq > 1 and status_sebelumnya is not MilestoneStatus.DISBURSED:
+        raise ValueError("Milestone sebelumnya belum cair.")
+```
+
+- [ ] **Step 4: Jalankan test, pastikan lolos**
+
+Run: `pytest tests/unit/test_milestone_rules.py -v`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -am "feat: add milestone reporting and disbursement preconditions"
+```
+
+---
+
+### Task 2: Laporan progres dengan jejak revisi
+
+**Files:**
+- Create: `backend/app/models/milestone_report.py`, `backend/app/api/v1/milestones.py`
+- Test: `backend/tests/integration/test_milestone_lapor.py`
+
+- [ ] **Step 1: Tulis test yang gagal**
+
+```python
+# backend/tests/integration/test_milestone_lapor.py
+def body_laporan(**ubah):
+    return {"narrative": "Mesin kopi sudah dibeli dan dipasang. "
+                         "Omzet minggu pertama naik 15 persen.",
+            "metrics": {"omzet_minggu_1": 3_200_000}} | ubah
+
+async def test_umkm_bisa_lapor_milestone_kedua(client, umkm, funded_proposal):
+    m1, m2 = funded_proposal.milestones
+    await cairkan_lewat_api(client, m1)
+    res = await client.post(f"/api/v1/milestones/{m2.id}/reports",
+                            headers=umkm.headers, json=body_laporan())
+    assert res.status_code == 201
+
+async def test_br41_milestone_pertama_tidak_bisa_dilaporkan(client, umkm, funded_proposal):
+    m1 = funded_proposal.milestones[0]
+    res = await client.post(f"/api/v1/milestones/{m1.id}/reports",
+                            headers=umkm.headers, json=body_laporan())
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "milestone_pertama_tanpa_laporan"
+
+async def test_br43_milestone_kedua_dilaporkan_sebelum_pertama_cair_ditolak(
+    client, umkm, funded_proposal
+):
+    m2 = funded_proposal.milestones[1]
+    res = await client.post(f"/api/v1/milestones/{m2.id}/reports",
+                            headers=umkm.headers, json=body_laporan())
+    assert res.status_code == 409
+
+async def test_br46_laporan_yang_direject_tidak_dihapus_dan_revisi_jadi_baris_baru(
+    client, db, umkm, investor, funded_proposal
+):
+    m1, m2 = funded_proposal.milestones
+    await cairkan_lewat_api(client, m1)
+
+    pertama = await client.post(f"/api/v1/milestones/{m2.id}/reports",
+                                headers=umkm.headers, json=body_laporan())
+    await client.post(f"/api/v1/milestones/{m2.id}/reject", headers=investor.headers,
+                      json={"note": "Angka omzet belum disertai bukti."})
+    await client.post(f"/api/v1/milestones/{m2.id}/reports", headers=umkm.headers,
+                      json=body_laporan(narrative="Revisi: bukti terlampir." + "x" * 40))
+
+    laporan = (await db.scalars(select(MilestoneReport)
+               .where(MilestoneReport.milestone_id == m2.id)
+               .order_by(MilestoneReport.submitted_at))).all()
+    assert len(laporan) == 2
+    assert laporan[0].review_status is ReportStatus.REJECTED
+    assert laporan[0].reviewer_note == "Angka omzet belum disertai bukti."
+    assert laporan[1].review_status is ReportStatus.PENDING
+
+async def test_t30_approve_menandai_laporan_approved(client, db, investor,
+                                                      milestone_reported):
+    await client.post(f"/api/v1/milestones/{milestone_reported.id}/approve",
+                      headers=investor.headers)
+    laporan = await laporan_terakhir(db, milestone_reported.id)
+    assert laporan.review_status is ReportStatus.APPROVED
+    assert laporan.reviewed_by == investor.user.id
+
+async def test_t31_reject_menandai_laporan_rejected_beserta_catatan(
+    client, db, investor, milestone_reported
+):
+    await client.post(f"/api/v1/milestones/{milestone_reported.id}/reject",
+                      headers=investor.headers,
+                      json={"note": "Angka omzet belum disertai bukti."})
+    laporan = await laporan_terakhir(db, milestone_reported.id)
+    assert laporan.review_status is ReportStatus.REJECTED
+    assert laporan.reviewer_note == "Angka omzet belum disertai bukti."
+    assert laporan.reviewed_at is not None
+
+async def test_br45_reject_tanpa_catatan_ditolak(client, investor, milestone_reported):
+    res = await client.post(f"/api/v1/milestones/{milestone_reported.id}/reject",
+                            headers=investor.headers, json={"note": "x"})
+    assert res.status_code == 422
+
+async def test_umkm_lain_tidak_bisa_lapor(client, umkm_lain, funded_proposal):
+    m2 = funded_proposal.milestones[1]
+    res = await client.post(f"/api/v1/milestones/{m2.id}/reports",
+                            headers=umkm_lain.headers, json=body_laporan())
+    assert res.status_code in {403, 404}
+```
+
+- [ ] **Step 2: Jalankan test, pastikan gagal**
+
+Run: `pytest tests/integration/test_milestone_lapor.py -v`
+Expected: FAIL
+
+- [ ] **Step 3: Implementasi minimal**
+
+Model `MilestoneReport` seperti di [09-data-model](../prd/09-data-model.md). Service:
+
+```python
+async def kirim_laporan(session, umkm, milestone, body, clock) -> MilestoneReport:
+    sebelumnya = await ambil_milestone_sebelumnya(session, milestone)
+    if not boleh_dilaporkan(milestone.seq, sebelumnya.status if sebelumnya else None):
+        kode = ("milestone_pertama_tanpa_laporan" if milestone.seq == 1
+                else "milestone_sebelumnya_belum_cair")
+        raise ConflictError(kode, "Milestone ini belum bisa dilaporkan.")
+
+    laporan = MilestoneReport(milestone_id=milestone.id, umkm_id=umkm.id,
+                              narrative=body.narrative, metrics=body.metrics,
+                              review_status=ReportStatus.PENDING, submitted_at=clock.now())
+    session.add(laporan)
+    milestone.status = apply_milestone(milestone.status, MilestoneEvent.LAPOR)
+    await session.flush()
+    return laporan
+```
+
+- [ ] **Step 4: Jalankan test, pastikan lolos**
+
+Run: `pytest tests/integration/test_milestone_lapor.py -v`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -am "feat: add milestone progress reports with revision history"
+```
+
+---
+
+### Task 3: Approve, reject, dan pencairan
+
+**Files:**
+- Modify: `backend/app/services/milestone.py`, `backend/app/api/v1/milestones.py`
+- Test: `backend/tests/integration/test_milestone_cair.py`
+
+**Interfaces:**
+- Produces: `approve_milestone(session, lead, milestone, clock) -> None` yang mencatat
+  `disbursement_out` dan, bila itu milestone terakhir, mentransisikan proposal ke `completed`.
+
+- [ ] **Step 1: Tulis test yang gagal**
+
+```python
+# backend/tests/integration/test_milestone_cair.py
+from app.domain.transitions import MilestoneStatus as M, ProposalStatus as S
+
+async def test_d13_milestone_pertama_cair_tanpa_laporan_setelah_approve(
+    client, db, investor, funded_proposal
+):
+    m1 = funded_proposal.milestones[0]
+    res = await client.post(f"/api/v1/milestones/{m1.id}/approve", headers=investor.headers)
+    assert res.status_code == 200
+    await db.refresh(m1)
+    assert m1.status is M.DISBURSED
+
+async def test_br47_approve_mencatat_disbursement_sebesar_amount_milestone(
+    client, db, investor, funded_proposal
+):
+    m1 = funded_proposal.milestones[0]
+    await client.post(f"/api/v1/milestones/{m1.id}/approve", headers=investor.headers)
+    entri = (await db.scalars(select(LedgerEntry).where(
+        LedgerEntry.proposal_id == funded_proposal.id,
+        LedgerEntry.entry_type == EntryType.DISBURSEMENT_OUT))).all()
+    assert len(entri) == 1
+    assert entri[0].amount == m1.amount
+
+async def test_br44_investor_yang_bukan_lead_tidak_bisa_approve(
+    client, investor_kecil, funded_proposal
+):
+    """investor_kecil ikut mendanai tapi bukan pemilik pledge terbesar."""
+    m1 = funded_proposal.milestones[0]
+    res = await client.post(f"/api/v1/milestones/{m1.id}/approve",
+                            headers=investor_kecil.headers)
+    assert res.status_code == 403
+    assert res.json()["error"]["code"] == "bukan_lead_investor"
+
+async def test_t09_milestone_terakhir_cair_membuat_proposal_completed(
+    client, db, investor, umkm, funded_proposal
+):
+    m1, m2 = funded_proposal.milestones
+    await client.post(f"/api/v1/milestones/{m1.id}/approve", headers=investor.headers)
+    await client.post(f"/api/v1/milestones/{m2.id}/reports", headers=umkm.headers,
+                      json={"narrative": "x" * 60, "metrics": None})
+    await client.post(f"/api/v1/milestones/{m2.id}/approve", headers=investor.headers)
+
+    await db.refresh(funded_proposal)
+    assert funded_proposal.status is S.COMPLETED
+
+async def test_seluruh_dana_cair_sama_dengan_dana_diminta(client, db, investor, umkm,
+                                                          funded_proposal):
+    await cairkan_semua(client, investor, umkm, funded_proposal)
+    cair = await db.scalar(select(func.coalesce(func.sum(LedgerEntry.amount), 0)).where(
+        LedgerEntry.proposal_id == funded_proposal.id,
+        LedgerEntry.entry_type == EntryType.DISBURSEMENT_OUT))
+    assert cair == funded_proposal.requested_amount
+```
+
+- [ ] **Step 2: Jalankan test, pastikan gagal**
+
+Run: `pytest tests/integration/test_milestone_cair.py -v`
+Expected: FAIL
+
+- [ ] **Step 3: Implementasi minimal**
+
+```python
+async def approve_milestone(session, aktor, milestone, clock) -> None:
+    # Mengunci baris proposal karena di sini uang bergerak (RF-5).
+    proposal = await ambil_proposal_terkunci(session, milestone.proposal_id)
+
+    if proposal.lead_investor_id != aktor.id:
+        raise ForbiddenError("bukan_lead_investor",
+                             "Hanya lead investor yang bisa menyetujui pencairan.")
+
+    sebelumnya = await ambil_milestone_sebelumnya(session, milestone)
+    try:
+        prasyarat_pencairan(milestone.seq, sebelumnya.status if sebelumnya else None,
+                            proposal.status is ProposalStatus.FUNDED)
+    except ValueError as exc:
+        raise ConflictError("prasyarat_pencairan_belum_terpenuhi", str(exc)) from None
+
+    event = (MilestoneEvent.APPROVE_TANPA_LAPORAN if milestone.seq == 1
+             else MilestoneEvent.APPROVE)
+    milestone.status = apply_milestone(milestone.status, event)
+    milestone.disbursed_at = clock.now()
+
+    # Kunci idempotensi berasal dari milestone, jadi approve ganda hanya
+    # menghasilkan satu entri (BR-48, RF-5).
+    await catat_entri(session, proposal.id, EntryType.DISBURSEMENT_OUT, milestone.amount,
+                      idempotency_key=f"disburse:{milestone.id}",
+                      ref_type="milestone", ref_id=milestone.id, actor_id=aktor.id)
+
+    if await semua_milestone_cair(session, proposal.id):
+        proposal.status = apply_proposal(proposal.status,
+                                         ProposalEvent.SEMUA_MILESTONE_CAIR)
+    await session.flush()
+```
+
+- [ ] **Step 4: Jalankan test, pastikan lolos**
+
+Run: `pytest tests/integration/test_milestone_cair.py -v`
+Expected: PASS
+
+- [ ] **Step 5: Perbarui RBAC_MATRIX, jalankan R5**
+
+Run: `pytest tests/regression -v`
+Expected: PASS
+
+- [ ] **Step 6: Commit**
+
+```bash
+git commit -am "feat: add milestone approval, rejection and ledger disbursement"
+```
+
+---
+
+### Task 4: Approve ganda bersamaan (RF-5)
+
+**Files:**
+- Test: `backend/tests/integration/test_approve_bersamaan.py`
+
+- [ ] **Step 1: Tulis test yang gagal**
+
+```python
+# backend/tests/integration/test_approve_bersamaan.py
+"""RF-5: approve milestone terakhir dikirim dua kali nyaris bersamaan."""
+import asyncio
+from app.db.session import SessionLocal
+from app.domain.transitions import ProposalStatus as S
+
+async def test_rf5_approve_ganda_hanya_satu_pencairan(funded_proposal_tercommit, lead, clock):
+    m1 = funded_proposal_tercommit.milestones[0]
+
+    async def approve():
+        async with SessionLocal() as sesi, sesi.begin():
+            with contextlib.suppress(Exception):
+                milestone = await sesi.get(ProposalMilestone, m1.id)
+                await approve_milestone(sesi, lead.user, milestone, clock)
+
+    await asyncio.gather(approve(), approve())
+
+    async with SessionLocal() as sesi:
+        entri = (await sesi.scalars(select(LedgerEntry).where(
+            LedgerEntry.ref_id == m1.id,
+            LedgerEntry.entry_type == EntryType.DISBURSEMENT_OUT))).all()
+    assert len(entri) == 1, "approve ganda menghasilkan dua pencairan"
+
+async def test_rf5_approve_ganda_milestone_terakhir_hanya_satu_transisi_completed(
+    funded_proposal_tercommit, lead, clock
+):
+    await cairkan(funded_proposal_tercommit.milestones[0])
+    await laporkan(funded_proposal_tercommit.milestones[1])
+    m_terakhir = funded_proposal_tercommit.milestones[1]
+
+    async def approve():
+        async with SessionLocal() as sesi, sesi.begin():
+            with contextlib.suppress(Exception):
+                milestone = await sesi.get(ProposalMilestone, m_terakhir.id)
+                await approve_milestone(sesi, lead.user, milestone, clock)
+
+    await asyncio.gather(approve(), approve())
+
+    async with SessionLocal() as sesi:
+        proposal = await sesi.get(Proposal, funded_proposal_tercommit.id)
+        cair = await total_disbursement(sesi, proposal.id)
+    assert proposal.status is S.COMPLETED
+    assert cair == proposal.requested_amount   # bukan dua kali lipat
+```
+
+- [ ] **Step 2: Jalankan test**
+
+Run: `pytest tests/integration/test_approve_bersamaan.py -v`
+Expected: PASS kalau `ambil_proposal_terkunci` dan `idempotency_key` sudah dipasang di Task 3.
+Kalau merah, itu berarti salah satunya terlewat.
+
+- [ ] **Step 3: Buktikan pagarnya benar-benar bekerja**
+
+Hapus sementara `with_for_update()` dari `ambil_proposal_terkunci`, jalankan ulang test, pastikan
+**merah**, lalu kembalikan. Test yang tidak pernah bisa merah tidak membuktikan apa-apa.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git commit -am "feat: prevent double disbursement on concurrent milestone approval"
+```
+
+---
+
+### Task 5: Regression R3, happy path end-to-end
+
+**Files:**
+- Create: `backend/tests/regression/test_r3_happy_path.py`
+
+Satu test panjang, sengaja tidak dipecah, karena yang diuji adalah rantainya.
+
+- [ ] **Step 1: Tulis test**
+
+```python
+# backend/tests/regression/test_r3_happy_path.py
+"""R3: campaign dibuat sampai proposal completed, satu alur utuh."""
+from app.domain.transitions import ProposalStatus as S
+
+async def test_r3_alur_penuh_dari_campaign_sampai_completed(client, db, clock):
+    # 1. Investor A dan B registrasi, A membuat campaign
+    a = await daftar(client, "a@contoh.id", "investor")
+    b = await daftar(client, "b@contoh.id", "investor")
+    campaign = await buat_campaign(client, a, target=50_000_000, threshold=60)
+
+    # 2. UMKM registrasi dan submit proposal dengan dua milestone
+    umkm = await daftar(client, "umkm@contoh.id", "umkm")
+    proposal = await submit_proposal(client, umkm, campaign, diminta=10_000_000,
+                                     milestones=[5_000_000, 5_000_000])
+
+    # 3. MockScoringEngine menilai, proposal menjadi listed
+    assert (await ambil_proposal(client, proposal))["status"] == "listed"
+
+    # 4. Komunitas vote
+    warga = await daftar(client, "warga@contoh.id", "community")
+    await vote(client, warga, proposal)
+    assert (await ambil_proposal(client, proposal))["vote_count"] == 1
+
+    # 5. Investor A pledge separuh
+    await pledge(client, a, proposal, 6_000_000)
+    assert (await ambil_proposal(client, proposal))["status"] == "partially_funded"
+
+    # 6. Investor B pledge sisanya, A jadi lead karena pledge-nya lebih besar
+    await pledge(client, b, proposal, 4_000_000)
+    detail = await ambil_proposal(client, proposal)
+    assert detail["status"] == "funded"
+    assert detail["lead_investor_id"] == a.user_id
+
+    # 7. Lead investor approve milestone 1, tanpa laporan (D-13)
+    m1, m2 = (await ambil_milestones(client, proposal))
+    await approve(client, a, m1)
+    assert (await ambil_milestones(client, proposal))[0]["status"] == "disbursed"
+
+    # 8. UMKM lapor milestone 2, lead investor approve
+    await lapor(client, umkm, m2, "Mesin terpasang, omzet naik 15 persen." + "x" * 30)
+    await approve(client, a, m2)
+
+    # 9. Proposal completed
+    assert (await ambil_proposal(client, proposal))["status"] == "completed"
+
+    # 10. Seluruh dana cair sama persis dengan dana yang diminta
+    ledger = await ambil_ledger(client, a, proposal)
+    cair = sum(e["amount"] for e in ledger["entries"]
+               if e["entry_type"] == "disbursement_out")
+    assert cair == 10_000_000
+    assert ledger["saldo"] == 0
+
+async def test_r3_investor_b_tidak_bisa_approve_karena_bukan_lead(client):
+    """Cabang kecil dari alur yang sama, dipisah supaya kegagalannya jelas."""
+    ...
+```
+
+- [ ] **Step 2: Jalankan, pastikan hijau**
+
+Run: `pytest tests/regression -v`
+Expected: PASS, R1, R2, R2b, R3, R5, R6
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add backend/tests/regression/test_r3_happy_path.py
+git commit -m "feat: add end-to-end happy path regression suite"
+```
+
+## Gerbang keluar fase 07
+
+- [ ] `make test` dan `make test-regression` hijau
+- [ ] R3 berjalan dari campaign sampai `completed` tanpa intervensi manual
+- [ ] Jumlah seluruh `disbursement_out` sama persis dengan `requested_amount`
+- [ ] Test approve bersamaan terbukti merah saat penguncian dihapus
