@@ -10,7 +10,7 @@ from app.db.session import engine, get_session
 from app.domain.clock import FrozenClock, SystemClock
 from app.main import create_app
 from app.models.campaign import Campaign, CampaignStatus, Sector
-from app.models.proposal import Proposal, ProposalStatus
+from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
 from app.models.user import Role, User
 from app.services.auth import hash_password, issue_token
 
@@ -117,15 +117,45 @@ async def campaign(db, investor):
     return c
 
 
+def _isi_proposal_minimal(campaign_id, umkm_id, status: ProposalStatus) -> Proposal:
+    """Baris proposal lengkap secara kolom, dipakai fixture status manapun.
+
+    Scoring belum ada sampai fase 05 (lihat laporan fase ini), jadi status
+    diset langsung di sini alih-alih lewat mesin skoring sungguhan.
+    """
+    return Proposal(
+        campaign_id=campaign_id,
+        umkm_id=umkm_id,
+        business_name="Warung Kopi Mbak Sri",
+        business_profile="x" * 50,
+        fund_usage_plan="x" * 50,
+        business_projection="x" * 50,
+        requested_amount=10_000_000,
+        status=status,
+        scoring_status=ScoringStatus.DONE,
+    )
+
+
 @pytest.fixture
 async def listed_proposal(db, campaign, umkm):
     """Satu proposal lolos skoring untuk campaign fixture, demi BR-77."""
-    p = Proposal(
-        campaign_id=campaign.id, umkm_id=umkm.user.id, status=ProposalStatus.LISTED
-    )
+    p = _isi_proposal_minimal(campaign.id, umkm.user.id, ProposalStatus.LISTED)
     db.add(p)
     await db.flush()
     return p
+
+
+@pytest.fixture
+def buat_proposal(db, campaign, umkm):
+    """Pembuat proposal lepas status, dipakai menguji partial unique index (BR-13)."""
+
+    async def _buat(status: ProposalStatus) -> Proposal:
+        p = _isi_proposal_minimal(campaign.id, umkm.user.id, status)
+        db.add(p)
+        await db.flush()
+        return p
+
+    return _buat
 
 
 @pytest.fixture

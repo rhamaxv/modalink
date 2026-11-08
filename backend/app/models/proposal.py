@@ -1,18 +1,26 @@
-"""Kerangka minimal tabel proposals: hanya kolom yang dibutuhkan fase campaign
-(kunci score_threshold lewat BR-77, dan daftar proposal per campaign). Kolom
-bisnis proposal (judul, nominal diminta, hasil skoring, dll.) ditambahkan fase
-proposal lewat migrasinya sendiri; tabel ini sengaja tidak mendahuluinya.
+"""Model proposal lengkap (BR-10 sampai BR-18) dan milestone-nya.
 
-ProposalStatus didefinisikan ulang di sini seperti Sector dan CampaignStatus di
-models/campaign.py, bukan diimpor dari domain/transitions.py, karena ini tipe
-kolom database, bukan tipe mesin transisi.
+Kolom bisnis (judul, nominal diminta, hasil skoring) ditambahkan di sini lewat
+migrasi fase ini sendiri, memperluas kerangka minimal fase campaign (lihat
+docstring migrasi `proposals_skeleton`).
+
+ProposalStatus, ScoringStatus, dan MilestoneStatus didefinisikan ulang di sini
+seperti Sector dan CampaignStatus di models/campaign.py, bukan diimpor dari
+domain/transitions.py, karena ini tipe kolom database, bukan tipe mesin
+transisi.
 """
 
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Column,
+    SmallInteger,
+    UniqueConstraint,
+)
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
@@ -29,12 +37,37 @@ class ProposalStatus(StrEnum):
     COMPLETED = "completed"
 
 
+class ScoringStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class MilestoneStatus(StrEnum):
+    PENDING = "pending"
+    REPORTED = "reported"
+    DISBURSED = "disbursed"
+
+
 class Proposal(SQLModel, table=True):
     __tablename__ = "proposals"
+    __table_args__ = (
+        CheckConstraint(
+            "requested_amount > 0", name="ck_proposal_requested_amount_positif"
+        ),
+    )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     campaign_id: UUID = Field(foreign_key="campaigns.id", index=True)
     umkm_id: UUID = Field(foreign_key="users.id", index=True)
+    business_name: str
+    business_profile: str
+    fund_usage_plan: str
+    business_projection: str
+    # sa_column=Column(BigInteger) wajib: SQLModel memetakan int ke INTEGER
+    # secara default, dan INTEGER meluap di Rp2,1 miliar (BR-50).
+    requested_amount: int = Field(sa_column=Column(BigInteger, nullable=False))
     status: ProposalStatus = Field(
         default=ProposalStatus.SUBMITTED,
         sa_column=Column(
@@ -47,4 +80,49 @@ class Proposal(SQLModel, table=True):
             index=True,
         ),
     )
+    scoring_status: ScoringStatus = Field(
+        default=ScoringStatus.PENDING,
+        sa_column=Column(
+            SAEnum(
+                ScoringStatus,
+                name="scoring_status",
+                values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
+    # Dihitung ulang tiap pledge berubah (fase pledge), bukan ditulis sekali.
+    lead_investor_id: UUID | None = Field(
+        default=None, foreign_key="users.id", nullable=True
+    )
+    funded_at: datetime | None = Field(default=None, nullable=True)
     created_at: datetime = Field(default_factory=lambda: SystemClock().now())
+
+
+class ProposalMilestone(SQLModel, table=True):
+    __tablename__ = "proposal_milestones"
+    __table_args__ = (
+        UniqueConstraint("proposal_id", "seq", name="uq_milestone_proposal_seq"),
+        CheckConstraint("seq >= 1", name="ck_milestone_seq_positif"),
+        CheckConstraint("amount > 0", name="ck_milestone_amount_positif"),
+    )
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    proposal_id: UUID = Field(foreign_key="proposals.id", index=True)
+    seq: int = Field(sa_column=Column(SmallInteger, nullable=False))
+    title: str
+    description: str
+    amount: int = Field(sa_column=Column(BigInteger, nullable=False))
+    status: MilestoneStatus = Field(
+        default=MilestoneStatus.PENDING,
+        sa_column=Column(
+            SAEnum(
+                MilestoneStatus,
+                name="milestone_status",
+                values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            ),
+            nullable=False,
+        ),
+    )
+    disbursed_at: datetime | None = Field(default=None, nullable=True)
