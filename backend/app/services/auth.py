@@ -6,13 +6,22 @@ from uuid import UUID
 
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 from app.config import settings
 from app.domain.clock import SystemClock
+from app.errors import DomainError
 
 _hasher = PasswordHasher()
 _clock = SystemClock()
+
+
+class TokenKedaluwarsa(DomainError):
+    status = 401
+
+
+class TokenTidakSah(DomainError):
+    status = 401
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,9 +35,12 @@ def hash_password(raw: str) -> str:
 
 
 def verify_password(raw: str, hashed: str) -> bool:
+    # Hash korup atau dari algoritme lain melempar VerificationError atau
+    # InvalidHashError, bukan VerifyMismatchError; keduanya berarti "tidak
+    # cocok", bukan kegagalan server (500).
     try:
         return _hasher.verify(hashed, raw)
-    except VerifyMismatchError:
+    except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
 
 
@@ -46,7 +58,9 @@ def decode_token(token: str) -> TokenClaims:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
-        raise ValueError("Token kedaluwarsa.") from None
+        raise TokenKedaluwarsa(
+            "token_kedaluwarsa", "Token sudah kedaluwarsa."
+        ) from None
     except jwt.InvalidTokenError:
-        raise ValueError("Token tidak sah.") from None
+        raise TokenTidakSah("token_tidak_sah", "Token tidak sah.") from None
     return TokenClaims(sub=UUID(payload["sub"]), role=payload["role"])

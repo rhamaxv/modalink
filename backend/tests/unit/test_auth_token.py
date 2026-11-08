@@ -4,7 +4,14 @@ from uuid import uuid4
 
 import pytest
 
-from app.services.auth import decode_token, hash_password, issue_token, verify_password
+from app.services.auth import (
+    TokenKedaluwarsa,
+    TokenTidakSah,
+    decode_token,
+    hash_password,
+    issue_token,
+    verify_password,
+)
 
 
 def test_br03_hash_tidak_pernah_sama_dengan_password_asli():
@@ -19,6 +26,10 @@ def test_verify_password_benar_dan_salah():
     assert verify_password("rahasia124", h) is False
 
 
+def test_verify_password_hash_rusak_dianggap_tidak_cocok():
+    assert verify_password("rahasia123", "bukan-hash-argon2-yang-sah") is False
+
+
 def test_token_membawa_sub_dan_role():
     uid = uuid4()
     claims = decode_token(issue_token(uid, "investor"))
@@ -29,7 +40,7 @@ def test_token_membawa_sub_dan_role():
 def test_token_kedaluwarsa_ditolak():
     uid = uuid4()
     kedaluwarsa = issue_token(uid, "investor", ttl_hours=-1)
-    with pytest.raises(ValueError, match="kedaluwarsa"):
+    with pytest.raises(TokenKedaluwarsa):
         decode_token(kedaluwarsa)
 
 
@@ -41,5 +52,5 @@ def test_token_dengan_tanda_tangan_lain_ditolak():
         "kunci-lain-yang-sama-sekali-berbeda-32-byte",
         algorithm="HS256",
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(TokenTidakSah):
         decode_token(palsu)
