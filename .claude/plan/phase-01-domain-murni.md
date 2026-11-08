@@ -418,7 +418,7 @@ seluruh suite tetap hijau meski spec tidak diperbarui.
 - [ ] **Step 2: Jalankan, pastikan hijau**
 
 Run: `pytest tests/regression/test_r1_transitions.py -v`
-Expected: PASS, 63 + 12 + 5 test
+Expected: PASS, 49 + 12 + 5 test (7 status kali 7 event untuk proposal, 3 status kali 4 event untuk milestone, lalu 2 test penguncian jumlah dan 3 test status terminal)
 
 - [ ] **Step 3: Commit**
 

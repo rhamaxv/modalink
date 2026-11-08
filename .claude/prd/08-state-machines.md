@@ -10,8 +10,8 @@ yang tidak ada di tabel ini**, memastikan semuanya ditolak dengan `409 Conflict`
 
 ## Proposal
 
-Enam status. "Didanai sebagian" adalah status sungguhan di database, bukan hasil hitungan
-([D-05](../docs/decisions.md)).
+Tujuh status. "Didanai sebagian" adalah status sungguhan di database, bukan hasil hitungan
+([D-05](../docs/decisions.md)), dan penambahannya itulah yang membuat jumlahnya tujuh, bukan enam.
 
 | ID | Dari | Event | Ke |
 | --- | --- | --- | --- |
