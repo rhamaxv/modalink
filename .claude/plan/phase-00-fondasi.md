@@ -56,20 +56,20 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: logicodix
-      POSTGRES_PASSWORD: logicodix
-      POSTGRES_DB: logicodix
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports: ["5432:5432"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U logicodix"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 2s
       retries: 15
   db-test:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: logicodix
-      POSTGRES_PASSWORD: logicodix
-      POSTGRES_DB: logicodix_test
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}_test
     ports: ["5433:5432"]
     tmpfs: ["/var/lib/postgresql/data"]
 ```
@@ -140,11 +140,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     env: str = "dev"
-    database_url: str = "postgresql+asyncpg://logicodix:logicodix@localhost:5433/logicodix_test"
-    jwt_secret: str = "ganti-di-produksi"
+    # Tanpa default: nilai yang hilang harus menggagalkan startup dengan keras,
+    # bukan diam-diam menunjuk database atau kunci yang tidak pernah dikonfigurasi.
+    database_url: str
+    jwt_secret: str
     jwt_ttl_hours: int = 24
     scoring_engine: str = "mock"      # "mock" atau "gemini"
-    gemini_api_key: str | None = None
+    gemini_api_key: str
     gemini_model: str = "gemini-2.5-flash"
     gemini_timeout_s: int = 20
 
@@ -424,12 +426,12 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: logicodix
-          POSTGRES_PASSWORD: logicodix
-          POSTGRES_DB: logicodix_test
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'modalink' }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'modalink' }}
+          POSTGRES_DB: modalink_test
         ports: ["5433:5432"]
         options: >-
-          --health-cmd "pg_isready -U logicodix" --health-interval 2s --health-retries 15
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-retries 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
