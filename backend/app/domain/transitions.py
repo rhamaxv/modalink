@@ -64,6 +64,59 @@ MILESTONE_MAP: dict[tuple[MilestoneStatus, MilestoneEvent], MilestoneStatus] = {
 }
 
 
+class ReportStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class ReportEvent(StrEnum):
+    APPROVE = "approve"
+    REJECT = "reject"
+
+
+class CampaignStatus(StrEnum):
+    OPEN = "open"
+    CLOSED = "closed"
+
+
+class CampaignEvent(StrEnum):
+    TUTUP_MANUAL = "tutup_manual"
+    APPLY_DEADLINE_LEWAT = "apply_deadline_lewat"
+
+
+class ScoringStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class ScoringEvent(StrEnum):
+    AMBIL = "ambil"
+    SELESAI = "selesai"
+    GAGAL = "gagal"
+    NILAI_ULANG = "nilai_ulang"
+
+
+REPORT_MAP: dict[tuple[ReportStatus, ReportEvent], ReportStatus] = {
+    (ReportStatus.PENDING, ReportEvent.APPROVE): ReportStatus.APPROVED,   # T-30
+    (ReportStatus.PENDING, ReportEvent.REJECT):  ReportStatus.REJECTED,   # T-31
+}
+
+CAMPAIGN_MAP: dict[tuple[CampaignStatus, CampaignEvent], CampaignStatus] = {
+    (CampaignStatus.OPEN, CampaignEvent.TUTUP_MANUAL):         CampaignStatus.CLOSED,  # T-40
+    (CampaignStatus.OPEN, CampaignEvent.APPLY_DEADLINE_LEWAT): CampaignStatus.CLOSED,  # T-41
+}
+
+SCORING_MAP: dict[tuple[ScoringStatus, ScoringEvent], ScoringStatus] = {
+    (ScoringStatus.PENDING, ScoringEvent.AMBIL):         ScoringStatus.PROCESSING,  # T-50
+    (ScoringStatus.PROCESSING, ScoringEvent.SELESAI):    ScoringStatus.DONE,        # T-51
+    (ScoringStatus.PROCESSING, ScoringEvent.GAGAL):      ScoringStatus.FAILED,      # T-52
+    (ScoringStatus.FAILED, ScoringEvent.NILAI_ULANG):    ScoringStatus.PENDING,     # T-53
+}
+
+
 class IllegalTransition(Exception):
     """Dilempar untuk kombinasi status-event yang tidak ada di peta.
 
@@ -88,5 +141,26 @@ def apply_proposal(current: ProposalStatus, event: ProposalEvent) -> ProposalSta
 def apply_milestone(current: MilestoneStatus, event: MilestoneEvent) -> MilestoneStatus:
     try:
         return MILESTONE_MAP[(current, event)]
+    except KeyError:
+        raise IllegalTransition(current, event) from None
+
+
+def apply_report(current: ReportStatus, event: ReportEvent) -> ReportStatus:
+    try:
+        return REPORT_MAP[(current, event)]
+    except KeyError:
+        raise IllegalTransition(current, event) from None
+
+
+def apply_campaign(current: CampaignStatus, event: CampaignEvent) -> CampaignStatus:
+    try:
+        return CAMPAIGN_MAP[(current, event)]
+    except KeyError:
+        raise IllegalTransition(current, event) from None
+
+
+def apply_scoring(current: ScoringStatus, event: ScoringEvent) -> ScoringStatus:
+    try:
+        return SCORING_MAP[(current, event)]
     except KeyError:
         raise IllegalTransition(current, event) from None

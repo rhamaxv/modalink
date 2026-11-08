@@ -4,19 +4,34 @@ import itertools
 import pytest
 
 from app.domain.transitions import (
+    CAMPAIGN_MAP,
     MILESTONE_MAP,
     PROPOSAL_MAP,
+    REPORT_MAP,
+    SCORING_MAP,
+    CampaignEvent,
+    CampaignStatus,
     IllegalTransition,
     MilestoneEvent,
     MilestoneStatus,
     ProposalEvent,
     ProposalStatus,
+    ReportEvent,
+    ReportStatus,
+    ScoringEvent,
+    ScoringStatus,
+    apply_campaign,
     apply_milestone,
     apply_proposal,
+    apply_report,
+    apply_scoring,
 )
 
 PROPOSAL_KOMBINASI = list(itertools.product(ProposalStatus, ProposalEvent))
 MILESTONE_KOMBINASI = list(itertools.product(MilestoneStatus, MilestoneEvent))
+REPORT_KOMBINASI = list(itertools.product(ReportStatus, ReportEvent))
+CAMPAIGN_KOMBINASI = list(itertools.product(CampaignStatus, CampaignEvent))
+SCORING_KOMBINASI = list(itertools.product(ScoringStatus, ScoringEvent))
 
 
 @pytest.mark.parametrize("status,event", PROPOSAL_KOMBINASI)
@@ -37,6 +52,33 @@ def test_r1_milestone_setiap_kombinasi_sesuai_peta(status, event):
             apply_milestone(status, event)
 
 
+@pytest.mark.parametrize("status,event", REPORT_KOMBINASI)
+def test_r1_report_setiap_kombinasi_sesuai_peta(status, event):
+    if (status, event) in REPORT_MAP:
+        assert apply_report(status, event) is REPORT_MAP[(status, event)]
+    else:
+        with pytest.raises(IllegalTransition):
+            apply_report(status, event)
+
+
+@pytest.mark.parametrize("status,event", CAMPAIGN_KOMBINASI)
+def test_r1_campaign_setiap_kombinasi_sesuai_peta(status, event):
+    if (status, event) in CAMPAIGN_MAP:
+        assert apply_campaign(status, event) is CAMPAIGN_MAP[(status, event)]
+    else:
+        with pytest.raises(IllegalTransition):
+            apply_campaign(status, event)
+
+
+@pytest.mark.parametrize("status,event", SCORING_KOMBINASI)
+def test_r1_scoring_setiap_kombinasi_sesuai_peta(status, event):
+    if (status, event) in SCORING_MAP:
+        assert apply_scoring(status, event) is SCORING_MAP[(status, event)]
+    else:
+        with pytest.raises(IllegalTransition):
+            apply_scoring(status, event)
+
+
 def test_r1_jumlah_transisi_proposal_sesuai_spec():
     """Mengunci jumlahnya ke spec. Menambah transisi tanpa memperbarui
     08-state-machines.md akan membuat test ini merah."""
@@ -45,6 +87,18 @@ def test_r1_jumlah_transisi_proposal_sesuai_spec():
 
 def test_r1_jumlah_transisi_milestone_sesuai_spec():
     assert len(MILESTONE_MAP) == 4  # T-20 sampai T-23
+
+
+def test_r1_jumlah_transisi_laporan_sesuai_spec():
+    assert len(REPORT_MAP) == 2    # T-30, T-31
+
+
+def test_r1_jumlah_transisi_campaign_sesuai_spec():
+    assert len(CAMPAIGN_MAP) == 2  # T-40, T-41
+
+
+def test_r1_jumlah_transisi_scoring_sesuai_spec():
+    assert len(SCORING_MAP) == 4   # T-50 sampai T-53
 
 
 @pytest.mark.parametrize("terminal", [
