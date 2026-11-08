@@ -1,9 +1,13 @@
+from dataclasses import dataclass
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import engine, get_session
 from app.main import create_app
+from app.models.user import Role, User
+from app.services.auth import hash_password, issue_token
 
 
 @pytest.fixture
@@ -36,3 +40,31 @@ async def client(app):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
+
+
+@dataclass
+class PenggunaTeruji:
+    """Pengguna yang sudah ada di `db` beserta header Authorization-nya."""
+
+    user: User
+    headers: dict[str, str]
+
+
+async def _pengguna_teruji(db: AsyncSession, role: Role, email: str) -> PenggunaTeruji:
+    user = User(
+        email=email, password_hash=hash_password("rahasia123"), name="Test", role=role
+    )
+    db.add(user)
+    await db.flush()
+    token = issue_token(user.id, user.role)
+    return PenggunaTeruji(user=user, headers={"Authorization": f"Bearer {token}"})
+
+
+@pytest.fixture
+async def investor(db):
+    return await _pengguna_teruji(db, Role.INVESTOR, "investor-teruji@contoh.id")
+
+
+@pytest.fixture
+async def umkm(db):
+    return await _pengguna_teruji(db, Role.UMKM, "umkm-teruji@contoh.id")

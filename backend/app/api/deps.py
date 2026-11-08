@@ -1,13 +1,14 @@
 """Dependency FastAPI yang dipakai setiap router: siapa pengguna, dan apa perannya."""
 
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.errors import DomainError
-from app.models.user import User
+from app.errors import DomainError, ForbiddenError
+from app.models.user import Role, User
 from app.services.auth import decode_token
 
 
@@ -29,3 +30,15 @@ async def current_user(
     if user is None:
         raise TidakTerautentikasi("token_tidak_sah", "Akun tidak ditemukan.")
     return user
+
+
+def require_role(*roles: Role) -> Callable[[User], User]:
+    def guard(user: User = Depends(current_user)) -> User:
+        # Peran dibaca dari baris database, bukan dari klaim token (BR-04).
+        if user.role not in roles:
+            raise ForbiddenError(
+                "peran_tidak_berhak", "Peran Anda tidak berhak atas aksi ini."
+            )
+        return user
+
+    return guard
