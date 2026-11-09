@@ -57,15 +57,49 @@ def _terdaftar() -> set[str]:
     return hasil
 
 
+# Endpoint yang kontraknya sudah ditulis tapi fasenya belum dikerjakan. Setiap
+# entri menyebut fase yang memilikinya, karena daftar tanpa pemilik adalah cara
+# endpoint menghilang dari rencana: itulah yang terjadi pada empat endpoint baca
+# yang melahirkan pagar ini. Entri dihapus begitu fasenya mendarat, dan
+# test_daftar_tunggu_tidak_menyimpan_yang_sudah_jadi di bawah yang memaksanya.
+BELUM_DIBANGUN = {
+    "POST /internal/clock/tick": "Fase 09, jam virtual (D-06, BR-63)",
+    "POST /internal/clock/reset": "Fase 09, jam virtual (D-06, BR-63)",
+    "POST /internal/seed": "Fase 13, data demo",
+}
+
+
 def test_setiap_endpoint_kontrak_terdaftar_di_aplikasi():
     terdaftar = _terdaftar()
     diminta = {
         f"{m} {_samakan(p)}": f"{m} {p}" for m, p in POLA.findall(KONTRAK.read_text())
     }
-    hilang = sorted(asli for kunci, asli in diminta.items() if kunci not in terdaftar)
+    hilang = sorted(
+        asli
+        for kunci, asli in diminta.items()
+        if kunci not in terdaftar and asli not in BELUM_DIBANGUN
+    )
     assert not hilang, (
-        "endpoint ini ada di 10-api-contract.md tapi tidak terdaftar di aplikasi: "
-        f"{hilang}"
+        "endpoint ini ada di 10-api-contract.md, tidak terdaftar di aplikasi, dan "
+        f"tidak dimiliki fase mana pun di BELUM_DIBANGUN: {hilang}"
+    )
+
+
+def test_daftar_tunggu_tidak_menyimpan_yang_sudah_jadi():
+    """Daftar tunggu wajib menyusut sendiri.
+
+    Tanpa test ini BELUM_DIBANGUN akan membusuk menjadi daftar pengecualian
+    permanen, dan pagar di atas berhenti menjaga apa pun yang sempat masuk ke
+    sana."""
+    terdaftar = _terdaftar()
+    sudah_jadi = sorted(
+        e
+        for e in BELUM_DIBANGUN
+        if f"{e.split(' ')[0]} {_samakan(e.split(' ')[1])}" in terdaftar
+    )
+    assert not sudah_jadi, (
+        "endpoint ini sudah terdaftar di aplikasi tapi masih tercatat sebagai belum "
+        f"dibangun; hapus dari BELUM_DIBANGUN: {sudah_jadi}"
     )
 
 

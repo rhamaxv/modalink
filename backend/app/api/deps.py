@@ -13,11 +13,13 @@ from app.db.session import get_session
 from app.domain.clock import Clock, SystemClock
 from app.errors import DomainError, ForbiddenError, NotFoundError
 from app.models.campaign import Campaign
+from app.models.comment import Comment
 from app.models.pledge import Pledge
 from app.models.proposal import Proposal, ProposalMilestone
 from app.models.user import Role, User
 from app.services.auth import ambil_user, decode_token
 from app.services.campaign import ambil_campaign
+from app.services.community import ambil_komentar_aktif
 from app.services.milestone import get_milestone
 from app.services.pledge import get_pledge
 from app.services.proposal import ambil_proposal
@@ -176,6 +178,25 @@ async def ambil_proposal_untuk_daftar_pledge(
     if user.role is Role.UMKM and proposal.umkm_id != user.id:
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
     return proposal
+
+
+async def get_own_comment(
+    comment_id: UUID,
+    user: User = Depends(require_role(Role.COMMUNITY)),
+    session: AsyncSession = Depends(get_session),
+) -> Comment:
+    """Kepemilikan komentar (BR-34), terpisah dari peran benar di atas, sama
+    seperti get_own_pledge. 404 untuk komentar yang tidak ada atau sudah
+    terhapus, 403 untuk komentar yang ada tapi bukan milik pengguna ini --
+    keberadaannya sudah publik lewat GET /proposals/{id}/comments, jadi 403
+    di sini tidak menambah kebocoran baru.
+    """
+    komentar = await ambil_komentar_aktif(session, comment_id)
+    if komentar is None:
+        raise NotFoundError("komentar_tidak_ada", "Komentar tidak ditemukan.")
+    if komentar.user_id != user.id:
+        raise ForbiddenError("bukan_penulis", "Komentar ini bukan milik Anda.")
+    return komentar
 
 
 async def jaga_akses_scoring_milik_sendiri(

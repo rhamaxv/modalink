@@ -22,6 +22,7 @@ from app.models.proposal import (
     ScoringStatus,
 )
 from app.models.user import Role, User
+from app.models.vote import Vote
 from app.schemas.milestone import MilestoneReportIn
 from app.services.auth import hash_password, issue_token
 from app.services.milestone import approve_milestone, submit_report
@@ -125,6 +126,14 @@ async def investor_lain(db):
 async def umkm_lain(db):
     """UMKM kedua: bukan pemilik proposal manapun di test, dipakai BR-13 dan akses baca."""
     return await _buat_akun(db, "umkm-lain-teruji@contoh.id", Role.UMKM)
+
+
+@pytest.fixture
+async def community_lain(db):
+    """Komunitas kedua: dipakai membuktikan BR-34 (bukan penulis komentar)
+    dengan dua akun sungguhan, bukan satu akun yang menghapus komentarnya
+    sendiri."""
+    return await _buat_akun(db, "warga-lain-teruji@contoh.id", Role.COMMUNITY)
 
 
 @pytest.fixture
@@ -383,6 +392,109 @@ async def proposal_scoring_gagal(db, campaign, umkm, clock, engine_meledak):
     await jalankan_scoring(db, p.id, engine_meledak, clock)
     await db.refresh(p)
     return p
+
+
+@dataclass
+class ProposalWithSkorTerbaru:
+    """Proposal dibungkus skor sungguhan yang seharusnya dipakai UI, khusus
+    fixture test. Atribut bebas seperti ini ditolak langsung di instance
+    Proposal (lihat docstring ProposalWithPledge di atas), jadi pembungkus
+    tipis yang sama dipakai lagi di sini."""
+
+    proposal: Proposal
+    skor_terbaru: int
+
+    def __getattr__(self, name: str):
+        return getattr(self.proposal, name)
+
+
+@pytest.fixture
+def proposal_dengan(db, campaign, clock):
+    """Factory proposal dengan skor dan jumlah vote yang dikontrol, dipakai
+    menguji urutan daftar proposal investor (10-api-contract.md: "terurut
+    skor lalu vote lalu waktu submit"). Skor dicapai lewat scoring
+    sungguhan via MockScoringEngine dan penanda [[SCORE:n]] (BR-73), bukan
+    ditulis langsung ke scoring_results, supaya test di atasnya memverifikasi
+    jalur baca produksi yang sesungguhnya, termasuk kasus skor di bawah
+    threshold campaign yang membuat proposal berstatus rejected -- pemilik
+    campaign tetap melihatnya di endpoint ini.
+
+    Setiap panggilan memakai UMKM baru supaya partial unique index BR-13
+    (satu proposal aktif per UMKM per campaign) tidak pernah jadi penghalang,
+    dan pool akun komunitas dipakai ulang antar panggilan untuk vote supaya
+    jumlah akun yang dibuat tidak meledak di test dengan banyak proposal.
+    """
+    counter = {"n": 0}
+    pool: list[Akun] = []
+
+    async def _akun_komunitas(indeks: int) -> Akun:
+        while indeks >= len(pool):
+            pool.append(
+                await _buat_akun(
+                    db, f"vote-pool-{len(pool)}-teruji@contoh.id", Role.COMMUNITY
+                )
+            )
+        return pool[indeks]
+
+    async def _buat(skor: int, vote: int) -> Proposal:
+        counter["n"] += 1
+        n = counter["n"]
+        umkm_akun = await _buat_akun(db, f"umkm-urutan-{n}-teruji@contoh.id", Role.UMKM)
+        p = _proposal_submitted(
+            campaign.id,
+            umkm_akun.user.id,
+            business_name=f"Warung Urutan {n}",
+            business_profile="x" * 110 + f" [[SCORE:{skor}]]",
+        )
+        db.add(p)
+        await db.flush()
+        await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+        for i in range(vote):
+            akun = await _akun_komunitas(i)
+            db.add(Vote(proposal_id=p.id, user_id=akun.user.id))
+        await db.flush()
+        await db.refresh(p)
+        return p
+
+    return _buat
+
+
+@pytest.fixture
+async def banyak_proposal(proposal_dengan):
+    """Beberapa proposal dengan skor dan vote yang sama, dipakai membuktikan
+    urutan stabil antar-request murni dari tie-break created_at lalu id,
+    bukan dari nilai skor/vote yang berbeda-beda."""
+    return [await proposal_dengan(skor=60, vote=1) for _ in range(5)]
+
+
+@pytest.fixture
+async def proposal_discore_ulang(db, campaign, clock):
+    """Proposal yang dinilai dua kali (BR-76, append-only): baris pertama
+    tidak boleh terpilih lagi sebagai skor yang dipakai UI setelah baris
+    kedua ditulis. Mengulang pola test_br76_dua_percobaan_scoring_sungguhan_
+    meninggalkan_dua_baris di test_scoring_flow.py, bukan menulis dua baris
+    ScoringResult langsung: query produksi harus benar-benar diuji lewat
+    jalur yang sama dengan yang menulis datanya."""
+    umkm_akun = await _buat_akun(db, "umkm-discore-ulang-teruji@contoh.id", Role.UMKM)
+    p = _proposal_submitted(
+        campaign.id, umkm_akun.user.id, business_profile="x" * 110 + " [[SCORE:50]]"
+    )
+    db.add(p)
+    await db.flush()
+    await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+
+    await db.refresh(p)
+    p.scoring_status = ScoringStatus.PENDING
+    p.status = ProposalStatus.SUBMITTED
+    # Ganti, bukan ditambah: MockScoringEngine mengambil penanda [[SCORE:n]]
+    # PERTAMA yang ditemukan di teks gabungan (lihat mock_engine.py), jadi
+    # menambahkan [[SCORE:95]] di belakang [[SCORE:50]] yang lama akan tetap
+    # menghasilkan 50 lagi, bukan membuktikan apa pun soal baris terbaru.
+    p.business_profile = "x" * 110 + " [[SCORE:95]]"
+    await db.flush()
+    await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+    await db.refresh(p)
+    return ProposalWithSkorTerbaru(proposal=p, skor_terbaru=95)
 
 
 @pytest.fixture

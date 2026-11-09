@@ -72,3 +72,19 @@ class MilestoneOut(BaseModel):
 
 class MilestoneListOut(BaseModel):
     items: list[MilestoneOut]
+
+
+class ProposalWithSignalsOut(ProposalOut):
+    """ProposalOut ditambah sinyal komunitas dan AI yang dipakai mengurutkan
+    daftar proposal investor (10-api-contract.md: skor lalu vote lalu waktu
+    submit). `total_score` 0 untuk proposal yang belum pernah dinilai,
+    `vote_count` 0 untuk yang belum pernah divote -- keduanya hasil
+    coalesce di query, bukan nilai yang pernah ditulis ke kolom manapun.
+    """
+
+    total_score: int
+    vote_count: int
+
+
+class ProposalWithSignalsListOut(BaseModel):
+    items: list[ProposalWithSignalsOut]

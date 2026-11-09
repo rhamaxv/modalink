@@ -153,6 +153,36 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # app/api/v1/internal.py): literal "{proposal_id}" tetap gagal UUID
     # untuk siapa pun, jadi satu baris anonim ini sudah cukup representatif.
     ("GET", "/api/v1/internal/ledger/{proposal_id}", None, 422),
+    # Fase 08 (komunitas): vote dan komentar. Peran salah ditolak sebelum
+    # literal "{proposal_id}" dicoba divalidasi sebagai UUID, sama seperti
+    # pola pledges/rescore di atas; peran benar lolos ke 422 karena literal
+    # itu. Toggle, BR-31, BR-30, dan kasus peran salah/benar sungguhan ada
+    # di tests/integration/test_vote.py.
+    ("POST", "/api/v1/proposals/{proposal_id}/vote", None, 401),
+    ("POST", "/api/v1/proposals/{proposal_id}/vote", "investor", 403),  # peran salah
+    ("POST", "/api/v1/proposals/{proposal_id}/vote", "umkm", 403),  # peran salah
+    ("POST", "/api/v1/proposals/{proposal_id}/vote", "community", 422),
+    # Publik tanpa pagar peran: literal "{proposal_id}" gagal UUID untuk
+    # peran manapun, jadi satu baris saja cukup (pola yang sama dengan
+    # GET /proposals/{proposal_id}). Cakupan isi daftar ada di
+    # tests/integration/test_comment.py.
+    ("GET", "/api/v1/proposals/{proposal_id}/comments", None, 422),
+    ("POST", "/api/v1/proposals/{proposal_id}/comments", None, 401),
+    (
+        "POST",
+        "/api/v1/proposals/{proposal_id}/comments",
+        "investor",
+        403,
+    ),  # peran salah
+    ("POST", "/api/v1/proposals/{proposal_id}/comments", "umkm", 403),  # peran salah
+    ("POST", "/api/v1/proposals/{proposal_id}/comments", "community", 422),
+    ("DELETE", "/api/v1/comments/{comment_id}", None, 401),
+    ("DELETE", "/api/v1/comments/{comment_id}", "investor", 403),  # peran salah
+    ("DELETE", "/api/v1/comments/{comment_id}", "umkm", 403),  # peran salah
+    # Komunitas lolos pagar peran; 422 karena literal "{comment_id}" gagal
+    # divalidasi sebagai UUID. Kasus peran benar tapi bukan penulis (403) dan
+    # penghapusan sungguhan ada di tests/integration/test_comment.py.
+    ("DELETE", "/api/v1/comments/{comment_id}", "community", 422),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 
