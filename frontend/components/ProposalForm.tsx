@@ -26,7 +26,7 @@ export type ProposalSubmission = {
   requested_amount: number;
   fund_usage_plan: string;
   business_projection: string;
-  milestones: { title: string; description: string; amount: number }[];
+  milestones: { seq: number; title: string; description: string; amount: number }[];
 };
 
 type ProposalFormProps = {
@@ -128,7 +128,15 @@ export function ProposalForm({
       requested_amount: requestedAmountValue,
       fund_usage_plan: fundUsagePlan,
       business_projection: businessProjection,
-      milestones: milestones.map((m) => ({
+      // seq (1-indeks urutan tahap) wajib diisi: backend/app/schemas/
+      // proposal.py MilestoneIn tidak punya default untuk field ini. Tanpa
+      // ini, POST /campaigns/{id}/proposals selalu gagal 422 "Field
+      // required" untuk setiap milestone -- dibuktikan lewat e2e Fase 11
+      // Task 12 terhadap backend asli, bukan diasumsikan: tidak ada test
+      // unit yang pernah membangun body permintaan sungguhan untuk
+      // membuktikan bentuknya benar, hanya memverifikasi onSubmit dipanggil.
+      milestones: milestones.map((m, index) => ({
+        seq: index + 1,
         title: m.title,
         description: m.description,
         amount: Number(m.amount) || 0,
