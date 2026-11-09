@@ -67,6 +67,46 @@ async def test_br25_pledge_cannot_be_cancelled_after_funded(
     assert res.status_code == 409
 
 
+async def test_br25_pledge_cannot_be_cancelled_after_completed(
+    client, db, investor, umkm_lain, funded_proposal
+):
+    """Reproduksi double-spend (review Finding 1): BR-25 ditulis sebagai
+    `proposal.status is FUNDED` saja, padahal `completed` ada SETELAH funded
+    (T-09) dan tidak pernah tertutup. Begitu kedua milestone cair dan
+    proposal `completed`, pledge yang mendanainya harus tetap terkunci --
+    membatalkannya sekarang berarti merefund uang yang sudah keluar ke UMKM.
+    """
+    m1, m2 = funded_proposal.milestones
+    pledge_id = funded_proposal.pledges[0].id
+
+    await client.post(f"/api/v1/milestones/{m1.id}/approve", headers=investor.headers)
+    await client.post(
+        f"/api/v1/milestones/{m2.id}/reports",
+        headers=umkm_lain.headers,
+        json={"narrative": "x" * 60, "metrics": None},
+    )
+    approve_m2 = await client.post(
+        f"/api/v1/milestones/{m2.id}/approve", headers=investor.headers
+    )
+    assert approve_m2.status_code == 200
+    await db.refresh(funded_proposal.proposal)
+    assert funded_proposal.proposal.status is ProposalStatus.COMPLETED
+
+    res = await client.delete(f"/api/v1/pledges/{pledge_id}", headers=investor.headers)
+    assert res.status_code == 409
+
+    await db.refresh(funded_proposal.proposal)
+    assert funded_proposal.proposal.status is ProposalStatus.COMPLETED
+
+    entries = (
+        await db.scalars(
+            select(LedgerEntry).where(LedgerEntry.proposal_id == funded_proposal.id)
+        )
+    ).all()
+    assert EntryType.REFUND_OUT not in [e.entry_type for e in entries]
+    assert hitung_saldo(entries) == 0
+
+
 async def test_br26_cancellation_records_refund_not_delete(
     client, db, investor, listed_proposal
 ):

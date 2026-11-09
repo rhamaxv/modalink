@@ -56,6 +56,39 @@ PROPOSAL_MAP: dict[tuple[ProposalStatus, ProposalEvent], ProposalStatus] = {
     (S.FUNDED, E.SEMUA_MILESTONE_CAIR): S.COMPLETED,  # T-09
 }
 
+
+def _reachable_closure(
+    start: ProposalStatus,
+    mapping: dict[tuple[ProposalStatus, ProposalEvent], ProposalStatus],
+) -> frozenset[ProposalStatus]:
+    """Himpunan status yang bisa dicapai dari `start`, termasuk `start`
+    sendiri, lewat edge PROPOSAL_MAP. Dihitung dari data peta, bukan
+    dienumerasi tangan, supaya status baru yang ditambahkan sebagai hilir
+    dari `start` (menambah baris ke PROPOSAL_MAP, langkah wajib di
+    SKILL.md state-machine-guard) otomatis ikut masuk tanpa menyentuh
+    pemanggil fungsi ini sama sekali."""
+    seen = {start}
+    frontier = [start]
+    while frontier:
+        current = frontier.pop()
+        for (src, _event), dst in mapping.items():
+            if src == current and dst not in seen:
+                seen.add(dst)
+                frontier.append(dst)
+    return frozenset(seen)
+
+
+# BR-25: begitu proposal mencapai funded, pledge-nya terkunci selamanya --
+# termasuk status apa pun yang masih bisa dicapai SETELAH funded (sekarang
+# hanya completed, lewat T-09). Review Finding 1 menemukan kode yang hanya
+# menolak status FUNDED secara harfiah, lolos begitu proposal maju ke
+# completed. Closure di atas, bukan {FUNDED, COMPLETED} yang dieja tangan:
+# status baru yang ditambahkan sebagai hilir dari FUNDED otomatis ikut
+# terkunci tanpa ada yang perlu mengingat untuk menambahkannya ke sini.
+PLEDGE_LOCKED_PROPOSAL_STATUSES: frozenset[ProposalStatus] = _reachable_closure(
+    ProposalStatus.FUNDED, PROPOSAL_MAP
+)
+
 M, ME = MilestoneStatus, MilestoneEvent
 MILESTONE_MAP: dict[tuple[MilestoneStatus, MilestoneEvent], MilestoneStatus] = {
     (M.PENDING, ME.LAPOR): M.REPORTED,  # T-20
