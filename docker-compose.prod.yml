@@ -21,8 +21,12 @@ services:
       ENV: prod
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      SCORING_ENGINE: ${SCORING_ENGINE}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # Keduanya wajib, bukan opsional. Tanpa penjaga `:?`, variabel yang tidak
+      # diset menjadi string kosong dan container tetap menyala; kegagalannya baru
+      # muncul pada percobaan scoring pertama, yaitu di depan juri, sebagai proposal
+      # yang menggantung tanpa penjelasan. Lebih baik compose menolak berjalan.
+      SCORING_ENGINE: ${SCORING_ENGINE:?set gemini untuk produksi, mock hanya untuk pengembangan}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY is required}
       GEMINI_MODEL: ${GEMINI_MODEL}
     depends_on:
       db: { condition: service_healthy }

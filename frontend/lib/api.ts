@@ -1,7 +1,12 @@
 // Default relatif, bukan URL absolut: di produksi frontend dan backend berada
 // di balik proxy yang sama, dan di dev `NEXT_PUBLIC_API_URL` menimpanya ke
 // origin backend. Lihat .claude/prd/10-api-contract.md untuk bentuk error.
-const BASIS = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+//
+// `||`, bukan `??`, dan bedanya mematikan di produksi: Docker build arg yang
+// dibiarkan kosong menghasilkan string kosong, bukan undefined, dan `??` hanya
+// jatuh ke default untuk undefined. Dibangun begitu, seluruh request kehilangan
+// prefiks /api/v1 dan 404, sementara setiap container melaporkan dirinya sehat.
+const BASIS = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export class ApiError extends Error {
   constructor(
