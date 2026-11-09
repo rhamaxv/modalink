@@ -103,7 +103,7 @@ markers = ["live: memanggil Gemini sungguhan, di-skip default"]
 `backend/tests/integration/test_health.py`:
 
 ```python
-async def test_health_mengembalikan_status_database(client):
+async def test_health_returns_database_status(client):
     res = await client.get("/health")
     assert res.status_code == 200
     assert res.json() == {"status": "ok", "database": "ok"}
@@ -230,7 +230,7 @@ git commit -m "feat: scaffold FastAPI backend with health endpoint"
 import pytest
 from app.errors import ConflictError
 
-async def test_domain_error_jadi_bentuk_seragam(client, app):
+async def test_domain_error_becomes_uniform_shape(client, app):
     @app.get("/_boom")
     async def boom():
         raise ConflictError("transisi_tidak_sah", "Proposal sudah funded.",
@@ -322,13 +322,13 @@ git commit -am "feat: add uniform error envelope for all endpoints"
 # backend/tests/integration/test_db_fixture.py
 from sqlalchemy import text
 
-async def test_fixture_db_dirollback_antar_test(db):
+async def test_db_fixture_rolled_back_between_tests(db):
     await db.execute(text("CREATE TEMP TABLE jejak (n int)"))
     await db.execute(text("INSERT INTO jejak VALUES (1)"))
     rows = (await db.execute(text("SELECT count(*) FROM jejak"))).scalar()
     assert rows == 1
 
-async def test_fixture_db_bersih_di_test_berikutnya(db):
+async def test_db_fixture_clean_in_next_test(db):
     exists = (await db.execute(
         text("SELECT to_regclass('pg_temp.jejak') IS NOT NULL")
     )).scalar()
@@ -481,7 +481,7 @@ melainkan satu hal yang tidak boleh ikut tercatat.
 # backend/tests/integration/test_logging.py
 import json
 
-async def test_setiap_request_menghasilkan_satu_baris_json(client, caplog):
+async def test_every_request_produces_one_json_line(client, caplog):
     await client.get("/health")
     baris = [json.loads(r.message) for r in caplog.records if r.name == "modalink.http"]
     assert len(baris) == 1
@@ -501,8 +501,8 @@ async def test_log_tidak_pernah_memuat_password_atau_token(client, caplog):
 
 async def test_log_pemanggilan_ai_tidak_memuat_isi_proposal(db, submitted_proposal,
                                                             engine_mock, clock, caplog):
-    from app.services.scoring import jalankan_scoring
-    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+    from app.services.scoring import run_scoring
+    await run_scoring(db, submitted_proposal.id, engine_mock, clock)
     baris = [json.loads(r.message) for r in caplog.records if r.name == "modalink.ai"]
     assert baris[0].keys() >= {"model", "durasi_ms", "valid"}
     assert submitted_proposal.business_profile not in " ".join(

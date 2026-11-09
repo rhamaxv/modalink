@@ -45,26 +45,26 @@ def draft(seq: int, amount: int) -> MilestoneDraft:
     return MilestoneDraft(seq=seq, title=f"Tahap {seq}",
                           description="x" * 20, amount=amount)
 
-def test_rencana_valid_lolos():
+def test_valid_plan_passes():
     validate_milestone_plan([draft(1, 5_000_000), draft(2, 5_000_000)], 10_000_000)
 
-def test_br14_kurang_dari_dua_milestone_ditolak():
+def test_br14_fewer_than_two_milestones_rejected():
     with pytest.raises(ValueError, match="minimal dua"):
         validate_milestone_plan([draft(1, 10_000_000)], 10_000_000)
 
-def test_br14_jumlah_tidak_sama_ditolak_dan_menyebut_selisihnya():
+def test_br14_amount_mismatch_rejected_and_reports_difference():
     with pytest.raises(ValueError, match="kurang Rp1.000.000"):
         validate_milestone_plan([draft(1, 5_000_000), draft(2, 4_000_000)], 10_000_000)
 
-def test_br14_jumlah_berlebih_juga_menyebut_selisihnya():
+def test_br14_amount_surplus_also_reports_difference():
     with pytest.raises(ValueError, match="lebih Rp2.000.000"):
         validate_milestone_plan([draft(1, 6_000_000), draft(2, 6_000_000)], 10_000_000)
 
-def test_br15_seq_harus_berurutan_dari_satu():
+def test_br15_seq_must_be_sequential_from_one():
     with pytest.raises(ValueError, match="berurutan"):
         validate_milestone_plan([draft(1, 5_000_000), draft(3, 5_000_000)], 10_000_000)
 
-def test_br16_amount_nol_ditolak():
+def test_br16_zero_amount_rejected():
     with pytest.raises(ValueError):
         validate_milestone_plan([draft(1, 10_000_000), draft(2, 0)], 10_000_000)
 ```
@@ -147,7 +147,7 @@ from sqlalchemy.exc import IntegrityError
 from app.domain.transitions import ProposalStatus
 from app.models.proposal import Proposal
 
-async def test_br13_umkm_tidak_bisa_punya_dua_proposal_aktif_di_campaign_sama(
+async def test_br13_umkm_cannot_have_two_active_proposals_in_same_campaign(
     db, umkm, campaign, buat_proposal
 ):
     await buat_proposal(status=ProposalStatus.LISTED)
@@ -155,7 +155,7 @@ async def test_br13_umkm_tidak_bisa_punya_dua_proposal_aktif_di_campaign_sama(
         await buat_proposal(status=ProposalStatus.SUBMITTED)
 
 @pytest.mark.parametrize("status_mati", [ProposalStatus.REJECTED, ProposalStatus.FAILED])
-async def test_br13_proposal_yang_sudah_mati_tidak_menghalangi_pengajuan_baru(
+async def test_br13_dead_proposal_does_not_block_new_submission(
     db, buat_proposal, status_mati
 ):
     await buat_proposal(status=status_mati)
@@ -240,7 +240,7 @@ def body_proposal(**ubah):
     }
     return isi | ubah
 
-async def test_umkm_bisa_submit_proposal(client, umkm, campaign):
+async def test_umkm_can_submit_proposal(client, umkm, campaign):
     res = await client.post(f"/api/v1/campaigns/{campaign.id}/proposals",
                             headers=umkm.headers, json=body_proposal())
     assert res.status_code == 201
@@ -248,7 +248,7 @@ async def test_umkm_bisa_submit_proposal(client, umkm, campaign):
     assert data["status"] == "submitted"
     assert data["scoring_status"] in {"pending", "processing", "done"}
 
-async def test_br11_dana_melebihi_target_campaign_ditolak(client, umkm, campaign):
+async def test_br11_funds_exceeding_campaign_target_rejected(client, umkm, campaign):
     res = await client.post(f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
         json=body_proposal(requested_amount=campaign.target_amount + 1,
@@ -258,7 +258,7 @@ async def test_br11_dana_melebihi_target_campaign_ditolak(client, umkm, campaign
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "dana_melebihi_target_campaign"
 
-async def test_br14_jumlah_milestone_tidak_pas_ditolak_dengan_selisih(client, umkm, campaign):
+async def test_br14_milestone_amount_mismatch_rejected_with_difference(client, umkm, campaign):
     res = await client.post(f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
         json=body_proposal(milestones=[
@@ -268,7 +268,7 @@ async def test_br14_jumlah_milestone_tidak_pas_ditolak_dengan_selisih(client, um
     assert res.status_code == 422
     assert "Rp1.000.000" in res.json()["error"]["message"]
 
-async def test_br12_dana_di_bawah_minimum_ditolak(client, umkm, campaign):
+async def test_br12_funds_below_minimum_rejected(client, umkm, campaign):
     res = await client.post(f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
         json=body_proposal(requested_amount=400_000, milestones=[
@@ -278,7 +278,7 @@ async def test_br12_dana_di_bawah_minimum_ditolak(client, umkm, campaign):
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "dana_di_bawah_minimum"
 
-async def test_br13_proposal_kedua_ke_campaign_sama_ditolak_409(client, umkm, campaign):
+async def test_br13_second_proposal_to_same_campaign_rejected_409(client, umkm, campaign):
     await client.post(f"/api/v1/campaigns/{campaign.id}/proposals",
                       headers=umkm.headers, json=body_proposal())
     res = await client.post(f"/api/v1/campaigns/{campaign.id}/proposals",
@@ -286,7 +286,7 @@ async def test_br13_proposal_kedua_ke_campaign_sama_ditolak_409(client, umkm, ca
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "proposal_aktif_sudah_ada"
 
-async def test_br17_campaign_yang_apply_deadline_nya_lewat_menolak(
+async def test_br17_campaign_past_apply_deadline_rejects(
     client, umkm, campaign_kedaluwarsa
 ):
     res = await client.post(f"/api/v1/campaigns/{campaign_kedaluwarsa.id}/proposals",
@@ -294,7 +294,7 @@ async def test_br17_campaign_yang_apply_deadline_nya_lewat_menolak(
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "pengajuan_ditutup"
 
-async def test_br18_tidak_ada_endpoint_ubah_proposal(app):
+async def test_br18_no_endpoint_to_update_proposal(app):
     rute = {(m, r.path) for r in app.routes
             if getattr(r, "methods", None) for m in r.methods}
     assert ("PATCH", "/api/v1/proposals/{proposal_id}") not in rute
@@ -381,30 +381,30 @@ git commit -am "feat: add proposal submission with milestone plan"
 
 ```python
 # backend/tests/integration/test_proposal_akses.py
-async def test_proposal_listed_terlihat_publik(client, listed_proposal):
+async def test_proposal_listed_visible_publicly(client, listed_proposal):
     assert (await client.get(f"/api/v1/proposals/{listed_proposal.id}")).status_code == 200
 
-async def test_proposal_submitted_tidak_terlihat_publik(client, submitted_proposal):
+async def test_proposal_submitted_not_visible_publicly(client, submitted_proposal):
     assert (await client.get(f"/api/v1/proposals/{submitted_proposal.id}")).status_code == 404
 
-async def test_proposal_submitted_terlihat_oleh_pemiliknya(client, umkm, submitted_proposal):
+async def test_proposal_submitted_visible_to_its_owner(client, umkm, submitted_proposal):
     res = await client.get(f"/api/v1/proposals/{submitted_proposal.id}",
                            headers=umkm.headers)
     assert res.status_code == 200
 
-async def test_proposal_rejected_terlihat_oleh_pemilik_campaign(
+async def test_proposal_rejected_visible_to_campaign_owner(
     client, investor, rejected_proposal
 ):
     res = await client.get(f"/api/v1/proposals/{rejected_proposal.id}",
                            headers=investor.headers)
     assert res.status_code == 200
 
-async def test_proposal_submitted_tidak_terlihat_umkm_lain(client, umkm_lain, submitted_proposal):
+async def test_proposal_submitted_not_visible_to_other_umkm(client, umkm_lain, submitted_proposal):
     res = await client.get(f"/api/v1/proposals/{submitted_proposal.id}",
                            headers=umkm_lain.headers)
     assert res.status_code == 404
 
-async def test_daftar_proposal_campaign_menyembunyikan_yang_belum_listed(
+async def test_list_campaign_proposals_hides_not_yet_listed(
     client, investor, listed_proposal, submitted_proposal, rejected_proposal
 ):
     """Filter visibilitas di endpoint daftar proposal campaign lahir di fase 03
@@ -426,7 +426,7 @@ async def test_daftar_proposal_campaign_menyembunyikan_yang_belum_listed(
             str(rejected_proposal.id)} <= semua
 
 
-async def test_campaign_yang_sudah_closed_menolak_proposal_baru(
+async def test_already_closed_campaign_rejects_new_proposal(
     client, investor, campaign, umkm
 ):
     """Ditunda dari fase 03 karena endpoint POST proposal baru lahir di sini."""
@@ -437,7 +437,7 @@ async def test_campaign_yang_sudah_closed_menolak_proposal_baru(
     assert res.json()["error"]["code"] == "pengajuan_ditutup"
 
 
-async def test_patch_dan_close_campaign_yang_tidak_ada_mengembalikan_404(
+async def test_patch_and_close_nonexistent_campaign_returns_404(
     client, investor
 ):
     """Satu-satunya cabang di dependency kepemilikan yang belum pernah dieksekusi."""
@@ -449,7 +449,7 @@ async def test_patch_dan_close_campaign_yang_tidak_ada_mengembalikan_404(
             headers=investor.headers)).status_code == 404
 
 
-async def test_daftar_publik_hanya_memuat_listed_ke_atas(
+async def test_public_listing_only_includes_listed_and_above(
     client, listed_proposal, submitted_proposal, rejected_proposal
 ):
     ids = {p["id"] for p in (await client.get("/api/v1/proposals")).json()["items"]}
@@ -472,7 +472,7 @@ Expected: FAIL
 PUBLIK = {ProposalStatus.LISTED, ProposalStatus.PARTIALLY_FUNDED,
           ProposalStatus.FUNDED, ProposalStatus.COMPLETED, ProposalStatus.FAILED}
 
-def boleh_melihat(proposal: Proposal, campaign: Campaign, user: User | None) -> bool:
+def can_view(proposal: Proposal, campaign: Campaign, user: User | None) -> bool:
     if proposal.status in PUBLIK:
         return True
     if user is None:

@@ -43,14 +43,14 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from app.models.user import Role, User
 
-async def test_br02_email_unik_lintas_peran(db):
+async def test_br02_email_unique_across_roles(db):
     db.add(User(email="a@x.id", password_hash="h", name="A", role=Role.INVESTOR))
     await db.flush()
     db.add(User(email="a@x.id", password_hash="h", name="B", role=Role.UMKM))
     with pytest.raises(IntegrityError):
         await db.flush()
 
-async def test_email_disimpan_lowercase(db):
+async def test_email_stored_as_lowercase(db):
     u = User(email="Budi@Contoh.ID", password_hash="h", name="Budi", role=Role.UMKM)
     db.add(u)
     await db.flush()
@@ -135,34 +135,34 @@ import pytest
 from app.services.auth import decode_token, hash_password, issue_token, verify_password
 from uuid import uuid4
 
-def test_br03_hash_tidak_pernah_sama_dengan_password_asli():
+def test_br03_hash_never_equals_original_password():
     h = hash_password("rahasia123")
     assert h != "rahasia123"
     assert h.startswith("$argon2")
 
-def test_verify_password_benar_dan_salah():
+def test_verify_password_correct_and_incorrect():
     h = hash_password("rahasia123")
     assert verify_password("rahasia123", h) is True
     assert verify_password("rahasia124", h) is False
 
-def test_token_membawa_sub_dan_role():
+def test_token_carries_sub_and_role():
     uid = uuid4()
     claims = decode_token(issue_token(uid, "investor"))
     assert claims.sub == uid
     assert claims.role == "investor"
 
-def test_token_kedaluwarsa_ditolak():
+def test_expired_token_rejected():
     uid = uuid4()
     kedaluwarsa = issue_token(uid, "investor", ttl_hours=-1)
-    with pytest.raises(TokenKedaluwarsa) as err:
+    with pytest.raises(TokenExpired) as err:
         decode_token(kedaluwarsa)
     assert err.value.status == 401
 
-def test_token_dengan_tanda_tangan_lain_ditolak():
+def test_token_with_different_signature_rejected():
     import jwt
     palsu = jwt.encode({"sub": str(uuid4()), "role": "investor"},
                        "kunci-lain-yang-panjangnya-cukup-32-byte", algorithm="HS256")
-    with pytest.raises(TokenTidakSah):
+    with pytest.raises(TokenInvalid):
         decode_token(palsu)
 ```
 
@@ -213,12 +213,12 @@ def issue_token(user_id: UUID, role: str, ttl_hours: int | None = None) -> str:
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
-class TokenKedaluwarsa(DomainError):
+class TokenExpired(DomainError):
     """Token masih sah tanda tangannya, tetapi masa berlakunya habis."""
     status = 401
 
 
-class TokenTidakSah(DomainError):
+class TokenInvalid(DomainError):
     """Tanda tangan tidak cocok, bentuknya rusak, atau klaimnya tidak lengkap."""
     status = 401
 
@@ -231,9 +231,9 @@ def decode_token(token: str) -> TokenClaims:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
-        raise TokenKedaluwarsa("token_kedaluwarsa", "Sesi Anda sudah berakhir, silakan masuk lagi.") from None
+        raise TokenExpired("token_kedaluwarsa", "Sesi Anda sudah berakhir, silakan masuk lagi.") from None
     except jwt.InvalidTokenError:
-        raise TokenTidakSah("token_tidak_sah", "Token tidak sah.") from None
+        raise TokenInvalid("token_tidak_sah", "Token tidak sah.") from None
     return TokenClaims(sub=UUID(payload["sub"]), role=payload["role"])
 ```
 
@@ -262,7 +262,7 @@ git commit -am "feat: add argon2 hashing and role-bearing JWT"
 # backend/tests/integration/test_auth.py
 import pytest
 
-async def test_register_lalu_login(client):
+async def test_register_then_login(client):
     daftar = await client.post("/api/v1/auth/register", json={
         "email": "investor@contoh.id", "password": "rahasia123",
         "name": "Sari", "role": "investor",
@@ -275,7 +275,7 @@ async def test_register_lalu_login(client):
     assert masuk.status_code == 200
     assert masuk.json()["token_type"] == "bearer"
 
-async def test_br03_password_hash_tidak_pernah_dikembalikan(client):
+async def test_br03_password_hash_never_returned(client):
     res = await client.post("/api/v1/auth/register", json={
         "email": "a@contoh.id", "password": "rahasia123", "name": "A", "role": "umkm",
     })
@@ -308,7 +308,7 @@ async def test_login_tidak_membocorkan_email_lewat_lama_respons(client, monkeypa
         "memakai hash umpan, supaya lama responsnya tidak membedakan keduanya"
     )
 
-async def test_login_salah_password_tidak_membocorkan_apakah_email_ada(client):
+async def test_login_wrong_password_does_not_leak_whether_email_exists(client):
     await client.post("/api/v1/auth/register", json={
         "email": "a@contoh.id", "password": "rahasia123", "name": "A", "role": "umkm",
     })
@@ -319,7 +319,7 @@ async def test_login_salah_password_tidak_membocorkan_apakah_email_ada(client):
     assert ada.status_code == tidak_ada.status_code == 401
     assert ada.json() == tidak_ada.json()
 
-async def test_br05_endpoint_me_butuh_token(client):
+async def test_br05_me_endpoint_requires_token(client):
     assert (await client.get("/api/v1/auth/me")).status_code == 401
 ```
 
@@ -346,7 +346,7 @@ from app.services.auth import hash_password, issue_token, verify_password
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
-class KredensialSalah(DomainError):
+class InvalidCredentials(DomainError):
     status = 401
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserOut)
@@ -374,7 +374,7 @@ async def login(body: LoginIn, session: AsyncSession = Depends(get_session)) -> 
     cocok = verify_password(body.password, hash_diperiksa)
 
     if user is None or not cocok:
-        raise KredensialSalah("kredensial_salah", "Email atau password salah.")
+        raise InvalidCredentials("kredensial_salah", "Email atau password salah.")
     return TokenOut(access_token=issue_token(user.id, user.role))
 ```
 
@@ -407,7 +407,7 @@ git commit -am "feat: add register, login and me endpoints"
 
 ```python
 # backend/tests/integration/test_deps.py
-async def test_br04_role_diverifikasi_ulang_ke_database(client, db, investor):
+async def test_br04_role_reverified_against_database(client, db, investor):
     """Token lama dengan role yang sudah berubah tidak boleh lolos."""
     from app.models.user import Role
     investor.user.role = Role.COMMUNITY
@@ -416,12 +416,12 @@ async def test_br04_role_diverifikasi_ulang_ke_database(client, db, investor):
     res = await client.post("/api/v1/campaigns", headers=investor.headers, json={})
     assert res.status_code == 403
 
-async def test_peran_salah_ditolak_403_bukan_401(client, umkm):
+async def test_wrong_role_rejected_403_not_401(client, umkm):
     res = await client.post("/api/v1/campaigns", headers=umkm.headers, json={})
     assert res.status_code == 403
     assert res.json()["error"]["code"] == "peran_tidak_berhak"
 
-async def test_tanpa_token_ditolak_401(client):
+async def test_without_token_rejected_401(client):
     assert (await client.post("/api/v1/campaigns", json={})).status_code == 401
 ```
 
@@ -446,7 +446,7 @@ from app.errors import DomainError, ForbiddenError
 from app.models.user import Role, User
 from app.services.auth import decode_token
 
-class TidakTerautentikasi(DomainError):
+class Unauthenticated(DomainError):
     status = 401
 
 async def current_user(
@@ -454,14 +454,14 @@ async def current_user(
     session: AsyncSession = Depends(get_session),
 ) -> User:
     if not authorization or not authorization.startswith("Bearer "):
-        raise TidakTerautentikasi("tidak_terautentikasi", "Token tidak ada.")
-    # Tidak ada penerjemahan di sini: decode_token sudah melempar TokenKedaluwarsa
-    # atau TokenTidakSah, keduanya DomainError berstatus 401.
+        raise Unauthenticated("tidak_terautentikasi", "Token tidak ada.")
+    # Tidak ada penerjemahan di sini: decode_token sudah melempar TokenExpired
+    # atau TokenInvalid, keduanya DomainError berstatus 401.
     claims = decode_token(authorization.removeprefix("Bearer "))
 
     user = await session.get(User, claims.sub)
     if user is None:
-        raise TidakTerautentikasi("token_tidak_sah", "Akun tidak ditemukan.")
+        raise Unauthenticated("token_tidak_sah", "Akun tidak ditemukan.")
     return user
 
 def require_role(*roles: Role) -> Callable[[User], User]:
@@ -514,7 +514,7 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
 ]
 
 @pytest.mark.parametrize("method,path,peran,harapan", RBAC_MATRIX)
-async def test_r5_matriks_rbac(client, akun, method, path, peran, harapan):
+async def test_r5_rbac_matrix(client, akun, method, path, peran, harapan):
     headers = akun[peran].headers if peran else {}
     res = await client.request(method, path, headers=headers, json={})
     assert res.status_code == harapan, (
@@ -522,7 +522,7 @@ async def test_r5_matriks_rbac(client, akun, method, path, peran, harapan):
         f"dapat {res.status_code}, harusnya {harapan}"
     )
 
-def test_r5_setiap_route_punya_baris_di_matriks(app):
+def test_r5_every_route_has_a_row_in_the_matrix(app):
     """Endpoint baru tanpa baris baru di matriks membuat test ini merah."""
     DIKECUALIKAN = {"/health", "/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"}
     terdaftar = {
@@ -607,7 +607,7 @@ yang menyalinnya.
 ```python
 # backend/tests/integration/test_auth.py (tambahan)
 
-async def test_me_mengembalikan_profil_tanpa_password_hash(client):
+async def test_me_returns_profile_without_password_hash(client):
     await client.post("/api/v1/auth/register", json={
         "email": "sari@contoh.id", "password": "rahasia123",
         "name": "Sari", "role": "investor",
@@ -626,7 +626,7 @@ async def test_me_mengembalikan_profil_tanpa_password_hash(client):
     assert "rahasia123" not in res.text
 
 
-async def test_br02_email_duplikat_ditolak_400_bukan_500(client):
+async def test_br02_duplicate_email_rejected_400_not_500(client):
     """Menutup celah balapan: pemeriksaan di Python bisa dilewati dua registrasi
     bersamaan, dan constraint database yang menangkapnya harus diterjemahkan
     menjadi error yang rapi, bukan bocor sebagai 500."""
@@ -681,7 +681,7 @@ async def authenticate_user(session: AsyncSession, body: LoginIn) -> User:
     # lama responsnya tidak membedakan "email tidak ada" dari "password salah".
     cocok = verify_password(body.password, user.password_hash if user else HASH_UMPAN)
     if user is None or not cocok:
-        raise KredensialSalah("kredensial_salah", "Email atau password salah.")
+        raise InvalidCredentials("kredensial_salah", "Email atau password salah.")
     return user
 ```
 

@@ -56,10 +56,10 @@ def skor(fit=30, data=20, impact=20, flags=()):
         brief=Brief(strengths=["a"], risks=["b"], recommendation="c"),
     )
 
-def test_br70_total_dijumlahkan_dari_tiga_komponen():
+def test_br70_total_is_summed_from_three_components():
     assert total_score(skor(34, 21, 18)) == 73
 
-def test_br70_field_total_dari_model_dibuang():
+def test_br70_total_field_from_model_is_discarded():
     """Model yang mengarang 'total' tidak boleh mempengaruhi apa pun."""
     mentah = {
         "fit_score": 10, "data_quality_score": 10, "impact_score": 10, "total": 99,
@@ -68,13 +68,13 @@ def test_br70_field_total_dari_model_dibuang():
     }
     assert total_score(ProposalScore.model_validate(mentah)) == 30
 
-def test_br73_di_bawah_threshold_jadi_rejected():
+def test_br73_below_threshold_becomes_rejected():
     assert decide_verdict(skor(10, 10, 10), threshold=60) is Verdict.REJECTED
 
-def test_br73_tepat_di_threshold_jadi_listed():
+def test_br73_exactly_at_threshold_becomes_listed():
     assert decide_verdict(skor(20, 20, 20), threshold=60) is Verdict.LISTED
 
-def test_br71_threshold_tidak_pernah_masuk_ke_prompt():
+def test_br71_threshold_never_enters_the_prompt():
     """Model tidak boleh tahu ambangnya, supaya penilaiannya tidak condong
     menyesuaikan ambang."""
     from pathlib import Path
@@ -82,17 +82,17 @@ def test_br71_threshold_tidak_pernah_masuk_ke_prompt():
     assert "threshold" not in prompt.lower()
     assert "{score_threshold" not in prompt
 
-def test_br71_verdict_berubah_mengikuti_threshold_yang_berbeda():
+def test_br71_verdict_changes_with_different_threshold():
     s = skor(20, 20, 20)   # total 60
     assert decide_verdict(s, threshold=60) is Verdict.LISTED
     assert decide_verdict(s, threshold=61) is Verdict.REJECTED
 
-def test_br72_red_flag_kritis_menolak_meski_skor_tinggi():
+def test_br72_critical_red_flag_rejects_despite_high_score():
     kritis = RedFlag(code="projeksi_tidak_realistis", severity="critical",
                      message="x", evidence="y")
     assert decide_verdict(skor(40, 30, 30, [kritis]), threshold=60) is Verdict.REJECTED
 
-def test_red_flag_warning_tidak_menolak():
+def test_red_flag_warning_does_not_reject():
     ringan = RedFlag(code="isian_template", severity="warning", message="x", evidence="y")
     assert decide_verdict(skor(40, 30, 30, [ringan]), threshold=60) is Verdict.LISTED
 
@@ -108,7 +108,7 @@ def test_br78_komponen_di_luar_rentang_ditolak_validator(field, nilai):
 Test terakhir ditulis eksplisit per field agar jelas, bukan lewat trik `**kwargs`:
 
 ```python
-def test_br78_fit_score_di_atas_40_ditolak():
+def test_br78_fit_score_above_40_rejected():
     with pytest.raises(ValidationError):
         ProposalScore(fit_score=41, data_quality_score=0, impact_score=0,
                       red_flags=[],
@@ -205,23 +205,23 @@ git commit -am "feat: add scoring schema and code-side verdict decision"
 from app.ai.mock_engine import MockScoringEngine
 from app.domain.verdict import total_score
 
-async def test_mock_deterministik(proposal_draft, campaign_draft):
+async def test_mock_is_deterministic(proposal_draft, campaign_draft):
     engine = MockScoringEngine()
     a = await engine.score(proposal_draft, campaign_draft)
     b = await engine.score(proposal_draft, campaign_draft)
     assert a == b
 
-async def test_penanda_score_memaksa_total(proposal_draft, campaign_draft):
+async def test_score_marker_forces_total(proposal_draft, campaign_draft):
     proposal_draft.business_profile += " [[SCORE:59]]"
     skor = await MockScoringEngine().score(proposal_draft, campaign_draft)
     assert total_score(skor) == 59
 
-async def test_penanda_red_flag_menghasilkan_flag_kritis(proposal_draft, campaign_draft):
+async def test_red_flag_marker_produces_critical_flag(proposal_draft, campaign_draft):
     proposal_draft.business_projection += " [[RED_FLAG:critical]]"
     skor = await MockScoringEngine().score(proposal_draft, campaign_draft)
     assert any(f.severity == "critical" for f in skor.red_flags)
 
-async def test_proposal_lengkap_dapat_skor_lebih_tinggi_dari_yang_tipis(
+async def test_complete_proposal_scores_higher_than_thin_one(
     proposal_draft, proposal_draft_tipis, campaign_draft
 ):
     engine = MockScoringEngine()
@@ -325,7 +325,7 @@ halusinasi, dan tidak boleh ditampilkan ke UMKM sebagai bukti penolakan.
 ```python
 # backend/tests/unit/test_gemini_engine.py
 import pytest
-from app.ai.gemini_engine import GeminiEngine, buang_evidence_halusinasi
+from app.ai.gemini_engine import GeminiEngine, drop_hallucinated_evidence
 from app.ai.models import Brief, ProposalScore, RedFlag
 
 def skor_dengan(evidence: str) -> ProposalScore:
@@ -338,25 +338,25 @@ def skor_dengan(evidence: str) -> ProposalScore:
 
 ISI_PROPOSAL = "Omzet rata-rata Rp12 juta per bulan dengan dua pekerja."
 
-def test_rf3_evidence_yang_ada_di_proposal_dipertahankan():
-    hasil = buang_evidence_halusinasi(skor_dengan("Omzet rata-rata Rp12 juta"), ISI_PROPOSAL)
+def test_rf3_evidence_present_in_proposal_is_kept():
+    hasil = drop_hallucinated_evidence(skor_dengan("Omzet rata-rata Rp12 juta"), ISI_PROPOSAL)
     assert len(hasil.red_flags) == 1
 
-def test_rf3_evidence_yang_tidak_ada_di_proposal_dibuang():
-    hasil = buang_evidence_halusinasi(skor_dengan("Omzet Rp900 juta per hari"), ISI_PROPOSAL)
+def test_rf3_evidence_not_in_proposal_is_dropped():
+    hasil = drop_hallucinated_evidence(skor_dengan("Omzet Rp900 juta per hari"), ISI_PROPOSAL)
     assert hasil.red_flags == []
 
-def test_rf3_membuang_red_flag_kritis_halusinasi_mengubah_verdict():
+def test_rf3_dropping_hallucinated_critical_red_flag_changes_verdict():
     """Konsekuensi yang harus disadari: proposal tidak jadi ditolak
     karena kutipan yang mendasarinya ternyata karangan."""
     from app.domain.verdict import Verdict, decide_verdict
     kotor = skor_dengan("Omzet Rp900 juta per hari")
     assert decide_verdict(kotor, 60) is Verdict.REJECTED
-    bersih = buang_evidence_halusinasi(kotor, ISI_PROPOSAL)
+    bersih = drop_hallucinated_evidence(kotor, ISI_PROPOSAL)
     assert decide_verdict(bersih, 60) is Verdict.LISTED
 
-def test_rf3_pembandingan_mengabaikan_beda_spasi_dan_huruf_besar():
-    hasil = buang_evidence_halusinasi(skor_dengan("OMZET   RATA-RATA  rp12 JUTA"), ISI_PROPOSAL)
+def test_rf3_comparison_ignores_whitespace_and_case_differences():
+    hasil = drop_hallucinated_evidence(skor_dengan("OMZET   RATA-RATA  rp12 JUTA"), ISI_PROPOSAL)
     assert len(hasil.red_flags) == 1
 ```
 
@@ -376,17 +376,17 @@ from app.ai.models import ProposalScore
 
 PROMPT = (Path(__file__).parent / "prompts" / "score_proposal.md").read_text()
 
-def _normalkan(teks: str) -> str:
+def _normalize(teks: str) -> str:
     return re.sub(r"\s+", " ", teks).strip().casefold()
 
-def buang_evidence_halusinasi(score: ProposalScore, isi_proposal: str) -> ProposalScore:
+def drop_hallucinated_evidence(score: ProposalScore, isi_proposal: str) -> ProposalScore:
     """Red flag dengan kutipan yang tidak ada di proposal dibuang (RF-3).
 
     Kutipan karangan yang ditampilkan ke UMKM sebagai alasan penolakan lebih merusak
     daripada red flag yang terlewat, jadi yang ragu dibuang.
     """
-    sumber = _normalkan(isi_proposal)
-    bersih = [f for f in score.red_flags if _normalkan(f.evidence) in sumber]
+    sumber = _normalize(isi_proposal)
+    bersih = [f for f in score.red_flags if _normalize(f.evidence) in sumber]
     return score.model_copy(update={"red_flags": bersih})
 
 class GeminiEngine:
@@ -398,7 +398,7 @@ class GeminiEngine:
         self._timeout_s = timeout_s
 
     async def score(self, proposal, campaign) -> ProposalScore:
-        isi = self._rakit_isi(proposal, campaign)
+        isi = self._assemble_content(proposal, campaign)
         hasil = await self._client.chat.completions.create(
             model=self.model,
             response_model=ProposalScore,
@@ -406,7 +406,7 @@ class GeminiEngine:
             timeout=self._timeout_s,
             messages=[{"role": "user", "content": PROMPT.format(**isi)}],
         )
-        return buang_evidence_halusinasi(hasil, isi["isi_proposal"])
+        return drop_hallucinated_evidence(hasil, isi["isi_proposal"])
 ```
 
 Prompt **tidak** memuat `score_threshold`, supaya penilaian model tidak condong menyesuaikan
@@ -426,11 +426,11 @@ from app.domain.verdict import total_score
 
 pytestmark = pytest.mark.live
 
-async def test_live_output_lolos_validasi(gemini_engine, proposal_bagus, campaign_draft):
+async def test_live_output_passes_validation(gemini_engine, proposal_bagus, campaign_draft):
     skor = await gemini_engine.score(proposal_bagus, campaign_draft)
     assert 0 <= total_score(skor) <= 100
 
-async def test_live_urutan_skor_masuk_akal(
+async def test_live_score_ordering_makes_sense(
     gemini_engine, proposal_bagus, proposal_biasa, proposal_red_flag, campaign_draft
 ):
     bagus = total_score(await gemini_engine.score(proposal_bagus, campaign_draft))
@@ -438,13 +438,13 @@ async def test_live_urutan_skor_masuk_akal(
     buruk = total_score(await gemini_engine.score(proposal_red_flag, campaign_draft))
     assert bagus > biasa > buruk
 
-async def test_live_proyeksi_berlebihan_memicu_red_flag_kritis(
+async def test_live_excessive_projection_triggers_critical_red_flag(
     gemini_engine, proposal_red_flag, campaign_draft
 ):
     skor = await gemini_engine.score(proposal_red_flag, campaign_draft)
     assert any(f.severity == "critical" for f in skor.red_flags)
 
-async def test_live_setiap_evidence_benar_benar_ada_di_proposal(
+async def test_live_every_evidence_actually_exists_in_proposal(
     gemini_engine, proposal_red_flag, campaign_draft
 ):
     """Paling sering jebol saat prompt diubah, dan paling berguna."""
@@ -475,13 +475,13 @@ git commit -am "feat: integrate Gemini API for proposal scoring via Instructor"
 
 **Interfaces:**
 - Produces: protocol `JobRunner.submit(coro_factory)`, `InlineRunner`,
-  `jalankan_scoring(session, proposal_id, engine, clock) -> None`.
+  `run_scoring(session, proposal_id, engine, clock) -> None`.
 
 - [ ] **Step 1: Tulis test yang gagal**
 
 ```python
 # backend/tests/integration/test_scoring_flow.py
-async def test_proposal_masuk_langsung_dapat_skor(client, umkm, campaign, body_proposal):
+async def test_submitted_proposal_gets_scored_immediately(client, umkm, campaign, body_proposal):
     res = await client.post(f"/api/v1/campaigns/{campaign.id}/proposals",
                             headers=umkm.headers, json=body_proposal())
     pid = res.json()["id"]
@@ -489,7 +489,7 @@ async def test_proposal_masuk_langsung_dapat_skor(client, umkm, campaign, body_p
     assert detail["scoring_status"] == "done"
     assert detail["status"] == "listed"
 
-async def test_br73_skor_di_bawah_threshold_jadi_rejected(
+async def test_br73_score_below_threshold_becomes_rejected(
     client, umkm, campaign, body_proposal
 ):
     body = body_proposal()
@@ -500,7 +500,7 @@ async def test_br73_skor_di_bawah_threshold_jadi_rejected(
     detail = (await client.get(f"/api/v1/proposals/{pid}", headers=umkm.headers)).json()
     assert detail["status"] == "rejected"
 
-async def test_br76_rescore_menambah_baris_bukan_menimpa(
+async def test_br76_rescore_adds_a_row_instead_of_overwriting(
     client, db, umkm, proposal_scoring_gagal
 ):
     await client.post(f"/api/v1/proposals/{proposal_scoring_gagal.id}/rescore",
@@ -510,32 +510,32 @@ async def test_br76_rescore_menambah_baris_bukan_menimpa(
         .where(ScoringResult.proposal_id == proposal_scoring_gagal.id))
     assert jumlah >= 1
 
-async def test_br75_job_terpicu_dua_kali_tidak_menghasilkan_dua_transisi(
+async def test_br75_job_triggered_twice_does_not_produce_two_transitions(
     db, listed_proposal, engine_mock, clock
 ):
-    from app.services.scoring import jalankan_scoring
-    await jalankan_scoring(db, listed_proposal.id, engine_mock, clock)
+    from app.services.scoring import run_scoring
+    await run_scoring(db, listed_proposal.id, engine_mock, clock)
     await db.refresh(listed_proposal)
     assert listed_proposal.status is ProposalStatus.LISTED   # tidak berubah, tidak error
 
-async def test_t50_t51_scoring_status_berjalan_pending_processing_done(
+async def test_t50_t51_scoring_status_runs_pending_processing_done(
     db, submitted_proposal, engine_mock, clock
 ):
-    from app.services.scoring import jalankan_scoring
+    from app.services.scoring import run_scoring
     assert submitted_proposal.scoring_status is ScoringStatus.PENDING
-    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+    await run_scoring(db, submitted_proposal.id, engine_mock, clock)
     await db.refresh(submitted_proposal)
     assert submitted_proposal.scoring_status is ScoringStatus.DONE
 
-async def test_t52_scoring_status_jadi_failed_saat_engine_meledak(
+async def test_t52_scoring_status_becomes_failed_when_engine_blows_up(
     db, submitted_proposal, engine_meledak, clock
 ):
-    from app.services.scoring import jalankan_scoring
-    await jalankan_scoring(db, submitted_proposal.id, engine_meledak, clock)
+    from app.services.scoring import run_scoring
+    await run_scoring(db, submitted_proposal.id, engine_meledak, clock)
     await db.refresh(submitted_proposal)
     assert submitted_proposal.scoring_status is ScoringStatus.FAILED
 
-async def test_t53_rescore_mengembalikan_scoring_status_ke_pending(
+async def test_t53_rescore_returns_scoring_status_to_pending(
     client, db, umkm, proposal_scoring_gagal
 ):
     await client.post(f"/api/v1/proposals/{proposal_scoring_gagal.id}/rescore",
@@ -545,7 +545,7 @@ async def test_t53_rescore_mengembalikan_scoring_status_ke_pending(
                                                      ScoringStatus.PROCESSING,
                                                      ScoringStatus.DONE}
 
-async def test_br35_komunitas_tidak_bisa_melihat_red_flag(client, community, listed_proposal):
+async def test_br35_community_cannot_see_red_flag(client, community, listed_proposal):
     res = await client.get(f"/api/v1/proposals/{listed_proposal.id}/scoring",
                            headers=community.headers)
     assert res.status_code == 403
@@ -563,7 +563,7 @@ Expected: FAIL
 from app.domain.transitions import ProposalEvent, ProposalStatus, ScoringStatus, apply_proposal
 from app.domain.verdict import Verdict, decide_verdict, total_score
 
-async def jalankan_scoring(session, proposal_id, engine, clock) -> None:
+async def run_scoring(session, proposal_id, engine, clock) -> None:
     proposal = await session.get(Proposal, proposal_id)
     if proposal is None or proposal.status is not ProposalStatus.SUBMITTED:
         return   # compare-and-set: job kedua tidak melakukan apa-apa (BR-75)
@@ -625,7 +625,7 @@ git commit -am "feat: add scoring orchestration with compare-and-set transition"
 import asyncio
 import pytest
 from app.domain.transitions import ProposalStatus, ScoringStatus
-from app.services.scoring import jalankan_scoring
+from app.services.scoring import run_scoring
 
 class EngineMeledak:
     name, model = "palsu", "palsu"
@@ -640,39 +640,39 @@ MODE_GAGAL = [
 ]
 
 @pytest.mark.parametrize("kegagalan", MODE_GAGAL)
-async def test_r6_kegagalan_tidak_mengubah_status_proposal(
+async def test_r6_failure_does_not_change_proposal_status(
     db, submitted_proposal, clock, kegagalan
 ):
-    await jalankan_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
+    await run_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
     await db.refresh(submitted_proposal)
 
     assert submitted_proposal.scoring_status is ScoringStatus.FAILED
     assert submitted_proposal.status is ProposalStatus.SUBMITTED   # bukan rejected
 
 @pytest.mark.parametrize("kegagalan", MODE_GAGAL)
-async def test_r6_kegagalan_tidak_meninggalkan_baris_scoring(
+async def test_r6_failure_does_not_leave_a_scoring_row(
     db, submitted_proposal, clock, kegagalan
 ):
-    await jalankan_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
+    await run_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
     jumlah = await db.scalar(
         select(func.count()).select_from(ScoringResult)
         .where(ScoringResult.proposal_id == submitted_proposal.id))
     assert jumlah == 0
 
-async def test_r6_rescore_mengembalikan_ke_pending(client, umkm, proposal_scoring_gagal):
+async def test_r6_rescore_returns_to_pending(client, umkm, proposal_scoring_gagal):
     res = await client.post(f"/api/v1/proposals/{proposal_scoring_gagal.id}/rescore",
                             headers=umkm.headers)
     assert res.status_code == 202
 
-async def test_r6_rescore_ditolak_saat_scoring_sudah_selesai(client, umkm, listed_proposal):
+async def test_r6_rescore_rejected_while_scoring_already_done(client, umkm, listed_proposal):
     res = await client.post(f"/api/v1/proposals/{listed_proposal.id}/rescore",
                             headers=umkm.headers)
     assert res.status_code == 409
 
-async def test_r6_job_dua_kali_hanya_satu_transisi(db, submitted_proposal, engine_mock, clock):
-    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+async def test_r6_job_run_twice_only_one_transition(db, submitted_proposal, engine_mock, clock):
+    await run_scoring(db, submitted_proposal.id, engine_mock, clock)
     status_pertama = submitted_proposal.status
-    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+    await run_scoring(db, submitted_proposal.id, engine_mock, clock)
     await db.refresh(submitted_proposal)
     assert submitted_proposal.status is status_pertama
 ```

@@ -53,24 +53,24 @@ luar jangkauan `BIGINT` ditolak, bukan dibulatkan diam-diam.
 import pytest
 from app.domain.money import MAX_RUPIAH, format_rupiah, parse_rupiah
 
-def test_parse_menerima_integer_positif():
+def test_parse_accepts_positive_integer():
     assert parse_rupiah(5_000_000) == 5_000_000
 
 @pytest.mark.parametrize("nilai", [0, -1, -5_000_000])
-def test_br54_parse_menolak_nol_dan_negatif(nilai):
+def test_br54_parse_rejects_zero_and_negative(nilai):
     with pytest.raises(ValueError, match="harus lebih besar dari nol"):
         parse_rupiah(nilai)
 
 @pytest.mark.parametrize("nilai", ["1e9", 1_000_000.5, "5.000.000", None, "abc", True])
-def test_rf2_parse_menolak_bentuk_yang_bukan_integer(nilai):
+def test_rf2_parse_rejects_non_integer_forms(nilai):
     with pytest.raises(ValueError):
         parse_rupiah(nilai)
 
-def test_rf2_parse_menolak_di_luar_jangkauan_bigint():
+def test_rf2_parse_rejects_out_of_bigint_range():
     with pytest.raises(ValueError, match="terlalu besar"):
         parse_rupiah(MAX_RUPIAH + 1)
 
-def test_format_memakai_titik_sebagai_pemisah_ribuan():
+def test_format_uses_dot_as_thousands_separator():
     assert format_rupiah(5_000_000) == "Rp5.000.000"
     assert format_rupiah(750) == "Rp750"
 ```
@@ -137,15 +137,15 @@ git commit -m "feat: add integer-only rupiah arithmetic"
 from datetime import UTC, datetime, timedelta
 from app.domain.clock import FrozenClock, SystemClock, VirtualClock
 
-def test_system_clock_mengembalikan_waktu_aware():
+def test_system_clock_returns_aware_time():
     assert SystemClock().now().tzinfo is not None
 
-def test_frozen_clock_selalu_mengembalikan_waktu_yang_sama():
+def test_frozen_clock_always_returns_the_same_time():
     saat = datetime(2026, 11, 7, 10, 0, tzinfo=UTC)
     clock = FrozenClock(saat)
     assert clock.now() == saat == clock.now()
 
-def test_virtual_clock_maju_sesuai_offset():
+def test_virtual_clock_advances_by_offset():
     dasar = FrozenClock(datetime(2026, 11, 7, tzinfo=UTC))
     virtual = VirtualClock(dasar, offset=timedelta(days=30))
     assert virtual.now() == datetime(2026, 12, 7, tzinfo=UTC)
@@ -226,15 +226,15 @@ from app.domain.transitions import (
     ProposalEvent, ProposalStatus, apply_milestone, apply_proposal,
 )
 
-def test_t01_submitted_ke_listed():
+def test_t01_submitted_to_listed():
     assert apply_proposal(ProposalStatus.SUBMITTED, ProposalEvent.SCORING_LULUS) \
         is ProposalStatus.LISTED
 
-def test_t03_listed_ke_partially_funded():
+def test_t03_listed_to_partially_funded():
     assert apply_proposal(ProposalStatus.LISTED, ProposalEvent.PLEDGE_SEBAGIAN) \
         is ProposalStatus.PARTIALLY_FUNDED
 
-def test_t07_partially_funded_kembali_ke_listed_saat_semua_pledge_batal():
+def test_t07_partially_funded_returns_to_listed_when_all_pledges_cancelled():
     assert apply_proposal(ProposalStatus.PARTIALLY_FUNDED, ProposalEvent.PLEDGE_KOSONG) \
         is ProposalStatus.LISTED
 
@@ -242,19 +242,19 @@ def test_t07_partially_funded_kembali_ke_listed_saat_semua_pledge_batal():
     ProposalStatus.REJECTED, ProposalStatus.FAILED, ProposalStatus.COMPLETED,
 ])
 @pytest.mark.parametrize("event", list(ProposalEvent))
-def test_status_terminal_menolak_semua_event(status, event):
+def test_terminal_status_rejects_every_event(status, event):
     with pytest.raises(IllegalTransition):
         apply_proposal(status, event)
 
-def test_t21_milestone_pertama_cair_tanpa_laporan():
+def test_t21_first_milestone_disburses_without_report():
     assert apply_milestone(MilestoneStatus.PENDING, MilestoneEvent.APPROVE_TANPA_LAPORAN) \
         is MilestoneStatus.DISBURSED
 
-def test_t23_reject_mengembalikan_milestone_ke_pending():
+def test_t23_reject_returns_milestone_to_pending():
     assert apply_milestone(MilestoneStatus.REPORTED, MilestoneEvent.REJECT) \
         is MilestoneStatus.PENDING
 
-def test_illegal_transition_menyebut_status_dan_event():
+def test_illegal_transition_names_status_and_event():
     with pytest.raises(IllegalTransition) as err:
         apply_proposal(ProposalStatus.FUNDED, ProposalEvent.PLEDGE_SEBAGIAN)
     assert "funded" in str(err.value)
@@ -382,7 +382,7 @@ PROPOSAL_KOMBINASI = list(itertools.product(ProposalStatus, ProposalEvent))
 MILESTONE_KOMBINASI = list(itertools.product(MilestoneStatus, MilestoneEvent))
 
 @pytest.mark.parametrize("status,event", PROPOSAL_KOMBINASI)
-def test_r1_proposal_setiap_kombinasi_sesuai_peta(status, event):
+def test_r1_proposal_every_combination_matches_map(status, event):
     if (status, event) in PROPOSAL_MAP:
         assert apply_proposal(status, event) is PROPOSAL_MAP[(status, event)]
     else:
@@ -390,25 +390,25 @@ def test_r1_proposal_setiap_kombinasi_sesuai_peta(status, event):
             apply_proposal(status, event)
 
 @pytest.mark.parametrize("status,event", MILESTONE_KOMBINASI)
-def test_r1_milestone_setiap_kombinasi_sesuai_peta(status, event):
+def test_r1_milestone_every_combination_matches_map(status, event):
     if (status, event) in MILESTONE_MAP:
         assert apply_milestone(status, event) is MILESTONE_MAP[(status, event)]
     else:
         with pytest.raises(IllegalTransition):
             apply_milestone(status, event)
 
-def test_r1_jumlah_transisi_proposal_sesuai_spec():
+def test_r1_proposal_transition_count_matches_spec():
     """Mengunci jumlahnya ke spec. Menambah transisi tanpa memperbarui
     08-state-machines.md akan membuat test ini merah."""
     assert len(PROPOSAL_MAP) == 9   # T-01 sampai T-09
 
-def test_r1_jumlah_transisi_milestone_sesuai_spec():
+def test_r1_milestone_transition_count_matches_spec():
     assert len(MILESTONE_MAP) == 4  # T-20 sampai T-23
 
 @pytest.mark.parametrize("terminal", [
     ProposalStatus.REJECTED, ProposalStatus.FAILED, ProposalStatus.COMPLETED,
 ])
-def test_r1_status_terminal_tidak_punya_jalan_keluar(terminal):
+def test_r1_terminal_status_has_no_way_out(terminal):
     assert not any(s is terminal for s, _ in PROPOSAL_MAP)
 ```
 
@@ -438,7 +438,7 @@ git commit -m "feat: add full status transition matrix regression suite"
 **Interfaces:**
 - Produces: `compute_funding_status(total_pledged, requested, now, funding_deadline) -> ProposalStatus`,
   `remaining_amount(total_pledged, requested) -> int`,
-  `pick_lead_investor(pledges: Sequence[PledgeRingkas]) -> UUID | None`
+  `pick_lead_investor(pledges: Sequence[PledgeSummary]) -> UUID | None`
 
 - [ ] **Step 1: Tulis test yang gagal**
 
@@ -464,11 +464,11 @@ KEMARIN = SEKARANG - timedelta(days=1)
 def test_compute_funding_status(terkumpul, diminta, deadline, harapan):
     assert compute_funding_status(terkumpul, diminta, SEKARANG, deadline) is harapan
 
-def test_br21_sisa_dana_dihitung_eksak():
+def test_br21_remaining_funds_computed_exactly():
     assert remaining_amount(4_000_000, 10_000_000) == 6_000_000
     assert remaining_amount(10_000_000, 10_000_000) == 0
 
-def test_total_melebihi_diminta_tidak_pernah_dianggap_sah():
+def test_total_exceeding_requested_never_considered_valid():
     with pytest.raises(ValueError, match="melebihi"):
         compute_funding_status(11_000_000, 10_000_000, SEKARANG, BESOK)
 ```
@@ -481,30 +481,30 @@ bocor, dan lebih baik sistem meledak keras daripada diam-diam menyimpan `funded`
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
-from app.domain.lead_investor import PledgeRingkas, pick_lead_investor
+from app.domain.lead_investor import PledgeSummary, pick_lead_investor
 
 T0 = datetime(2026, 11, 7, tzinfo=UTC)
 A, B = uuid4(), uuid4()
 
-def test_tidak_ada_pledge_berarti_tidak_ada_lead():
+def test_no_pledge_means_no_lead():
     assert pick_lead_investor([]) is None
 
-def test_br23_pledge_terbesar_jadi_lead():
-    pledges = [PledgeRingkas(A, 3_000_000, T0), PledgeRingkas(B, 7_000_000, T0)]
+def test_br23_largest_pledge_becomes_lead():
+    pledges = [PledgeSummary(A, 3_000_000, T0), PledgeSummary(B, 7_000_000, T0)]
     assert pick_lead_investor(pledges) == B
 
-def test_br24_beberapa_pledge_dari_investor_sama_dijumlahkan():
+def test_br24_multiple_pledges_from_same_investor_are_summed():
     pledges = [
-        PledgeRingkas(A, 4_000_000, T0),
-        PledgeRingkas(A, 4_000_000, T0 + timedelta(minutes=1)),
-        PledgeRingkas(B, 7_000_000, T0),
+        PledgeSummary(A, 4_000_000, T0),
+        PledgeSummary(A, 4_000_000, T0 + timedelta(minutes=1)),
+        PledgeSummary(B, 7_000_000, T0),
     ]
     assert pick_lead_investor(pledges) == A   # 8 juta mengalahkan 7 juta
 
-def test_br23_seri_dimenangkan_pledge_paling_awal():
+def test_br23_tie_won_by_earliest_pledge():
     pledges = [
-        PledgeRingkas(B, 5_000_000, T0 + timedelta(minutes=5)),
-        PledgeRingkas(A, 5_000_000, T0),
+        PledgeSummary(B, 5_000_000, T0 + timedelta(minutes=5)),
+        PledgeSummary(A, 5_000_000, T0),
     ]
     assert pick_lead_investor(pledges) == A
 ```
@@ -557,12 +557,12 @@ from uuid import UUID
 from app.domain.money import Rupiah
 
 @dataclass(frozen=True, slots=True)
-class PledgeRingkas:
+class PledgeSummary:
     investor_id: UUID
     amount: Rupiah
     created_at: datetime
 
-def pick_lead_investor(pledges: Sequence[PledgeRingkas]) -> UUID | None:
+def pick_lead_investor(pledges: Sequence[PledgeSummary]) -> UUID | None:
     if not pledges:
         return None
 
@@ -612,7 +612,7 @@ TERLARANG = {"sqlmodel", "sqlalchemy", "fastapi", "httpx", "asyncpg"}
 FILE_DOMAIN = sorted(DOMAIN.glob("*.py"))
 
 @pytest.mark.parametrize("berkas", FILE_DOMAIN, ids=lambda p: p.name)
-def test_domain_tidak_mengimpor_database_atau_http(berkas):
+def test_domain_does_not_import_database_or_http(berkas):
     pohon = ast.parse(berkas.read_text())
     diimpor = {
         (node.module or "").split(".")[0]
@@ -628,7 +628,7 @@ def test_domain_tidak_mengimpor_database_atau_http(berkas):
     assert not bocor, f"{berkas.name} mengimpor {bocor}; pindahkan logikanya ke services/"
 
 @pytest.mark.parametrize("berkas", FILE_DOMAIN, ids=lambda p: p.name)
-def test_br60_hanya_clock_yang_boleh_memanggil_datetime_now(berkas):
+def test_br60_only_clock_may_call_datetime_now(berkas):
     if berkas.name == "clock.py":
         pytest.skip("clock.py adalah satu-satunya yang berhak")
     assert "datetime.now(" not in berkas.read_text(), (
@@ -686,35 +686,35 @@ from app.domain.transitions import (
     ScoringEvent, ScoringStatus, apply_campaign, apply_report, apply_scoring,
 )
 
-def test_t30_approve_menandai_laporan_approved():
+def test_t30_approve_marks_report_approved():
     assert apply_report(ReportStatus.PENDING, ReportEvent.APPROVE) is ReportStatus.APPROVED
 
-def test_t31_reject_menandai_laporan_rejected():
+def test_t31_reject_marks_report_rejected():
     assert apply_report(ReportStatus.PENDING, ReportEvent.REJECT) is ReportStatus.REJECTED
 
-def test_laporan_yang_sudah_dinilai_tidak_bisa_dinilai_ulang():
+def test_already_reviewed_report_cannot_be_reviewed_again():
     with pytest.raises(IllegalTransition):
         apply_report(ReportStatus.APPROVED, ReportEvent.REJECT)
 
-def test_t40_campaign_ditutup_manual():
+def test_t40_campaign_closed_manually():
     assert apply_campaign(CampaignStatus.OPEN, CampaignEvent.TUTUP_MANUAL) \
         is CampaignStatus.CLOSED
 
-def test_t41_campaign_tertutup_karena_apply_deadline_lewat():
+def test_t41_campaign_closed_because_apply_deadline_passed():
     assert apply_campaign(CampaignStatus.OPEN, CampaignEvent.APPLY_DEADLINE_LEWAT) \
         is CampaignStatus.CLOSED
 
-def test_campaign_tertutup_tidak_bisa_ditutup_lagi():
+def test_closed_campaign_cannot_be_closed_again():
     with pytest.raises(IllegalTransition):
         apply_campaign(CampaignStatus.CLOSED, CampaignEvent.TUTUP_MANUAL)
 
-def test_t50_sampai_t53_alur_scoring():
+def test_t50_through_t53_scoring_flow():
     assert apply_scoring(ScoringStatus.PENDING, ScoringEvent.AMBIL) is ScoringStatus.PROCESSING
     assert apply_scoring(ScoringStatus.PROCESSING, ScoringEvent.SELESAI) is ScoringStatus.DONE
     assert apply_scoring(ScoringStatus.PROCESSING, ScoringEvent.GAGAL) is ScoringStatus.FAILED
     assert apply_scoring(ScoringStatus.FAILED, ScoringEvent.NILAI_ULANG) is ScoringStatus.PENDING
 
-def test_scoring_yang_sudah_done_adalah_terminal():
+def test_scoring_already_done_is_terminal():
     with pytest.raises(IllegalTransition):
         apply_scoring(ScoringStatus.DONE, ScoringEvent.AMBIL)
 ```
@@ -785,13 +785,13 @@ Ketiga fungsi `apply_*` mengikuti bentuk `apply_proposal` yang sudah ada: cari d
 dua yang sudah ada, serta tiga penguncian jumlah:
 
 ```python
-def test_r1_jumlah_transisi_laporan_sesuai_spec():
+def test_r1_report_transition_count_matches_spec():
     assert len(REPORT_MAP) == 2    # T-30, T-31
 
-def test_r1_jumlah_transisi_campaign_sesuai_spec():
+def test_r1_campaign_transition_count_matches_spec():
     assert len(CAMPAIGN_MAP) == 2  # T-40, T-41
 
-def test_r1_jumlah_transisi_scoring_sesuai_spec():
+def test_r1_scoring_transition_count_matches_spec():
     assert len(SCORING_MAP) == 4   # T-50 sampai T-53
 ```
 

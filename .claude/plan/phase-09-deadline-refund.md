@@ -29,8 +29,8 @@ backend/tests/
 - Test: `backend/tests/integration/test_clock_tick.py`
 
 **Interfaces:**
-- Produces: `ambil_clock(session) -> Clock` (mengembalikan `VirtualClock` bila ada offset,
-  `SystemClock` bila tidak), `majukan_jam(session, hari)`, `reset_jam(session)`.
+- Produces: `fetch_clock(session) -> Clock` (mengembalikan `VirtualClock` bila ada offset,
+  `SystemClock` bila tidak), `advance_clock(session, hari)`, `reset_clock(session)`.
 
 - [ ] **Step 1: Tulis test yang gagal**
 
@@ -40,30 +40,30 @@ from datetime import timedelta
 
 async def test_tanpa_offset_memakai_jam_asli(db):
     from app.domain.clock import SystemClock
-    from app.services.clock_service import ambil_clock
-    selisih = abs((await ambil_clock(db)).now() - SystemClock().now())
+    from app.services.clock_service import fetch_clock
+    selisih = abs((await fetch_clock(db)).now() - SystemClock().now())
     assert selisih < timedelta(seconds=2)
 
 async def test_tick_memajukan_jam(db):
-    from app.services.clock_service import ambil_clock, majukan_jam
-    sebelum = (await ambil_clock(db)).now()
-    await majukan_jam(db, hari=30)
-    sesudah = (await ambil_clock(db)).now()
+    from app.services.clock_service import fetch_clock, advance_clock
+    sebelum = (await fetch_clock(db)).now()
+    await advance_clock(db, hari=30)
+    sesudah = (await fetch_clock(db)).now()
     assert timedelta(days=29, hours=23) < sesudah - sebelum < timedelta(days=30, hours=1)
 
 async def test_tick_bersifat_akumulatif(db):
-    from app.services.clock_service import ambil_clock, majukan_jam
-    sebelum = (await ambil_clock(db)).now()
-    await majukan_jam(db, hari=10)
-    await majukan_jam(db, hari=10)
-    assert (await ambil_clock(db)).now() - sebelum > timedelta(days=19)
+    from app.services.clock_service import fetch_clock, advance_clock
+    sebelum = (await fetch_clock(db)).now()
+    await advance_clock(db, hari=10)
+    await advance_clock(db, hari=10)
+    assert (await fetch_clock(db)).now() - sebelum > timedelta(days=19)
 
 async def test_reset_mengembalikan_ke_jam_asli(db):
-    from app.services.clock_service import ambil_clock, majukan_jam, reset_jam
+    from app.services.clock_service import fetch_clock, advance_clock, reset_clock
     from app.domain.clock import SystemClock
-    await majukan_jam(db, hari=100)
-    await reset_jam(db)
-    assert abs((await ambil_clock(db)).now() - SystemClock().now()) < timedelta(seconds=2)
+    await advance_clock(db, hari=100)
+    await reset_clock(db)
+    assert abs((await fetch_clock(db)).now() - SystemClock().now()) < timedelta(seconds=2)
 
 async def test_br63_endpoint_tick_tidak_terdaftar_saat_env_prod(monkeypatch):
     from app.config import settings
@@ -84,7 +84,7 @@ async def test_br62_failed_dengan_pledge_aktif_tetap_direfund(
 
     Kasus ini nyata: pledge yang diterima tepat setelah funding_deadline lewat
     membuat recompute_funding_status menulis failed sementara pledge-nya tetap
-    aktif. Kalau evaluasi_kedaluwarsa menyaring status saja, proposal itu
+    aktif. Kalau evaluate_expiry menyaring status saja, proposal itu
     dilewati selamanya dan uangnya tidak pernah kembali.
     """
     await client.post(f"/api/v1/proposals/{listed_proposal.id}/pledges",
@@ -149,7 +149,7 @@ git commit -am "feat: add persisted virtual clock and dev-only tick endpoint"
 - Test: `backend/tests/integration/test_deadline.py`
 
 **Interfaces:**
-- Produces: `evaluasi_kedaluwarsa(session, proposal, clock) -> None`. Dipanggil di awal setiap
+- Produces: `evaluate_expiry(session, proposal, clock) -> None`. Dipanggil di awal setiap
   pembacaan proposal dan campaign.
 
 - [ ] **Step 1: Tulis test yang gagal**
@@ -178,7 +178,7 @@ async def test_t08_partially_funded_jadi_failed_dan_pledge_direfund(
     entri = await ambil_ledger(db, listed_proposal.id)
     assert any(e.entry_type is EntryType.REFUND_OUT and e.amount == 4_000_000
                for e in entri)
-    assert hitung_saldo(entri) == 0
+    assert compute_balance(entri) == 0
 
 async def test_proposal_funded_tidak_terpengaruh_deadline(client, db, funded_proposal,
                                                           majukan):
@@ -230,22 +230,22 @@ Expected: FAIL
 
 ```python
 # backend/app/services/expiry.py
-AKTIF = {ProposalStatus.LISTED, ProposalStatus.PARTIALLY_FUNDED}
+ACTIVE_STATUSES = {ProposalStatus.LISTED, ProposalStatus.PARTIALLY_FUNDED}
 
 # FAILED ikut diperiksa, dan ini bukan kehati-hatian berlebihan. Pledge bisa
 # masuk atau dibatalkan tepat setelah funding_deadline lewat; recompute_funding_status
 # langsung menulis failed, dan pledge aktifnya tertinggal tanpa refund_out.
 # Kalau fungsi ini menyaring status saja, proposal itu dilewati selamanya dan
 # uang investor lain tidak pernah kembali (BR-62).
-PERLU_REKONSILIASI = AKTIF | {ProposalStatus.FAILED}
+NEEDS_RECONCILIATION = ACTIVE_STATUSES | {ProposalStatus.FAILED}
 
-async def evaluasi_kedaluwarsa(session, proposal, clock) -> None:
+async def evaluate_expiry(session, proposal, clock) -> None:
     """Dipanggil di awal setiap pembacaan proposal (D-06, BR-61).
 
     Idempoten: kunci idempotensi refund berasal dari pledge, jadi pembacaan
     berulang tidak pernah menghasilkan entri ganda.
     """
-    if proposal.status not in PERLU_REKONSILIASI:
+    if proposal.status not in NEEDS_RECONCILIATION:
         return
 
     campaign = await session.get(Campaign, proposal.campaign_id)
@@ -253,13 +253,13 @@ async def evaluasi_kedaluwarsa(session, proposal, clock) -> None:
         return
 
     terkunci = await ambil_proposal_terkunci(session, proposal.id)
-    if terkunci.status not in AKTIF:
+    if terkunci.status not in ACTIVE_STATUSES:
         return      # transaksi lain sudah mengurusnya
 
     aktif = await ambil_pledge_aktif(session, terkunci.id)
     for p in aktif:
         p.status = PledgeStatus.CANCELLED
-        await catat_entri(session, terkunci.id, EntryType.REFUND_OUT, p.amount,
+        await record_entry(session, terkunci.id, EntryType.REFUND_OUT, p.amount,
                           idempotency_key=f"refund:{p.id}",
                           ref_type="pledge", ref_id=p.id)
 
@@ -325,7 +325,7 @@ async def test_r4_deadline_lewat_merefund_seluruh_pledge(client, db, listed_prop
     entri = await ambil_ledger(db, listed_proposal.id)
     refund = sum(e.amount for e in entri if e.entry_type is EntryType.REFUND_OUT)
     assert refund == 7_000_000
-    assert hitung_saldo(entri) == 0
+    assert compute_balance(entri) == 0
     await db.refresh(listed_proposal)
     assert listed_proposal.status is ProposalStatus.FAILED
 

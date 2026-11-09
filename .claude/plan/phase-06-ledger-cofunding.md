@@ -14,11 +14,11 @@ sebagai entri ledger. Regression R2 dan R2b hijau.
 backend/app/
   models/ledger.py           # LedgerEntry, enum EntryType
   models/pledge.py
-  services/ledger.py         # catat(), saldo(), total_terkumpul()
+  services/ledger.py         # catat(), saldo(), total_raised()
   services/pledge.py         # buat_pledge, batalkan_pledge, recompute_funding_status
   api/v1/pledges.py
 backend/tests/
-  unit/test_ledger_saldo.py
+  unit/test_ledger_balance.py
   integration/test_pledge.py
   integration/test_pledge_bersamaan.py
   regression/test_r2_ledger.py
@@ -31,17 +31,17 @@ backend/tests/
 
 **Files:**
 - Create: `backend/app/models/ledger.py`, `backend/app/services/ledger.py`, migrasi
-- Test: `backend/tests/unit/test_ledger_saldo.py`, `backend/tests/integration/test_ledger.py`
+- Test: `backend/tests/unit/test_ledger_balance.py`, `backend/tests/integration/test_ledger.py`
 
 **Interfaces:**
-- Produces: `EntryType`, `LedgerEntry`, `EntriRingkas`,
-  `hitung_saldo(entries) -> int`, `total_terkumpul(entries) -> int`,
-  `catat_entri(session, proposal_id, entry_type, amount, idempotency_key, ...) -> LedgerEntry | None`,
-  `total_terkumpul_proposal(session, proposal_id) -> int` (query, dipakai Task 3 dan 4),
+- Produces: `EntryType`, `LedgerEntry`, `LedgerEntrySummary`,
+  `compute_balance(entries) -> int`, `total_raised(entries) -> int`,
+  `record_entry(session, proposal_id, entry_type, amount, idempotency_key, ...) -> LedgerEntry | None`,
+  `collected_amount_for_proposal(session, proposal_id) -> int` (query, dipakai Task 3 dan 4),
   `total_pledge_aktif(session, proposal_id) -> int` (query, dipakai R2b)
 
   Dua yang terakhir adalah query, bukan fungsi murni. Penamaannya sengaja dibedakan dari
-  `total_terkumpul(entries)` supaya tidak tertukar: yang satu menerima daftar entri, yang lain
+  `total_raised(entries)` supaya tidak tertukar: yang satu menerima daftar entri, yang lain
   menerima sesi database.
 
 Ini juga tempat **RF-2** dikunci di batas HTTP: nominal yang bukan integer ditolak `422`.
@@ -49,33 +49,33 @@ Ini juga tempat **RF-2** dikunci di batas HTTP: nominal yang bukan integer ditol
 - [ ] **Step 1: Tulis test yang gagal**
 
 ```python
-# backend/tests/unit/test_ledger_saldo.py
+# backend/tests/unit/test_ledger_balance.py
 import pytest
-from app.services.ledger import EntriRingkas, hitung_saldo, total_terkumpul
+from app.services.ledger import LedgerEntrySummary, compute_balance, total_raised
 from app.models.ledger import EntryType as T
 
-def e(tipe, jumlah): return EntriRingkas(entry_type=tipe, amount=jumlah)
+def e(tipe, jumlah): return LedgerEntrySummary(entry_type=tipe, amount=jumlah)
 
-def test_br52_saldo_dijumlahkan_dari_entri():
+def test_br52_balance_is_summed_from_entries():
     entri = [e(T.PLEDGE_IN, 5_000_000), e(T.PLEDGE_IN, 5_000_000),
              e(T.DISBURSEMENT_OUT, 3_000_000)]
-    assert hitung_saldo(entri) == 7_000_000
+    assert compute_balance(entri) == 7_000_000
 
-def test_br52_refund_mengurangi_saldo():
+def test_br52_refund_reduces_balance():
     entri = [e(T.PLEDGE_IN, 5_000_000), e(T.REFUND_OUT, 5_000_000)]
-    assert hitung_saldo(entri) == 0
+    assert compute_balance(entri) == 0
 
-def test_total_terkumpul_hanya_menghitung_pledge_dikurangi_refund():
+def test_total_raised_only_counts_pledges_minus_refunds():
     entri = [e(T.PLEDGE_IN, 10_000_000), e(T.REFUND_OUT, 2_000_000),
              e(T.DISBURSEMENT_OUT, 4_000_000)]
-    assert total_terkumpul(entri) == 8_000_000   # pencairan tidak mengurangi yang terkumpul
-    assert hitung_saldo(entri) == 4_000_000
+    assert total_raised(entri) == 8_000_000   # pencairan tidak mengurangi yang terkumpul
+    assert compute_balance(entri) == 4_000_000
 
-def test_saldo_kosong_adalah_nol():
-    assert hitung_saldo([]) == 0
+def test_empty_balance_is_zero():
+    assert compute_balance([]) == 0
 ```
 
-Perbedaan `total_terkumpul` dan `hitung_saldo` halus tapi penting: progress bar funding memakai
+Perbedaan `total_raised` dan `compute_balance` halus tapi penting: progress bar funding memakai
 yang pertama, pengecekan "cukupkah dana untuk dicairkan" memakai yang kedua. Mencampurnya
 membuat progress bar turun setiap kali milestone cair.
 
@@ -84,7 +84,7 @@ membuat progress bar turun setiap kali milestone cair.
 import pytest
 from sqlalchemy.exc import IntegrityError
 from app.models.ledger import EntryType, LedgerEntry
-from app.services.ledger import catat_entri
+from app.services.ledger import record_entry
 
 async def test_br54_entri_nol_ditolak_database(db, listed_proposal):
     db.add(LedgerEntry(proposal_id=listed_proposal.id, entry_type=EntryType.PLEDGE_IN,
@@ -100,9 +100,9 @@ async def test_br54_entri_negatif_ditolak_database(db, listed_proposal):
 
 async def test_br55_idempotency_key_mencegah_entri_ganda(db, listed_proposal):
     kunci = f"pledge:{listed_proposal.id}"
-    pertama = await catat_entri(db, listed_proposal.id, EntryType.PLEDGE_IN,
+    pertama = await record_entry(db, listed_proposal.id, EntryType.PLEDGE_IN,
                                 5_000_000, kunci)
-    kedua = await catat_entri(db, listed_proposal.id, EntryType.PLEDGE_IN,
+    kedua = await record_entry(db, listed_proposal.id, EntryType.PLEDGE_IN,
                               5_000_000, kunci)
     assert pertama is not None
     assert kedua is None            # panggilan kedua tidak menambah apa pun
@@ -113,7 +113,7 @@ async def test_br55_idempotency_key_mencegah_entri_ganda(db, listed_proposal):
 
 - [ ] **Step 2: Jalankan test, pastikan gagal**
 
-Run: `pytest tests/unit/test_ledger_saldo.py tests/integration/test_ledger.py -v`
+Run: `pytest tests/unit/test_ledger_balance.py tests/integration/test_ledger.py -v`
 Expected: FAIL dengan `ModuleNotFoundError`
 
 - [ ] **Step 3: Implementasi minimal**
@@ -149,14 +149,14 @@ class LedgerEntry(SQLModel, table=True):
 
 ```python
 # backend/app/services/ledger.py
-MASUK = {EntryType.PLEDGE_IN}
-KELUAR = {EntryType.REFUND_OUT, EntryType.DISBURSEMENT_OUT}
+INCOMING_ENTRY_TYPES = {EntryType.PLEDGE_IN}
+OUTGOING_ENTRY_TYPES = {EntryType.REFUND_OUT, EntryType.DISBURSEMENT_OUT}
 
-def hitung_saldo(entries) -> int:
+def compute_balance(entries) -> int:
     """Saldo escrow: apa yang masuk dikurangi apa yang keluar (BR-52)."""
-    return sum(e.amount if e.entry_type in MASUK else -e.amount for e in entries)
+    return sum(e.amount if e.entry_type in INCOMING_ENTRY_TYPES else -e.amount for e in entries)
 
-def total_terkumpul(entries) -> int:
+def total_raised(entries) -> int:
     """Dana yang terkumpul dari investor. Pencairan tidak menguranginya,
     karena yang dicairkan tetap 'pernah terkumpul'."""
     return sum(
@@ -165,7 +165,7 @@ def total_terkumpul(entries) -> int:
         if e.entry_type in {EntryType.PLEDGE_IN, EntryType.REFUND_OUT}
     )
 
-async def catat_entri(session, proposal_id, entry_type, amount, idempotency_key,
+async def record_entry(session, proposal_id, entry_type, amount, idempotency_key,
                       ref_type="", ref_id=None, actor_id=None) -> LedgerEntry | None:
     """Mengembalikan None bila kunci idempotensi sudah pernah dipakai (BR-55)."""
     entri = LedgerEntry(proposal_id=proposal_id, entry_type=entry_type, amount=amount,
@@ -182,7 +182,7 @@ async def catat_entri(session, proposal_id, entry_type, amount, idempotency_key,
 
 - [ ] **Step 4: Jalankan test, pastikan lolos**
 
-Run: `pytest tests/unit/test_ledger_saldo.py tests/integration/test_ledger.py -v`
+Run: `pytest tests/unit/test_ledger_balance.py tests/integration/test_ledger.py -v`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -210,7 +210,7 @@ git commit -am "feat: add append-only ledger entries with idempotency keys"
 from app.domain.transitions import ProposalStatus as S
 from app.services.pledge import recompute_funding_status
 
-async def test_status_mengikuti_jumlah_pledge(db, listed_proposal, investor, clock, pledge):
+async def test_status_follows_pledge_amount(db, listed_proposal, investor, clock, pledge):
     await pledge(listed_proposal, investor, 4_000_000)       # diminta 10 juta
     await recompute_funding_status(db, listed_proposal, clock)
     assert listed_proposal.status is S.PARTIALLY_FUNDED
@@ -219,7 +219,7 @@ async def test_status_mengikuti_jumlah_pledge(db, listed_proposal, investor, clo
     await recompute_funding_status(db, listed_proposal, clock)
     assert listed_proposal.status is S.FUNDED
 
-async def test_t07_semua_pledge_dibatalkan_mengembalikan_ke_listed(
+async def test_t07_all_pledges_cancelled_returns_to_listed(
     db, listed_proposal, investor, clock, pledge, batalkan
 ):
     p = await pledge(listed_proposal, investor, 4_000_000)
@@ -228,7 +228,7 @@ async def test_t07_semua_pledge_dibatalkan_mengembalikan_ke_listed(
     await recompute_funding_status(db, listed_proposal, clock)
     assert listed_proposal.status is S.LISTED
 
-async def test_recompute_juga_memperbarui_lead_investor(
+async def test_recompute_also_updates_lead_investor(
     db, listed_proposal, investor, investor_lain, clock, pledge
 ):
     await pledge(listed_proposal, investor, 3_000_000)
@@ -247,7 +247,7 @@ Expected: FAIL
 ```python
 # backend/app/services/pledge.py
 from app.domain.funding import compute_funding_status
-from app.domain.lead_investor import PledgeRingkas, pick_lead_investor
+from app.domain.lead_investor import PledgeSummary, pick_lead_investor
 
 async def recompute_funding_status(session, proposal, clock) -> None:
     """SATU-SATUNYA tempat status funding ditulis (D-05).
@@ -266,7 +266,7 @@ async def recompute_funding_status(session, proposal, clock) -> None:
     proposal.status = compute_funding_status(
         total, proposal.requested_amount, clock.now(), campaign.funding_deadline)
     proposal.lead_investor_id = pick_lead_investor(
-        [PledgeRingkas(p.investor_id, p.amount, p.created_at) for p in aktif])
+        [PledgeSummary(p.investor_id, p.amount, p.created_at) for p in aktif])
     if proposal.status is ProposalStatus.FUNDED and proposal.funded_at is None:
         proposal.funded_at = clock.now()
     await session.flush()
@@ -363,7 +363,7 @@ Expected: FAIL dengan `404`
 
 ```python
 async def buat_pledge(session, investor, proposal, amount, clock) -> Pledge:
-    sisa = remaining_amount(await total_terkumpul_proposal(session, proposal.id),
+    sisa = remaining_amount(await collected_amount_for_proposal(session, proposal.id),
                             proposal.requested_amount)
     if amount > sisa:
         raise ConflictError(
@@ -377,7 +377,7 @@ async def buat_pledge(session, investor, proposal, amount, clock) -> Pledge:
     session.add(pledge)
     await session.flush()
 
-    await catat_entri(session, proposal.id, EntryType.PLEDGE_IN, amount,
+    await record_entry(session, proposal.id, EntryType.PLEDGE_IN, amount,
                       idempotency_key=f"pledge:{pledge.id}",
                       ref_type="pledge", ref_id=pledge.id, actor_id=investor.id)
     await recompute_funding_status(session, proposal, clock)
@@ -476,7 +476,7 @@ async def test_rf1_total_pledge_tidak_pernah_melebihi_dana_diminta(
     await asyncio.gather(coba(investor_a), coba(investor_b))
 
     async with SessionLocal() as sesi:
-        total = await total_terkumpul_proposal(sesi, listed_proposal_tercommit.id)
+        total = await collected_amount_for_proposal(sesi, listed_proposal_tercommit.id)
     assert total <= listed_proposal_tercommit.requested_amount
 ```
 
@@ -588,7 +588,7 @@ async def test_rf4_tidak_pernah_ada_funded_dengan_total_kurang(
     """Invarian: status funded berarti total == requested, tanpa kecuali."""
     await db.refresh(listed_proposal)
     if listed_proposal.status is S.FUNDED:
-        total = await total_terkumpul_proposal(db, listed_proposal.id)
+        total = await collected_amount_for_proposal(db, listed_proposal.id)
         assert total == listed_proposal.requested_amount
 ```
 
@@ -621,7 +621,7 @@ git commit -am "feat: add lead investor reassignment when a pledge is cancelled"
 """R2: invarian uang, diperiksa setelah setiap operasi di skenario end-to-end."""
 import pytest
 from app.models.ledger import EntryType, LedgerEntry
-from app.services.ledger import hitung_saldo, total_terkumpul
+from app.services.ledger import compute_balance, total_raised
 
 async def periksa_invarian(db, proposal_id, requested):
     entri = (await db.scalars(select(LedgerEntry)
@@ -631,9 +631,9 @@ async def periksa_invarian(db, proposal_id, requested):
 
     # BR-53: total pencairan tidak pernah melebihi dana yang terkumpul.
     cair = sum(e.amount for e in entri if e.entry_type is EntryType.DISBURSEMENT_OUT)
-    assert cair <= total_terkumpul(entri), "dana cair melebihi dana terkumpul"
-    assert hitung_saldo(entri) >= 0, "saldo escrow negatif"
-    assert total_terkumpul(entri) <= requested, "terkumpul melebihi dana yang diminta"
+    assert cair <= total_raised(entri), "dana cair melebihi dana terkumpul"
+    assert compute_balance(entri) >= 0, "saldo escrow negatif"
+    assert total_raised(entri) <= requested, "terkumpul melebihi dana yang diminta"
 
     kunci = [e.idempotency_key for e in entri]
     assert len(kunci) == len(set(kunci)), "idempotency_key duplikat"

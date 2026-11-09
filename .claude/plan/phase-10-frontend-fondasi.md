@@ -23,7 +23,7 @@ frontend/
   components/
     ui/Tombol.tsx
     ui/Kolom.tsx          # input + label + pesan error terhubung
-    ui/Nominal.tsx        # rupiah tabular, motif identitas
+    ui/Amount.tsx         # rupiah tabular, motif identitas
     ui/BilahProgres.tsx
     ui/LencanaStatus.tsx
     ui/KeadaanKosong.tsx
@@ -153,10 +153,10 @@ git commit -m "feat: add design tokens as CSS variables"
 ### Task 2: Format rupiah dan progres
 
 **Files:**
-- Create: `frontend/lib/money.ts`, `frontend/components/ui/Nominal.tsx`
+- Create: `frontend/lib/money.ts`, `frontend/components/ui/Amount.tsx`
 - Test: `frontend/tests/money.test.ts`
 
-`Nominal` adalah motif identitas produk ini: nominal rupiah selalu besar, tabular, dengan label
+`Amount` adalah motif identitas produk ini: nominal rupiah selalu besar, tabular, dengan label
 kecil di atasnya ([DESIGN.md](../../DESIGN.md)).
 
 - [ ] **Step 1: Tulis test yang gagal**

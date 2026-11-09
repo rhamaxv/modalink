@@ -336,7 +336,7 @@ async def test_br46_laporan_yang_direject_tidak_dihapus_dan_revisi_jadi_baris_ba
     assert laporan[0].reviewer_note == "Angka omzet belum disertai bukti."
     assert laporan[1].review_status is ReportStatus.PENDING
 
-async def test_t30_approve_menandai_laporan_approved(client, db, investor,
+async def test_t30_approve_marks_report_approved(client, db, investor,
                                                       milestone_reported):
     await client.post(f"/api/v1/milestones/{milestone_reported.id}/approve",
                       headers=investor.headers)
@@ -503,11 +503,11 @@ async def approve_milestone(session, aktor, milestone, clock) -> None:
 
     # Kunci idempotensi berasal dari milestone, jadi approve ganda hanya
     # menghasilkan satu entri (BR-48, RF-5).
-    await catat_entri(session, proposal.id, EntryType.DISBURSEMENT_OUT, milestone.amount,
+    await record_entry(session, proposal.id, EntryType.DISBURSEMENT_OUT, milestone.amount,
                       idempotency_key=f"disburse:{milestone.id}",
                       ref_type="milestone", ref_id=milestone.id, actor_id=aktor.id)
 
-    if await semua_milestone_cair(session, proposal.id):
+    if await all_milestones_disbursed(session, proposal.id):
         proposal.status = apply_proposal(proposal.status,
                                          ProposalEvent.SEMUA_MILESTONE_CAIR)
     await session.flush()
@@ -621,7 +621,7 @@ async def test_r3_alur_penuh_dari_campaign_sampai_completed(client, db, clock):
     # 1. Investor A dan B registrasi, A membuat campaign
     a = await daftar(client, "a@contoh.id", "investor")
     b = await daftar(client, "b@contoh.id", "investor")
-    campaign = await buat_campaign(client, a, target=50_000_000, threshold=60)
+    campaign = await create_campaign(client, a, target=50_000_000, threshold=60)
 
     # 2. UMKM registrasi dan submit proposal dengan dua milestone
     umkm = await daftar(client, "umkm@contoh.id", "umkm")
@@ -629,20 +629,20 @@ async def test_r3_alur_penuh_dari_campaign_sampai_completed(client, db, clock):
                                      milestones=[5_000_000, 5_000_000])
 
     # 3. MockScoringEngine menilai, proposal menjadi listed
-    assert (await ambil_proposal(client, proposal))["status"] == "listed"
+    assert (await get_proposal(client, proposal))["status"] == "listed"
 
     # 4. Komunitas vote
     warga = await daftar(client, "warga@contoh.id", "community")
     await vote(client, warga, proposal)
-    assert (await ambil_proposal(client, proposal))["vote_count"] == 1
+    assert (await get_proposal(client, proposal))["vote_count"] == 1
 
     # 5. Investor A pledge separuh
     await pledge(client, a, proposal, 6_000_000)
-    assert (await ambil_proposal(client, proposal))["status"] == "partially_funded"
+    assert (await get_proposal(client, proposal))["status"] == "partially_funded"
 
     # 6. Investor B pledge sisanya, A jadi lead karena pledge-nya lebih besar
     await pledge(client, b, proposal, 4_000_000)
-    detail = await ambil_proposal(client, proposal)
+    detail = await get_proposal(client, proposal)
     assert detail["status"] == "funded"
     assert detail["lead_investor_id"] == a.user_id
 
@@ -656,7 +656,7 @@ async def test_r3_alur_penuh_dari_campaign_sampai_completed(client, db, clock):
     await approve(client, a, m2)
 
     # 9. Proposal completed
-    assert (await ambil_proposal(client, proposal))["status"] == "completed"
+    assert (await get_proposal(client, proposal))["status"] == "completed"
 
     # 10. Seluruh dana cair sama persis dengan dana yang diminta
     ledger = await ambil_ledger(client, a, proposal)
@@ -751,7 +751,7 @@ Expected: keenamnya FAIL karena endpointnya belum ada. Catat outputnya.
 - [ ] **Step 3: Implementasi**
 
 Seluruh query hidup di `services/`, bukan di router. Pagar AST di
-`tests/unit/test_pagar_layering.py` memeriksa setiap file di `app/api/` dan akan menangkapmu.
+`tests/unit/test_layering_guard.py` memeriksa setiap file di `app/api/` dan akan menangkapmu.
 
 Hak akses dipasang lewat dependency, bukan lewat `if` di dalam handler, dan mengikuti pola
 yang sudah ada: **bukan pemilik mendapat 404, bukan 403**, karena 403 memberi tahu bahwa
@@ -805,7 +805,7 @@ def _terdaftar() -> set[str]:
     return hasil
 
 
-def test_setiap_endpoint_kontrak_terdaftar_di_aplikasi():
+def test_every_contract_endpoint_registered_in_app():
     terdaftar = _terdaftar()
     diminta = {
         f"{m} {_samakan(p)}": f"{m} {p}"
@@ -818,7 +818,7 @@ def test_setiap_endpoint_kontrak_terdaftar_di_aplikasi():
     )
 
 
-def test_pagar_ini_benar_benar_membandingkan_sesuatu():
+def test_this_guard_actually_compares_something():
     # Tanpa test ini, pagar di atas bisa hijau karena daftarnya kosong.
     diminta = POLA.findall(KONTRAK.read_text())
     assert len(diminta) >= 25, (

@@ -41,7 +41,7 @@ from app.models.campaign import Campaign, CampaignStatus, Sector
 
 SEKARANG = SystemClock().now()
 
-async def test_br64_funding_deadline_harus_setelah_apply_deadline(db, investor):
+async def test_br64_funding_deadline_must_be_after_apply_deadline(db, investor):
     db.add(Campaign(
         investor_id=investor.user.id, title="Modal warung", description="x" * 60,
         sector=Sector.KULINER, target_amount=50_000_000,
@@ -52,7 +52,7 @@ async def test_br64_funding_deadline_harus_setelah_apply_deadline(db, investor):
     with pytest.raises(IntegrityError):
         await db.flush()
 
-async def test_target_amount_harus_positif(db, investor):
+async def test_target_amount_must_be_positive(db, investor):
     db.add(Campaign(
         investor_id=investor.user.id, title="x", description="x" * 60,
         sector=Sector.KULINER, target_amount=0,
@@ -158,32 +158,32 @@ def body_campaign(**ubah):
     }
     return isi | ubah
 
-async def test_investor_bisa_membuat_campaign(client, investor):
+async def test_investor_can_create_campaign(client, investor):
     res = await client.post("/api/v1/campaigns", headers=investor.headers,
                             json=body_campaign())
     assert res.status_code == 201
     assert res.json()["status"] == "open"
 
-async def test_br64_funding_deadline_lebih_awal_ditolak_422(client, investor):
+async def test_br64_funding_deadline_too_early_rejected_422(client, investor):
     res = await client.post("/api/v1/campaigns", headers=investor.headers,
                             json=body_campaign(
                                 funding_deadline=(SEKARANG + timedelta(days=3)).isoformat()))
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "urutan_deadline_salah"
 
-async def test_apply_deadline_di_masa_lalu_ditolak(client, investor):
+async def test_apply_deadline_in_the_past_rejected(client, investor):
     res = await client.post("/api/v1/campaigns", headers=investor.headers,
                             json=body_campaign(
                                 apply_deadline=(SEKARANG - timedelta(days=1)).isoformat()))
     assert res.status_code == 422
 
-async def test_br05_daftar_campaign_bisa_diakses_tanpa_token(client, investor):
+async def test_br05_list_campaigns_accessible_without_token(client, investor):
     await client.post("/api/v1/campaigns", headers=investor.headers, json=body_campaign())
     res = await client.get("/api/v1/campaigns")
     assert res.status_code == 200
     assert len(res.json()["items"]) == 1
 
-async def test_daftar_campaign_urutannya_deterministik(client, investor):
+async def test_list_campaigns_ordering_is_deterministic(client, investor):
     for i in range(3):
         await client.post("/api/v1/campaigns", headers=investor.headers,
                           json=body_campaign(title=f"Campaign {i}"))
@@ -205,7 +205,7 @@ from app.domain.clock import Clock
 from app.errors import UnprocessableError
 from app.schemas.campaign import CampaignIn
 
-def validasi_deadline(body: CampaignIn, clock: Clock) -> None:
+def validate_deadline(body: CampaignIn, clock: Clock) -> None:
     sekarang = clock.now()
     if body.apply_deadline <= sekarang:
         raise UnprocessableError(
@@ -218,7 +218,7 @@ def validasi_deadline(body: CampaignIn, clock: Clock) -> None:
         )
 ```
 
-Router memanggil `validasi_deadline`, lalu menyimpan. Daftar diurut
+Router memanggil `validate_deadline`, lalu menyimpan. Daftar diurut
 `ORDER BY created_at DESC, id DESC` supaya deterministik.
 
 - [ ] **Step 4: Jalankan test, pastikan lolos**
@@ -234,7 +234,7 @@ Tambahkan di `tests/regression/test_r5_rbac.py` untuk setiap endpoint baru:
 `GET /api/v1/campaigns/{id}/proposals`.
 
 Run: `pytest tests/regression/test_r5_rbac.py -v`
-Expected: PASS, termasuk `test_r5_setiap_route_punya_baris_di_matriks`
+Expected: PASS, termasuk `test_r5_every_route_has_a_row_in_the_matrix`
 
 - [ ] **Step 6: Commit**
 
@@ -254,13 +254,13 @@ git commit -am "feat: add campaign create and list endpoints"
 
 ```python
 # backend/tests/integration/test_campaign_update.py
-async def test_br77_threshold_bisa_diubah_selama_belum_ada_proposal(client, investor, campaign):
+async def test_br77_threshold_can_change_while_no_proposal_exists(client, investor, campaign):
     res = await client.patch(f"/api/v1/campaigns/{campaign.id}",
                              headers=investor.headers, json={"score_threshold": 75})
     assert res.status_code == 200
     assert res.json()["score_threshold"] == 75
 
-async def test_br77_threshold_terkunci_setelah_proposal_pertama(
+async def test_br77_threshold_locked_after_first_proposal(
     client, investor, campaign, listed_proposal
 ):
     res = await client.patch(f"/api/v1/campaigns/{campaign.id}",
@@ -268,28 +268,28 @@ async def test_br77_threshold_terkunci_setelah_proposal_pertama(
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "threshold_terkunci"
 
-async def test_judul_tetap_bisa_diubah_setelah_ada_proposal(
+async def test_title_can_still_change_after_proposal_exists(
     client, investor, campaign, listed_proposal
 ):
     res = await client.patch(f"/api/v1/campaigns/{campaign.id}",
                              headers=investor.headers, json={"title": "Judul baru"})
     assert res.status_code == 200
 
-async def test_t40_pemilik_bisa_menutup_campaign_manual(client, db, investor, campaign):
+async def test_t40_owner_can_close_campaign_manually(client, db, investor, campaign):
     res = await client.post(f"/api/v1/campaigns/{campaign.id}/close",
                             headers=investor.headers)
     assert res.status_code == 200
     await db.refresh(campaign)
     assert campaign.status is CampaignStatus.CLOSED
 
-async def test_t41_campaign_tertutup_sendiri_setelah_apply_deadline_lewat(
+async def test_t41_campaign_closes_itself_after_apply_deadline_passes(
     client, db, campaign, majukan
 ):
     await majukan(hari=8)       # apply_deadline campaign fixture jatuh di hari ke-7
     detail = (await client.get(f"/api/v1/campaigns/{campaign.id}")).json()
     assert detail["status"] == "closed"
 
-async def test_t40_campaign_yang_sudah_closed_menolak_penutupan_ulang(
+async def test_t40_already_closed_campaign_rejects_reclosing(
     client, investor, campaign
 ):
     await client.post(f"/api/v1/campaigns/{campaign.id}/close", headers=investor.headers)
@@ -297,7 +297,7 @@ async def test_t40_campaign_yang_sudah_closed_menolak_penutupan_ulang(
                             headers=investor.headers)
     assert res.status_code == 409
 
-async def test_investor_lain_tidak_bisa_mengubah_campaign(client, campaign, investor_lain):
+async def test_other_investor_cannot_update_campaign(client, campaign, investor_lain):
     res = await client.patch(f"/api/v1/campaigns/{campaign.id}",
                              headers=investor_lain.headers, json={"title": "Dibajak"})
     assert res.status_code == 403
@@ -324,7 +324,7 @@ Expected: FAIL
 # backend/app/api/deps.py (tambahan)
 from app.errors import ForbiddenError, NotFoundError
 
-async def ambil_campaign_milik_sendiri(
+async def get_own_campaign(
     campaign_id: UUID,
     user: User = Depends(require_role(Role.INVESTOR)),
     session: AsyncSession = Depends(get_session),
@@ -340,7 +340,7 @@ async def ambil_campaign_milik_sendiri(
 Penguncian threshold di service:
 
 ```python
-async def ubah_campaign(campaign, body, session) -> Campaign:
+async def update_campaign(campaign, body, session) -> Campaign:
     if body.score_threshold is not None and body.score_threshold != campaign.score_threshold:
         ada_proposal = await session.scalar(
             select(func.count()).select_from(Proposal)
@@ -374,7 +374,7 @@ git commit -am "feat: add campaign update, close and threshold lock"
 ### Task 4: Pagar layering berbasis AST untuk seluruh router
 
 **Files:**
-- Create: `backend/tests/unit/test_pagar_layering.py`
+- Create: `backend/tests/unit/test_layering_guard.py`
 - Delete: pagar grep lama di `backend/tests/integration/test_auth.py`
 - Modify: `backend/app/services/auth.py`
 
@@ -395,7 +395,7 @@ menyasar perbuatannya, bukan ejaannya: router memakai objek session, atau meraki
 - [ ] **Step 1: Tulis test yang gagal**
 
 ```python
-# backend/tests/unit/test_pagar_layering.py
+# backend/tests/unit/test_layering_guard.py
 """Router hanya merangkai. Query dan orkestrasi milik services/."""
 import ast
 import pathlib
@@ -433,7 +433,7 @@ def _pelanggaran(pohon: ast.AST) -> list[str]:
 
 
 @pytest.mark.parametrize("berkas", BERKAS_ROUTER, ids=lambda p: p.name)
-def test_router_tidak_menyentuh_database_sendiri(berkas: pathlib.Path) -> None:
+def test_router_does_not_touch_database_directly(berkas: pathlib.Path) -> None:
     temuan = _pelanggaran(ast.parse(berkas.read_text()))
     assert not temuan, (
         f"{berkas.name} menyentuh database langsung:\n  "
@@ -442,7 +442,7 @@ def test_router_tidak_menyentuh_database_sendiri(berkas: pathlib.Path) -> None:
     )
 
 
-def test_pagar_ini_benar_benar_menangkap_sesuatu() -> None:
+def test_this_guard_actually_catches_something() -> None:
     """Pagar yang tidak pernah terbukti bisa merah mungkin tidak memagari apa pun."""
     contoh = ast.parse(
         "async def r(session):\n"
@@ -457,7 +457,7 @@ dijalankan, bukan sekali saat ditulis.
 - [ ] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `make test-unit`
-Expected: FAIL pada `test_pagar_ini_benar_benar_menangkap_sesuatu` sebelum `_pelanggaran` ada.
+Expected: FAIL pada `test_this_guard_actually_catches_something` sebelum `_pelanggaran` ada.
 
 - [ ] **Step 3: Hapus pagar grep yang lama**
 
@@ -468,10 +468,10 @@ seluruh router, bukan satu berkas.
 - [ ] **Step 4: Rapikan dua hal kecil di `services/auth.py`**
 
 Gantikan `raise DomainError("email_terpakai", ...)` dengan subclass bernama, selaras dengan
-`TokenKedaluwarsa`, `TokenTidakSah`, dan `KredensialSalah` yang sudah ada:
+`TokenExpired`, `TokenInvalid`, dan `InvalidCredentials` yang sudah ada:
 
 ```python
-class EmailTerpakai(DomainError):
+class EmailAlreadyUsed(DomainError):
     """Email sudah dipakai akun lain."""
     status = 400
 ```
@@ -484,7 +484,7 @@ berhubungan akan salah dilaporkan:
     except IntegrityError as exc:
         if "users_email" not in str(exc.orig).lower() and "ix_users_email" not in str(exc.orig).lower():
             raise
-        raise EmailTerpakai("email_terpakai", "Email ini sudah terdaftar.") from None
+        raise EmailAlreadyUsed("email_terpakai", "Email ini sudah terdaftar.") from None
 ```
 
 - [ ] **Step 5: Jalankan, pastikan hijau**
