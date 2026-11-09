@@ -24,18 +24,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={sansHumanis.variable}>
+    // suppressHydrationWarning: skrip no-flash di bawah menulis data-theme
+    // ke elemen ini sebelum React hidrasi, sengaja di luar siklus render
+    // React. Tanpa ini, React membandingkan atribut <html> yang sudah
+    // diubah skrip itu terhadap markup server (yang tidak mengenal
+    // data-theme sama sekali) dan melaporkannya sebagai hydration mismatch,
+    // walau atributnya memang benar-benar dikelola di luar React dengan
+    // sengaja.
+    <html lang="id" className={sansHumanis.variable} suppressHydrationWarning>
       <head>
         {/*
           Tema disetel sebelum cat pertama supaya tidak ada kedipan dari terang
-          ke gelap saat halaman dimuat. SakelarTema (fase berikutnya) menulis
-          dan membaca kunci localStorage yang sama: "tema", nilai "light"/"dark".
+          ke gelap saat halaman dimuat. ThemeToggle menulis dan membaca kunci
+          localStorage yang sama: "theme", nilai "light"/"dark".
         */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function () {
               try {
-                var tersimpan = localStorage.getItem("tema");
+                var tersimpan = localStorage.getItem("theme");
                 var gelap = tersimpan === "dark" ||
                   (!tersimpan && window.matchMedia("(prefers-color-scheme: dark)").matches);
                 if (gelap) document.documentElement.setAttribute("data-theme", "dark");
