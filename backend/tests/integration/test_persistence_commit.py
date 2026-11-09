@@ -21,7 +21,7 @@ from app.domain.clock import SystemClock
 from app.main import create_app
 
 
-async def test_register_endpoint_benar_benar_commit_ke_database() -> None:
+async def test_register_endpoint_really_commits_to_database() -> None:
     email = f"br-h1-persistence-{uuid.uuid4().hex}@contoh.id"
     app = create_app()  # tanpa dependency_overrides: jalur get_session produksi.
     transport = ASGITransport(app=app)
@@ -58,7 +58,7 @@ async def test_register_endpoint_benar_benar_commit_ke_database() -> None:
             await sesi_bersih.commit()
 
 
-async def test_c31_job_scoring_latar_belakang_benar_benar_commit_ke_database() -> None:
+async def test_c31_background_scoring_job_really_commits_to_database() -> None:
     """C-31: test di atas membuktikan H-1 lewat /auth/register, yang tidak
     punya job latar belakang. Bug sungguhan yang memotivasi H-1 adalah job
     scoring membaca proposal lewat sesi terpisahnya sendiri dan tidak

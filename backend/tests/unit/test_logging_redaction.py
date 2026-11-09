@@ -1,13 +1,13 @@
 from app.logging import redact_payload
 
 
-def test_redact_payload_menyamarkan_password():
+def test_redact_payload_masks_password():
     baris = redact_payload({"path": "/login", "password": "rahasia123"})
     assert baris["password"] != "rahasia123"
     assert "rahasia123" not in str(baris)
 
 
-def test_redact_payload_menyamarkan_authorization_dan_token():
+def test_redact_payload_masks_authorization_and_token():
     baris = redact_payload(
         {
             "path": "/me",
@@ -19,6 +19,6 @@ def test_redact_payload_menyamarkan_authorization_dan_token():
     assert baris["token"] != "abc.def.ghi"
 
 
-def test_redact_payload_tidak_mengubah_field_lain():
+def test_redact_payload_does_not_change_other_fields():
     baris = redact_payload({"method": "GET", "status": 200})
     assert baris == {"method": "GET", "status": 200}

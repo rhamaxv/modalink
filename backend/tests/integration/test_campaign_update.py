@@ -9,7 +9,7 @@ proposal baru" akan diuji saat endpoint itu dibangun.
 from app.models.campaign import CampaignStatus
 
 
-async def test_br77_threshold_bisa_diubah_selama_belum_ada_proposal(
+async def test_br77_threshold_can_change_while_no_proposal_exists(
     client, investor, campaign
 ):
     res = await client.patch(
@@ -21,7 +21,7 @@ async def test_br77_threshold_bisa_diubah_selama_belum_ada_proposal(
     assert res.json()["score_threshold"] == 75
 
 
-async def test_br77_threshold_terkunci_setelah_proposal_pertama(
+async def test_br77_threshold_locked_after_first_proposal(
     client, investor, campaign, listed_proposal
 ):
     res = await client.patch(
@@ -33,7 +33,7 @@ async def test_br77_threshold_terkunci_setelah_proposal_pertama(
     assert res.json()["error"]["code"] == "threshold_terkunci"
 
 
-async def test_judul_tetap_bisa_diubah_setelah_ada_proposal(
+async def test_title_can_still_change_after_proposal_exists(
     client, investor, campaign, listed_proposal
 ):
     res = await client.patch(
@@ -44,7 +44,7 @@ async def test_judul_tetap_bisa_diubah_setelah_ada_proposal(
     assert res.status_code == 200
 
 
-async def test_t40_pemilik_bisa_menutup_campaign_manual(client, db, investor, campaign):
+async def test_t40_owner_can_close_campaign_manually(client, db, investor, campaign):
     res = await client.post(
         f"/api/v1/campaigns/{campaign.id}/close", headers=investor.headers
     )
@@ -53,7 +53,7 @@ async def test_t40_pemilik_bisa_menutup_campaign_manual(client, db, investor, ca
     assert campaign.status is CampaignStatus.CLOSED
 
 
-async def test_t41_campaign_tertutup_sendiri_setelah_apply_deadline_lewat(
+async def test_t41_campaign_closes_itself_after_apply_deadline_passes(
     client, db, campaign, majukan
 ):
     await majukan(hari=8)  # apply_deadline campaign fixture jatuh di hari ke-7
@@ -61,7 +61,7 @@ async def test_t41_campaign_tertutup_sendiri_setelah_apply_deadline_lewat(
     assert detail["status"] == "closed"
 
 
-async def test_t40_campaign_yang_sudah_closed_menolak_penutupan_ulang(
+async def test_t40_already_closed_campaign_rejects_reclosing(
     client, investor, campaign
 ):
     await client.post(
@@ -73,9 +73,7 @@ async def test_t40_campaign_yang_sudah_closed_menolak_penutupan_ulang(
     assert res.status_code == 409
 
 
-async def test_investor_lain_tidak_bisa_mengubah_campaign(
-    client, campaign, investor_lain
-):
+async def test_other_investor_cannot_update_campaign(client, campaign, investor_lain):
     res = await client.patch(
         f"/api/v1/campaigns/{campaign.id}",
         headers=investor_lain.headers,

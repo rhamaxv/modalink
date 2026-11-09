@@ -37,21 +37,21 @@ def skor_dengan(evidence: str) -> ProposalScore:
 ISI_PROPOSAL = "Omzet rata-rata Rp12 juta per bulan dengan dua pekerja."
 
 
-def test_rf3_evidence_yang_ada_di_proposal_dipertahankan():
+def test_rf3_evidence_present_in_proposal_is_kept():
     hasil = drop_hallucinated_evidence(
         skor_dengan("Omzet rata-rata Rp12 juta"), ISI_PROPOSAL
     )
     assert len(hasil.red_flags) == 1
 
 
-def test_rf3_evidence_yang_tidak_ada_di_proposal_dibuang():
+def test_rf3_evidence_not_in_proposal_is_dropped():
     hasil = drop_hallucinated_evidence(
         skor_dengan("Omzet Rp900 juta per hari"), ISI_PROPOSAL
     )
     assert hasil.red_flags == []
 
 
-def test_rf3_membuang_red_flag_kritis_halusinasi_mengubah_verdict():
+def test_rf3_dropping_hallucinated_critical_red_flag_changes_verdict():
     """Konsekuensi yang harus disadari: proposal tidak jadi ditolak
     karena kutipan yang mendasarinya ternyata karangan."""
     from app.domain.verdict import Verdict, decide_verdict
@@ -62,14 +62,14 @@ def test_rf3_membuang_red_flag_kritis_halusinasi_mengubah_verdict():
     assert decide_verdict(bersih, 60) is Verdict.LISTED
 
 
-def test_rf3_pembandingan_mengabaikan_beda_spasi_dan_huruf_besar():
+def test_rf3_comparison_ignores_whitespace_and_case_differences():
     hasil = drop_hallucinated_evidence(
         skor_dengan("OMZET   RATA-RATA  rp12 JUTA"), ISI_PROPOSAL
     )
     assert len(hasil.red_flags) == 1
 
 
-def test_rf3_pembandingan_menolak_parafrase():
+def test_rf3_comparison_rejects_paraphrasing():
     """Beda spasi dan huruf besar diabaikan, tapi parafrase tetap dibuang:
     'omzet bulanan dua belas juta' bukan kutipan persis dari isi proposal."""
     hasil = drop_hallucinated_evidence(
@@ -78,7 +78,7 @@ def test_rf3_pembandingan_menolak_parafrase():
     assert hasil.red_flags == []
 
 
-def test_gemini_engine_menolak_dibuat_tanpa_kunci_api():
+def test_gemini_engine_refuses_to_build_without_api_key():
     """GeminiEngine.from_settings menolak membangun client, bukan gagal
     samar saat score() baru dipanggil belakangan."""
     tanpa_kunci = settings.model_copy(update={"gemini_api_key": None})
@@ -154,7 +154,7 @@ def _bangun_engine_dengan_stub(
     return engine
 
 
-async def test_score_memanggil_stub_dan_membuang_evidence_halusinasi(
+async def test_score_calls_stub_and_drops_hallucinated_evidence(
     proposal_draft, campaign_gemini_draft
 ):
     hasil_mentah = ProposalScore(

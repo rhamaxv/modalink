@@ -21,7 +21,7 @@ def _head_dari_berkas() -> str:
     return ScriptDirectory.from_config(cfg).get_current_head() or ""
 
 
-async def test_database_test_berada_di_revisi_terbaru(db):
+async def test_database_test_is_at_latest_revision(db):
     terpasang = (
         await db.execute(text("select version_num from alembic_version"))
     ).scalar()
@@ -33,7 +33,7 @@ async def test_database_test_berada_di_revisi_terbaru(db):
     )
 
 
-def test_hanya_ada_satu_head_migrasi():
+def test_only_one_migration_head_exists():
     """Rantai migrasi bercabang pernah membuat database melaporkan dirinya
     terbaru sementara dua tabel tidak ada. Dua head berarti satu cabang tidak
     akan pernah dijalankan oleh `upgrade head`."""

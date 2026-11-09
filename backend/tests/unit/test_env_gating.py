@@ -17,7 +17,7 @@ def _paths(app) -> set[str]:
     return hasil
 
 
-def test_default_env_menutup_router_internal(monkeypatch):
+def test_default_env_closes_internal_router(monkeypatch):
     monkeypatch.delenv("ENV", raising=False)
     s = Settings(
         _env_file=None, database_url="postgresql+asyncpg://x/y", jwt_secret="x"
@@ -28,13 +28,13 @@ def test_default_env_menutup_router_internal(monkeypatch):
     )
 
 
-def test_internal_tidak_terdaftar_di_prod(monkeypatch):
+def test_internal_not_registered_in_prod(monkeypatch):
     monkeypatch.setattr("app.main.settings.env", "prod")
     paths = _paths(create_app())
     assert not [p for p in paths if "/internal/" in p]
 
 
-def test_internal_terdaftar_di_dev(monkeypatch):
+def test_internal_registered_in_dev(monkeypatch):
     # Sisi sebaliknya diuji juga: pagar yang selalu menutup tidak membuktikan
     # bahwa ENV-lah yang memagarinya.
     monkeypatch.setattr("app.main.settings.env", "dev")
@@ -42,7 +42,7 @@ def test_internal_terdaftar_di_dev(monkeypatch):
     assert [p for p in paths if "/internal/" in p]
 
 
-def test_variabel_kosong_tidak_menimpa_default():
+def test_empty_variable_does_not_override_default():
     """Variabel environment yang tidak diset tapi tetap diteruskan tiba sebagai
     string kosong. Tanpa penolakan ini, `GEMINI_MODEL: ${GEMINI_MODEL}` di
     compose membuat scoring memanggil model bernama "" dan setiap proposal

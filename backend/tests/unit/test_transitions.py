@@ -20,21 +20,21 @@ from app.domain.transitions import (
 )
 
 
-def test_t01_submitted_ke_listed():
+def test_t01_submitted_to_listed():
     assert (
         apply_proposal(ProposalStatus.SUBMITTED, ProposalEvent.SCORING_LULUS)
         is ProposalStatus.LISTED
     )
 
 
-def test_t03_listed_ke_partially_funded():
+def test_t03_listed_to_partially_funded():
     assert (
         apply_proposal(ProposalStatus.LISTED, ProposalEvent.PLEDGE_SEBAGIAN)
         is ProposalStatus.PARTIALLY_FUNDED
     )
 
 
-def test_t07_partially_funded_kembali_ke_listed_saat_semua_pledge_batal():
+def test_t07_partially_funded_returns_to_listed_when_all_pledges_cancelled():
     assert (
         apply_proposal(ProposalStatus.PARTIALLY_FUNDED, ProposalEvent.PLEDGE_KOSONG)
         is ProposalStatus.LISTED
@@ -50,69 +50,69 @@ def test_t07_partially_funded_kembali_ke_listed_saat_semua_pledge_batal():
     ],
 )
 @pytest.mark.parametrize("event", list(ProposalEvent))
-def test_status_terminal_menolak_semua_event(status, event):
+def test_terminal_status_rejects_every_event(status, event):
     with pytest.raises(IllegalTransition):
         apply_proposal(status, event)
 
 
-def test_t21_milestone_pertama_cair_tanpa_laporan():
+def test_t21_first_milestone_disburses_without_report():
     assert (
         apply_milestone(MilestoneStatus.PENDING, MilestoneEvent.APPROVE_TANPA_LAPORAN)
         is MilestoneStatus.DISBURSED
     )
 
 
-def test_t23_reject_mengembalikan_milestone_ke_pending():
+def test_t23_reject_returns_milestone_to_pending():
     assert (
         apply_milestone(MilestoneStatus.REPORTED, MilestoneEvent.REJECT)
         is MilestoneStatus.PENDING
     )
 
 
-def test_illegal_transition_menyebut_status_dan_event():
+def test_illegal_transition_names_status_and_event():
     with pytest.raises(IllegalTransition) as err:
         apply_proposal(ProposalStatus.FUNDED, ProposalEvent.PLEDGE_SEBAGIAN)
     assert "funded" in str(err.value)
     assert err.value.current is ProposalStatus.FUNDED
 
 
-def test_t30_approve_menandai_laporan_approved():
+def test_t30_approve_marks_report_approved():
     assert (
         apply_report(ReportStatus.PENDING, ReportEvent.APPROVE) is ReportStatus.APPROVED
     )
 
 
-def test_t31_reject_menandai_laporan_rejected():
+def test_t31_reject_marks_report_rejected():
     assert (
         apply_report(ReportStatus.PENDING, ReportEvent.REJECT) is ReportStatus.REJECTED
     )
 
 
-def test_laporan_yang_sudah_dinilai_tidak_bisa_dinilai_ulang():
+def test_already_reviewed_report_cannot_be_reviewed_again():
     with pytest.raises(IllegalTransition):
         apply_report(ReportStatus.APPROVED, ReportEvent.REJECT)
 
 
-def test_t40_campaign_ditutup_manual():
+def test_t40_campaign_closed_manually():
     assert (
         apply_campaign(CampaignStatus.OPEN, CampaignEvent.TUTUP_MANUAL)
         is CampaignStatus.CLOSED
     )
 
 
-def test_t41_campaign_tertutup_karena_apply_deadline_lewat():
+def test_t41_campaign_closed_because_apply_deadline_passed():
     assert (
         apply_campaign(CampaignStatus.OPEN, CampaignEvent.APPLY_DEADLINE_LEWAT)
         is CampaignStatus.CLOSED
     )
 
 
-def test_campaign_tertutup_tidak_bisa_ditutup_lagi():
+def test_closed_campaign_cannot_be_closed_again():
     with pytest.raises(IllegalTransition):
         apply_campaign(CampaignStatus.CLOSED, CampaignEvent.TUTUP_MANUAL)
 
 
-def test_t50_sampai_t53_alur_scoring():
+def test_t50_through_t53_scoring_flow():
     assert (
         apply_scoring(ScoringStatus.PENDING, ScoringEvent.AMBIL)
         is ScoringStatus.PROCESSING
@@ -131,6 +131,6 @@ def test_t50_sampai_t53_alur_scoring():
     )
 
 
-def test_scoring_yang_sudah_done_adalah_terminal():
+def test_scoring_already_done_is_terminal():
     with pytest.raises(IllegalTransition):
         apply_scoring(ScoringStatus.DONE, ScoringEvent.AMBIL)

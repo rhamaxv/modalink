@@ -20,7 +20,7 @@ def body_campaign(**ubah):
     return isi | ubah
 
 
-async def test_investor_bisa_membuat_campaign(client, investor):
+async def test_investor_can_create_campaign(client, investor):
     res = await client.post(
         "/api/v1/campaigns", headers=investor.headers, json=body_campaign()
     )
@@ -28,7 +28,7 @@ async def test_investor_bisa_membuat_campaign(client, investor):
     assert res.json()["status"] == "open"
 
 
-async def test_br64_funding_deadline_lebih_awal_ditolak_422(client, investor):
+async def test_br64_funding_deadline_too_early_rejected_422(client, investor):
     res = await client.post(
         "/api/v1/campaigns",
         headers=investor.headers,
@@ -38,7 +38,7 @@ async def test_br64_funding_deadline_lebih_awal_ditolak_422(client, investor):
     assert res.json()["error"]["code"] == "urutan_deadline_salah"
 
 
-async def test_apply_deadline_di_masa_lalu_ditolak(client, investor):
+async def test_apply_deadline_in_the_past_rejected(client, investor):
     res = await client.post(
         "/api/v1/campaigns",
         headers=investor.headers,
@@ -47,7 +47,7 @@ async def test_apply_deadline_di_masa_lalu_ditolak(client, investor):
     assert res.status_code == 422
 
 
-async def test_br05_daftar_campaign_bisa_diakses_tanpa_token(client, investor):
+async def test_br05_list_campaigns_accessible_without_token(client, investor):
     dibuat = await client.post(
         "/api/v1/campaigns", headers=investor.headers, json=body_campaign()
     )
@@ -64,7 +64,7 @@ async def test_br05_daftar_campaign_bisa_diakses_tanpa_token(client, investor):
     assert dibuat.json()["id"] in ids
 
 
-async def test_daftar_campaign_urutannya_deterministik(client, investor):
+async def test_list_campaigns_ordering_is_deterministic(client, investor):
     for i in range(3):
         await client.post(
             "/api/v1/campaigns",

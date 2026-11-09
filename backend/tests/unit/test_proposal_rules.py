@@ -9,31 +9,31 @@ def draft(seq: int, amount: int) -> MilestoneDraft:
     )
 
 
-def test_rencana_valid_lolos():
+def test_valid_plan_passes():
     validate_milestone_plan([draft(1, 5_000_000), draft(2, 5_000_000)], 10_000_000)
 
 
-def test_br14_kurang_dari_dua_milestone_ditolak():
+def test_br14_fewer_than_two_milestones_rejected():
     with pytest.raises(ValueError, match="minimal dua"):
         validate_milestone_plan([draft(1, 10_000_000)], 10_000_000)
 
 
-def test_br14_jumlah_tidak_sama_ditolak_dan_menyebut_selisihnya():
+def test_br14_amount_mismatch_rejected_and_reports_difference():
     with pytest.raises(ValueError, match="kurang Rp1.000.000"):
         validate_milestone_plan([draft(1, 5_000_000), draft(2, 4_000_000)], 10_000_000)
 
 
-def test_br14_jumlah_berlebih_juga_menyebut_selisihnya():
+def test_br14_amount_surplus_also_reports_difference():
     with pytest.raises(ValueError, match="lebih Rp2.000.000"):
         validate_milestone_plan([draft(1, 6_000_000), draft(2, 6_000_000)], 10_000_000)
 
 
-def test_br15_seq_harus_berurutan_dari_satu():
+def test_br15_seq_must_be_sequential_from_one():
     with pytest.raises(ValueError, match="berurutan"):
         validate_milestone_plan([draft(1, 5_000_000), draft(3, 5_000_000)], 10_000_000)
 
 
-def test_br16_amount_nol_ditolak():
+def test_br16_zero_amount_rejected():
     with pytest.raises(ValueError):
         validate_milestone_plan([draft(1, 10_000_000), draft(2, 0)], 10_000_000)
 

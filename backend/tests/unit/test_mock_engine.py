@@ -8,28 +8,26 @@ from app.config import settings
 from app.domain.verdict import total_score
 
 
-async def test_mock_deterministik(proposal_draft, campaign_draft):
+async def test_mock_is_deterministic(proposal_draft, campaign_draft):
     engine = MockScoringEngine()
     a = await engine.score(proposal_draft, campaign_draft)
     b = await engine.score(proposal_draft, campaign_draft)
     assert a == b
 
 
-async def test_penanda_score_memaksa_total(proposal_draft, campaign_draft):
+async def test_score_marker_forces_total(proposal_draft, campaign_draft):
     proposal_draft.business_profile += " [[SCORE:59]]"
     skor = await MockScoringEngine().score(proposal_draft, campaign_draft)
     assert total_score(skor) == 59
 
 
-async def test_penanda_red_flag_menghasilkan_flag_kritis(
-    proposal_draft, campaign_draft
-):
+async def test_red_flag_marker_produces_critical_flag(proposal_draft, campaign_draft):
     proposal_draft.business_projection += " [[RED_FLAG:critical]]"
     skor = await MockScoringEngine().score(proposal_draft, campaign_draft)
     assert any(f.severity == "critical" for f in skor.red_flags)
 
 
-async def test_proposal_lengkap_dapat_skor_lebih_tinggi_dari_yang_tipis(
+async def test_complete_proposal_scores_higher_than_thin_one(
     proposal_draft, proposal_draft_tipis, campaign_draft
 ):
     engine = MockScoringEngine()
@@ -38,17 +36,17 @@ async def test_proposal_lengkap_dapat_skor_lebih_tinggi_dari_yang_tipis(
     assert lengkap > tipis
 
 
-def test_build_engine_scoring_engine_mock_mengembalikan_mock():
+def test_build_engine_scoring_engine_mock_returns_mock():
     engine = build_engine(settings.model_copy(update={"scoring_engine": "mock"}))
     assert isinstance(engine, MockScoringEngine)
 
 
-def test_build_engine_scoring_engine_lain_belum_didukung():
+def test_build_engine_other_scoring_engine_not_yet_supported():
     with pytest.raises(NotImplementedError):
         build_engine(settings.model_copy(update={"scoring_engine": "entah"}))
 
 
-def test_build_engine_scoring_engine_gemini_tanpa_kunci_menolak_jelas():
+def test_build_engine_scoring_engine_gemini_without_key_fails_clearly():
     """build_engine membangun GeminiEngine lewat from_settings, yang menolak
     dibuat tanpa GEMINI_API_KEY alih-alih gagal samar belakangan."""
     with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):

@@ -6,7 +6,7 @@ from app.models.proposal import ProposalStatus, ScoringStatus
 from app.models.scoring import ScoringResult
 
 
-async def test_proposal_masuk_langsung_dapat_skor(
+async def test_submitted_proposal_gets_scored_immediately(
     client, umkm, campaign, body_proposal
 ):
     res = await client.post(
@@ -20,7 +20,7 @@ async def test_proposal_masuk_langsung_dapat_skor(
     assert detail["status"] == "listed"
 
 
-async def test_br73_skor_di_bawah_threshold_jadi_rejected(
+async def test_br73_score_below_threshold_becomes_rejected(
     client, umkm, campaign, body_proposal
 ):
     body = body_proposal()
@@ -35,7 +35,7 @@ async def test_br73_skor_di_bawah_threshold_jadi_rejected(
     assert detail["status"] == "rejected"
 
 
-async def test_br76_rescore_menambah_baris_bukan_menimpa(
+async def test_br76_rescore_adds_a_row_instead_of_overwriting(
     client, db, umkm, proposal_scoring_gagal
 ):
     await client.post(
@@ -49,7 +49,7 @@ async def test_br76_rescore_menambah_baris_bukan_menimpa(
     assert jumlah >= 1
 
 
-async def test_br76_dua_percobaan_scoring_sungguhan_meninggalkan_dua_baris(
+async def test_br76_two_real_scoring_attempts_leave_two_rows(
     db, submitted_proposal, engine_mock, clock
 ):
     """H-3: test di atas mulai dari nol baris, jadi `jumlah >= 1` tidak bisa
@@ -97,7 +97,7 @@ async def test_br76_dua_percobaan_scoring_sungguhan_meninggalkan_dua_baris(
     assert baris_kedua.total_score != baris_pertama.total_score
 
 
-async def test_br75_job_terpicu_dua_kali_tidak_menghasilkan_dua_transisi(
+async def test_br75_job_triggered_twice_does_not_produce_two_transitions(
     db, listed_proposal, engine_mock, clock
 ):
     from app.services.scoring import run_scoring
@@ -107,7 +107,7 @@ async def test_br75_job_terpicu_dua_kali_tidak_menghasilkan_dua_transisi(
     assert listed_proposal.status is ProposalStatus.LISTED  # tidak berubah, tidak error
 
 
-async def test_t50_t51_scoring_status_berjalan_pending_processing_done(
+async def test_t50_t51_scoring_status_runs_pending_processing_done(
     db, submitted_proposal, engine_mock, clock
 ):
     from app.services.scoring import run_scoring
@@ -118,7 +118,7 @@ async def test_t50_t51_scoring_status_berjalan_pending_processing_done(
     assert submitted_proposal.scoring_status is ScoringStatus.DONE
 
 
-async def test_t52_scoring_status_jadi_failed_saat_engine_meledak(
+async def test_t52_scoring_status_becomes_failed_when_engine_blows_up(
     db, submitted_proposal, engine_meledak, clock
 ):
     from app.services.scoring import run_scoring
@@ -128,7 +128,7 @@ async def test_t52_scoring_status_jadi_failed_saat_engine_meledak(
     assert submitted_proposal.scoring_status is ScoringStatus.FAILED
 
 
-async def test_t53_rescore_mengembalikan_scoring_status_ke_pending(
+async def test_t53_rescore_returns_scoring_status_to_pending(
     client, db, umkm, proposal_scoring_gagal
 ):
     await client.post(
@@ -142,16 +142,14 @@ async def test_t53_rescore_mengembalikan_scoring_status_ke_pending(
     }
 
 
-async def test_br35_komunitas_tidak_bisa_melihat_red_flag(
-    client, community, listed_proposal
-):
+async def test_br35_community_cannot_see_red_flag(client, community, listed_proposal):
     res = await client.get(
         f"/api/v1/proposals/{listed_proposal.id}/scoring", headers=community.headers
     )
     assert res.status_code == 403
 
 
-async def test_rescore_ditolak_404_untuk_umkm_bukan_pemilik_proposal(
+async def test_rescore_rejected_404_for_umkm_not_owning_proposal(
     client, umkm_lain, proposal_scoring_gagal
 ):
     """H-2: proposal_scoring_gagal milik `umkm`, bukan `umkm_lain`. Peran
@@ -165,7 +163,7 @@ async def test_rescore_ditolak_404_untuk_umkm_bukan_pemilik_proposal(
     assert res.json()["error"]["code"] == "proposal_tidak_ada"
 
 
-async def test_rescore_ditolak_404_untuk_investor_bukan_pemilik_campaign(
+async def test_rescore_rejected_404_for_investor_not_owning_campaign(
     client, investor_lain, proposal_scoring_gagal
 ):
     """H-2: campaign dari proposal_scoring_gagal milik `investor`, bukan
@@ -179,7 +177,7 @@ async def test_rescore_ditolak_404_untuk_investor_bukan_pemilik_campaign(
     assert res.json()["error"]["code"] == "proposal_tidak_ada"
 
 
-async def test_rescore_diterima_untuk_pemilik_campaign_bukan_pemilik_proposal(
+async def test_rescore_accepted_for_campaign_owner_not_proposal_owner(
     client, investor, proposal_scoring_gagal
 ):
     """H-2: `investor` bukan pemilik proposal (itu `umkm`), tapi pemilik
@@ -191,7 +189,7 @@ async def test_rescore_diterima_untuk_pemilik_campaign_bukan_pemilik_proposal(
     assert res.status_code == 202
 
 
-async def test_scoring_get_ditolak_404_untuk_umkm_bukan_pemilik_proposal(
+async def test_scoring_get_rejected_404_for_umkm_not_owning_proposal(
     client, umkm, listed_proposal
 ):
     """H-2: listed_proposal milik `umkm_lain`, bukan `umkm`. Sebelumnya UMKM
@@ -204,7 +202,7 @@ async def test_scoring_get_ditolak_404_untuk_umkm_bukan_pemilik_proposal(
     assert res.json()["error"]["code"] == "proposal_tidak_ada"
 
 
-async def test_scoring_get_diterima_untuk_investor_manapun(
+async def test_scoring_get_accepted_for_any_investor(
     client, investor_lain, listed_proposal
 ):
     """Kontrak mengizinkan "investor" secara blanket di endpoint ini (bukan
@@ -216,12 +214,12 @@ async def test_scoring_get_diterima_untuk_investor_manapun(
     assert res.status_code == 200
 
 
-async def test_c30_scoring_get_diterima_untuk_umkm_pemilik_proposal(
+async def test_c30_scoring_get_accepted_for_umkm_owning_proposal(
     client, umkm_lain, listed_proposal
 ):
     """C-30: listed_proposal milik umkm_lain. Pemeriksaan kepemilikan yang
     terbalik (umkm_id == user.id dibalik jadi !=) akan lolos di
-    test_scoring_get_ditolak_404_untuk_umkm_bukan_pemilik_proposal di atas
+    test_scoring_get_rejected_404_for_umkm_not_owning_proposal di atas
     (keduanya sama-sama mengharapkan penolakan), tapi mengunci pemilik
     sungguhan dari datanya sendiri. Test ini satu-satunya yang membuktikan
     pemilik sungguhan tetap bisa membaca."""

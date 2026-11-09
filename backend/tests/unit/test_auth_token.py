@@ -14,37 +14,37 @@ from app.services.auth import (
 )
 
 
-def test_br03_hash_tidak_pernah_sama_dengan_password_asli():
+def test_br03_hash_never_equals_original_password():
     h = hash_password("rahasia123")
     assert h != "rahasia123"
     assert h.startswith("$argon2")
 
 
-def test_verify_password_benar_dan_salah():
+def test_verify_password_correct_and_incorrect():
     h = hash_password("rahasia123")
     assert verify_password("rahasia123", h) is True
     assert verify_password("rahasia124", h) is False
 
 
-def test_verify_password_hash_rusak_dianggap_tidak_cocok():
+def test_verify_password_corrupted_hash_treated_as_mismatch():
     assert verify_password("rahasia123", "bukan-hash-argon2-yang-sah") is False
 
 
-def test_token_membawa_sub_dan_role():
+def test_token_carries_sub_and_role():
     uid = uuid4()
     claims = decode_token(issue_token(uid, "investor"))
     assert claims.sub == uid
     assert claims.role == "investor"
 
 
-def test_token_kedaluwarsa_ditolak():
+def test_expired_token_rejected():
     uid = uuid4()
     kedaluwarsa = issue_token(uid, "investor", ttl_hours=-1)
     with pytest.raises(TokenExpired):
         decode_token(kedaluwarsa)
 
 
-def test_token_dengan_tanda_tangan_lain_ditolak():
+def test_token_with_different_signature_rejected():
     import jwt
 
     palsu = jwt.encode(

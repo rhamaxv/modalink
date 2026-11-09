@@ -8,14 +8,14 @@ from app.domain.verdict import total_score
 pytestmark = pytest.mark.live
 
 
-async def test_live_output_lolos_validasi(
+async def test_live_output_passes_validation(
     gemini_engine, proposal_bagus, campaign_draft
 ):
     skor = await gemini_engine.score(proposal_bagus, campaign_draft)
     assert 0 <= total_score(skor) <= 100
 
 
-async def test_live_urutan_skor_masuk_akal(
+async def test_live_score_ordering_makes_sense(
     gemini_engine, proposal_bagus, proposal_biasa, proposal_red_flag, campaign_draft
 ):
     bagus = total_score(await gemini_engine.score(proposal_bagus, campaign_draft))
@@ -24,14 +24,14 @@ async def test_live_urutan_skor_masuk_akal(
     assert bagus > biasa > buruk
 
 
-async def test_live_proyeksi_berlebihan_memicu_red_flag_kritis(
+async def test_live_excessive_projection_triggers_critical_red_flag(
     gemini_engine, proposal_red_flag, campaign_draft
 ):
     skor = await gemini_engine.score(proposal_red_flag, campaign_draft)
     assert any(f.severity == "critical" for f in skor.red_flags)
 
 
-async def test_live_setiap_evidence_benar_benar_ada_di_proposal(
+async def test_live_every_evidence_actually_exists_in_proposal(
     gemini_engine, proposal_red_flag, campaign_draft
 ):
     """Paling sering jebol saat prompt diubah, dan paling berguna."""

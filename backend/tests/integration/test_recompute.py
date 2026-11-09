@@ -58,7 +58,7 @@ def batalkan(db, clock):
     return _batalkan
 
 
-async def test_status_mengikuti_jumlah_pledge(
+async def test_status_follows_pledge_amount(
     db, listed_proposal, investor, clock, pledge
 ):
     await pledge(listed_proposal, investor, 4_000_000)  # diminta 10 juta
@@ -70,7 +70,7 @@ async def test_status_mengikuti_jumlah_pledge(
     assert listed_proposal.status is S.FUNDED
 
 
-async def test_t07_semua_pledge_dibatalkan_mengembalikan_ke_listed(
+async def test_t07_all_pledges_cancelled_returns_to_listed(
     db, listed_proposal, investor, clock, pledge, batalkan
 ):
     p = await pledge(listed_proposal, investor, 4_000_000)
@@ -80,7 +80,7 @@ async def test_t07_semua_pledge_dibatalkan_mengembalikan_ke_listed(
     assert listed_proposal.status is S.LISTED
 
 
-async def test_recompute_juga_memperbarui_lead_investor(
+async def test_recompute_also_updates_lead_investor(
     db, listed_proposal, investor, investor_lain, clock, pledge
 ):
     await pledge(listed_proposal, investor, 3_000_000)

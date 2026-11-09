@@ -197,7 +197,7 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
 
 
 @pytest.mark.parametrize("method,path,peran,harapan", RBAC_MATRIX)
-async def test_r5_matriks_rbac(client, akun, campaign, method, path, peran, harapan):
+async def test_r5_rbac_matrix(client, akun, campaign, method, path, peran, harapan):
     headers = akun[peran].headers if peran else {}
     url = path.replace("{campaign_id}", str(campaign.id))
     res = await client.request(method, url, headers=headers, json={})
@@ -225,7 +225,7 @@ def _semua_route(routes: list[Any]) -> list[Any]:
     return hasil
 
 
-def test_r5_setiap_route_punya_baris_di_matriks(app):
+def test_r5_every_route_has_a_row_in_the_matrix(app):
     """Endpoint baru tanpa baris baru di matriks membuat test ini merah."""
     DIKECUALIKAN = {
         "/health",

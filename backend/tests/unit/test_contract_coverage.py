@@ -61,13 +61,13 @@ def _terdaftar() -> set[str]:
 # entri menyebut fase yang memilikinya, karena daftar tanpa pemilik adalah cara
 # endpoint menghilang dari rencana: itulah yang terjadi pada empat endpoint baca
 # yang melahirkan pagar ini. Entri dihapus begitu fasenya mendarat, dan
-# test_daftar_tunggu_tidak_menyimpan_yang_sudah_jadi di bawah yang memaksanya.
+# test_pending_list_does_not_keep_items_already_done di bawah yang memaksanya.
 BELUM_DIBANGUN = {
     "POST /internal/clock/reset": "Fase 09, jam virtual (D-06, BR-63)",
 }
 
 
-def test_setiap_endpoint_kontrak_terdaftar_di_aplikasi():
+def test_every_contract_endpoint_registered_in_app():
     terdaftar = _terdaftar()
     diminta = {
         f"{m} {_samakan(p)}": f"{m} {p}" for m, p in POLA.findall(KONTRAK.read_text())
@@ -83,7 +83,7 @@ def test_setiap_endpoint_kontrak_terdaftar_di_aplikasi():
     )
 
 
-def test_daftar_tunggu_tidak_menyimpan_yang_sudah_jadi():
+def test_pending_list_does_not_keep_items_already_done():
     """Daftar tunggu wajib menyusut sendiri.
 
     Tanpa test ini BELUM_DIBANGUN akan membusuk menjadi daftar pengecualian
@@ -101,7 +101,7 @@ def test_daftar_tunggu_tidak_menyimpan_yang_sudah_jadi():
     )
 
 
-def test_pagar_ini_benar_benar_membandingkan_sesuatu():
+def test_this_guard_actually_compares_something():
     # Tanpa test ini, pagar di atas bisa hijau karena kedua himpunannya
     # kosong (misalnya _semua_route rusak lagi suatu hari) atau karena regex
     # berhenti cocok setelah 10-api-contract.md diformat ulang.

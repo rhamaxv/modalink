@@ -54,7 +54,7 @@ async def test_br55_idempotency_key_prevents_duplicate_entry(
     assert jumlah == 1
 
 
-async def test_br54_catat_entri_does_not_swallow_zero_amount_integrity_error(
+async def test_br54_record_entry_does_not_swallow_zero_amount_integrity_error(
     db, listed_proposal, clock
 ):
     """record_entry hanya boleh menelan pelanggaran unique idempotency_key

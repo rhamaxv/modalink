@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from app.domain.transitions import ProposalStatus
 
 
-async def test_br13_umkm_tidak_bisa_punya_dua_proposal_aktif_di_campaign_sama(
+async def test_br13_umkm_cannot_have_two_active_proposals_in_same_campaign(
     db, umkm, campaign, buat_proposal
 ):
     await buat_proposal(status=ProposalStatus.LISTED)
@@ -15,7 +15,7 @@ async def test_br13_umkm_tidak_bisa_punya_dua_proposal_aktif_di_campaign_sama(
 @pytest.mark.parametrize(
     "status_mati", [ProposalStatus.REJECTED, ProposalStatus.FAILED]
 )
-async def test_br13_proposal_yang_sudah_mati_tidak_menghalangi_pengajuan_baru(
+async def test_br13_dead_proposal_does_not_block_new_submission(
     db, buat_proposal, status_mati
 ):
     await buat_proposal(status=status_mati)

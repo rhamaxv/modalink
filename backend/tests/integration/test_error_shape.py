@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from app.errors import ConflictError
 
 
-async def test_domain_error_jadi_bentuk_seragam(client, app):
+async def test_domain_error_becomes_uniform_shape(client, app):
     @app.get("/_boom")
     async def boom():
         raise ConflictError(
@@ -23,7 +23,7 @@ async def test_domain_error_jadi_bentuk_seragam(client, app):
     }
 
 
-async def test_request_validation_error_jadi_bentuk_seragam(client, app):
+async def test_request_validation_error_becomes_uniform_shape(client, app):
     class Body(BaseModel):
         nama: str
 
@@ -38,7 +38,7 @@ async def test_request_validation_error_jadi_bentuk_seragam(client, app):
     assert data["error"]["detail"]["errors"]
 
 
-async def test_http_exception_jadi_bentuk_seragam(client, app):
+async def test_http_exception_becomes_uniform_shape(client, app):
     from fastapi import HTTPException
 
     @app.get("/_unauthorized")
@@ -56,7 +56,7 @@ async def test_http_exception_jadi_bentuk_seragam(client, app):
     }
 
 
-async def test_http_exception_meneruskan_header(client, app):
+async def test_http_exception_forwards_header(client, app):
     from fastapi import HTTPException
 
     @app.get("/_unauthorized_header")
@@ -72,7 +72,7 @@ async def test_http_exception_meneruskan_header(client, app):
     assert res.headers["WWW-Authenticate"] == "Bearer"
 
 
-async def test_http_exception_204_tidak_memuat_body(client, app):
+async def test_http_exception_204_has_no_body(client, app):
     from fastapi import HTTPException
 
     @app.get("/_no_content")

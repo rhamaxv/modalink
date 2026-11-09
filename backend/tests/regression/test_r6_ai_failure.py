@@ -27,7 +27,7 @@ MODE_GAGAL = [
 
 
 @pytest.mark.parametrize("kegagalan", MODE_GAGAL)
-async def test_r6_kegagalan_tidak_mengubah_status_proposal(
+async def test_r6_failure_does_not_change_proposal_status(
     db, submitted_proposal, clock, kegagalan
 ):
     await run_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
@@ -38,7 +38,7 @@ async def test_r6_kegagalan_tidak_mengubah_status_proposal(
 
 
 @pytest.mark.parametrize("kegagalan", MODE_GAGAL)
-async def test_r6_kegagalan_tidak_meninggalkan_baris_scoring(
+async def test_r6_failure_does_not_leave_a_scoring_row(
     db, submitted_proposal, clock, kegagalan
 ):
     await run_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
@@ -50,16 +50,14 @@ async def test_r6_kegagalan_tidak_meninggalkan_baris_scoring(
     assert jumlah == 0
 
 
-async def test_r6_rescore_mengembalikan_ke_pending(
-    client, umkm, proposal_scoring_gagal
-):
+async def test_r6_rescore_returns_to_pending(client, umkm, proposal_scoring_gagal):
     res = await client.post(
         f"/api/v1/proposals/{proposal_scoring_gagal.id}/rescore", headers=umkm.headers
     )
     assert res.status_code == 202
 
 
-async def test_r6_rescore_ditolak_saat_scoring_sudah_selesai(
+async def test_r6_rescore_rejected_while_scoring_already_done(
     client, umkm_lain, listed_proposal
 ):
     # listed_proposal milik umkm_lain (lihat conftest.py), bukan umkm: dengan
@@ -73,7 +71,7 @@ async def test_r6_rescore_ditolak_saat_scoring_sudah_selesai(
     assert res.status_code == 409
 
 
-async def test_r6_job_dua_kali_hanya_satu_transisi(
+async def test_r6_job_run_twice_only_one_transition(
     db, submitted_proposal, engine_mock, clock
 ):
     await run_scoring(db, submitted_proposal.id, engine_mock, clock)

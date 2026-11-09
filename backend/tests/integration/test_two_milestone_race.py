@@ -255,7 +255,7 @@ async def _race_satu_percobaan(lead: User, clock) -> dict:
 JUMLAH_PERCOBAAN = 30
 
 
-async def test_rf6_dua_milestone_berbeda_diapprove_bersamaan_tidak_pernah_overdisbursed(
+async def test_rf6_two_different_milestones_approved_concurrently_never_overdisbursed(
     lead, clock
 ):
     """Menjalankan race N kali terhadap kode SEKARANG (dengan

@@ -111,7 +111,7 @@ async def production_job_session() -> AsyncIterator[AsyncSession]:
     """Implementasi SessionFactory sungguhan untuk app/api/deps.py: session
     baru per job, dikomit kalau tidak ada exception. Diletakkan di sini,
     bukan di deps.py, karena pagar AST menolak router/deps menyentuh
-    session.<metode> secara langsung (test_pagar_layering.py)."""
+    session.<metode> secara langsung (test_layering_guard.py)."""
     async with SessionLocal() as session:
         yield session
         await session.commit()

@@ -1,19 +1,19 @@
 from uuid import uuid4
 
 
-async def test_proposal_listed_terlihat_publik(client, listed_proposal):
+async def test_proposal_listed_visible_publicly(client, listed_proposal):
     assert (
         await client.get(f"/api/v1/proposals/{listed_proposal.id}")
     ).status_code == 200
 
 
-async def test_proposal_submitted_tidak_terlihat_publik(client, submitted_proposal):
+async def test_proposal_submitted_not_visible_publicly(client, submitted_proposal):
     assert (
         await client.get(f"/api/v1/proposals/{submitted_proposal.id}")
     ).status_code == 404
 
 
-async def test_proposal_yang_sungguh_tidak_ada_dikembalikan_404(client):
+async def test_proposal_that_truly_does_not_exist_returns_404(client):
     """Cabang `if proposal is None` belum pernah dieksekusi test lain (C-22):
     test di atas hanya menguji proposal yang ada tapi tersembunyi dari
     viewer, bukan id yang sama sekali tidak ada baris-nya."""
@@ -23,7 +23,7 @@ async def test_proposal_yang_sungguh_tidak_ada_dikembalikan_404(client):
     assert res.json()["error"]["code"] == "proposal_tidak_ada"
 
 
-async def test_proposal_submitted_terlihat_oleh_pemiliknya(
+async def test_proposal_submitted_visible_to_its_owner(
     client, umkm, submitted_proposal
 ):
     res = await client.get(
@@ -32,7 +32,7 @@ async def test_proposal_submitted_terlihat_oleh_pemiliknya(
     assert res.status_code == 200
 
 
-async def test_proposal_rejected_terlihat_oleh_pemilik_campaign(
+async def test_proposal_rejected_visible_to_campaign_owner(
     client, investor, rejected_proposal
 ):
     res = await client.get(
@@ -41,7 +41,7 @@ async def test_proposal_rejected_terlihat_oleh_pemilik_campaign(
     assert res.status_code == 200
 
 
-async def test_proposal_submitted_tidak_terlihat_umkm_lain(
+async def test_proposal_submitted_not_visible_to_other_umkm(
     client, umkm_lain, submitted_proposal
 ):
     res = await client.get(
@@ -50,7 +50,7 @@ async def test_proposal_submitted_tidak_terlihat_umkm_lain(
     assert res.status_code == 404
 
 
-async def test_daftar_proposal_campaign_menyembunyikan_yang_belum_listed(
+async def test_list_campaign_proposals_hides_not_yet_listed(
     client, investor, listed_proposal, submitted_proposal, rejected_proposal
 ):
     """Filter visibilitas di endpoint daftar proposal campaign lahir di fase 03
@@ -76,7 +76,7 @@ async def test_daftar_proposal_campaign_menyembunyikan_yang_belum_listed(
     } <= semua
 
 
-async def test_campaign_yang_sudah_closed_menolak_proposal_baru(
+async def test_already_closed_campaign_rejects_new_proposal(
     client, investor, campaign, umkm, body_proposal
 ):
     """Ditunda dari fase 03 karena endpoint POST proposal baru lahir di sini."""
@@ -92,9 +92,7 @@ async def test_campaign_yang_sudah_closed_menolak_proposal_baru(
     assert res.json()["error"]["code"] == "pengajuan_ditutup"
 
 
-async def test_patch_dan_close_campaign_yang_tidak_ada_mengembalikan_404(
-    client, investor
-):
+async def test_patch_and_close_nonexistent_campaign_returns_404(client, investor):
     """Satu-satunya cabang di dependency kepemilikan yang belum pernah dieksekusi."""
     hantu = uuid4()
     assert (
@@ -107,7 +105,7 @@ async def test_patch_dan_close_campaign_yang_tidak_ada_mengembalikan_404(
     ).status_code == 404
 
 
-async def test_daftar_publik_hanya_memuat_listed_ke_atas(
+async def test_public_listing_only_includes_listed_and_above(
     client, listed_proposal, submitted_proposal, rejected_proposal
 ):
     ids = {p["id"] for p in (await client.get("/api/v1/proposals")).json()["items"]}

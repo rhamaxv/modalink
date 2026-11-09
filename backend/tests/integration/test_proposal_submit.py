@@ -1,4 +1,4 @@
-async def test_umkm_bisa_submit_proposal(client, umkm, campaign, body_proposal):
+async def test_umkm_can_submit_proposal(client, umkm, campaign, body_proposal):
     res = await client.post(
         f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
@@ -10,7 +10,7 @@ async def test_umkm_bisa_submit_proposal(client, umkm, campaign, body_proposal):
     assert data["scoring_status"] in {"pending", "processing", "done"}
 
 
-async def test_br10_fund_usage_plan_di_bawah_100_karakter_ditolak(
+async def test_br10_fund_usage_plan_under_100_characters_rejected(
     client, umkm, campaign, body_proposal
 ):
     """04-feature-umkm.md menetapkan minimal 100 karakter (BR-10). Rubrik
@@ -24,7 +24,7 @@ async def test_br10_fund_usage_plan_di_bawah_100_karakter_ditolak(
     assert res.status_code == 422
 
 
-async def test_c26_fund_usage_plan_tepat_100_karakter_diterima(
+async def test_c26_fund_usage_plan_exactly_100_characters_accepted(
     client, umkm, campaign, body_proposal
 ):
     """Batas tepat di 100 belum pernah diuji sebelumnya: 99 ditolak dan 162
@@ -38,7 +38,7 @@ async def test_c26_fund_usage_plan_tepat_100_karakter_diterima(
     assert res.status_code == 201
 
 
-async def test_br11_dana_melebihi_target_campaign_ditolak(
+async def test_br11_funds_exceeding_campaign_target_rejected(
     client, umkm, campaign, body_proposal
 ):
     res = await client.post(
@@ -60,7 +60,7 @@ async def test_br11_dana_melebihi_target_campaign_ditolak(
     assert res.json()["error"]["code"] == "dana_melebihi_target_campaign"
 
 
-async def test_br14_jumlah_milestone_tidak_pas_ditolak_dengan_selisih(
+async def test_br14_milestone_amount_mismatch_rejected_with_difference(
     client, umkm, campaign, body_proposal
 ):
     res = await client.post(
@@ -77,9 +77,7 @@ async def test_br14_jumlah_milestone_tidak_pas_ditolak_dengan_selisih(
     assert "Rp1.000.000" in res.json()["error"]["message"]
 
 
-async def test_br12_dana_di_bawah_minimum_ditolak(
-    client, umkm, campaign, body_proposal
-):
+async def test_br12_funds_below_minimum_rejected(client, umkm, campaign, body_proposal):
     res = await client.post(
         f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
@@ -95,7 +93,7 @@ async def test_br12_dana_di_bawah_minimum_ditolak(
     assert res.json()["error"]["code"] == "dana_di_bawah_minimum"
 
 
-async def test_br13_proposal_kedua_ke_campaign_sama_ditolak_409(
+async def test_br13_second_proposal_to_same_campaign_rejected_409(
     client, umkm, campaign, body_proposal
 ):
     await client.post(
@@ -112,7 +110,7 @@ async def test_br13_proposal_kedua_ke_campaign_sama_ditolak_409(
     assert res.json()["error"]["code"] == "proposal_aktif_sudah_ada"
 
 
-async def test_br17_campaign_yang_apply_deadline_nya_lewat_menolak(
+async def test_br17_campaign_past_apply_deadline_rejects(
     client, umkm, campaign_kedaluwarsa, body_proposal
 ):
     res = await client.post(
@@ -179,7 +177,7 @@ async def test_t3_more_than_30_milestones_rejected(
     assert res.status_code == 422
 
 
-async def test_br18_tidak_ada_endpoint_ubah_proposal(app):
+async def test_br18_no_endpoint_to_update_proposal(app):
     rute = {
         (m, r.path)
         for r in app.routes

@@ -46,7 +46,7 @@ def _pelanggaran(pohon: ast.AST) -> list[str]:
 
 
 @pytest.mark.parametrize("berkas", BERKAS_ROUTER, ids=lambda p: p.name)
-def test_router_tidak_menyentuh_database_sendiri(berkas: pathlib.Path) -> None:
+def test_router_does_not_touch_database_directly(berkas: pathlib.Path) -> None:
     temuan = _pelanggaran(ast.parse(berkas.read_text()))
     assert not temuan, (
         f"{berkas.name} menyentuh database langsung:\n  "
@@ -55,7 +55,7 @@ def test_router_tidak_menyentuh_database_sendiri(berkas: pathlib.Path) -> None:
     )
 
 
-def test_pagar_ini_benar_benar_menangkap_sesuatu() -> None:
+def test_this_guard_actually_catches_something() -> None:
     """Pagar yang tidak pernah terbukti bisa merah mungkin tidak memagari apa pun."""
     contoh = ast.parse(
         "async def r(session):\n    return await session.scalar(select(Campaign))\n"

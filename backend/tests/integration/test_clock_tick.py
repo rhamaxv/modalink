@@ -107,7 +107,7 @@ async def test_t3_advance_days_above_ceiling_rejected_with_422_not_overflow_erro
     assert res.status_code == 422
 
 
-async def test_ck_system_clock_tunggal_rejects_second_row(db):
+async def test_ck_system_clock_single_row_rejects_second_row(db):
     """Constraint database, bukan sekadar kolomnya ada: CHECK id = 1 wajib
     benar-benar menolak baris kedua, bukan hanya dipercaya karena tertulis
     di model."""

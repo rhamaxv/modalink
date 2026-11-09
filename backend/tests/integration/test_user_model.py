@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from app.models.user import Role, User
 
 
-async def test_br02_email_unik_lintas_peran(db):
+async def test_br02_email_unique_across_roles(db):
     db.add(User(email="a@x.id", password_hash="h", name="A", role=Role.INVESTOR))
     await db.flush()
     db.add(User(email="a@x.id", password_hash="h", name="B", role=Role.UMKM))
@@ -14,7 +14,7 @@ async def test_br02_email_unik_lintas_peran(db):
         await db.flush()
 
 
-async def test_email_disimpan_lowercase(db):
+async def test_email_stored_as_lowercase(db):
     u = User(email="Budi@Contoh.ID", password_hash="h", name="Budi", role=Role.UMKM)
     db.add(u)
     await db.flush()

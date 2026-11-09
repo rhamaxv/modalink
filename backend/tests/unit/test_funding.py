@@ -30,11 +30,11 @@ def test_compute_funding_status(terkumpul, diminta, deadline, harapan):
     assert compute_funding_status(terkumpul, diminta, SEKARANG, deadline) is harapan
 
 
-def test_br21_sisa_dana_dihitung_eksak():
+def test_br21_remaining_funds_computed_exactly():
     assert remaining_amount(4_000_000, 10_000_000) == 6_000_000
     assert remaining_amount(10_000_000, 10_000_000) == 0
 
 
-def test_total_melebihi_diminta_tidak_pernah_dianggap_sah():
+def test_total_exceeding_requested_never_considered_valid():
     with pytest.raises(ValueError, match="melebihi"):
         compute_funding_status(11_000_000, 10_000_000, SEKARANG, BESOK)

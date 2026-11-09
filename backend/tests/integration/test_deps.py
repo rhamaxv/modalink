@@ -11,7 +11,7 @@ from app.api.deps import require_role
 from app.models.user import Role
 
 
-async def test_br04_role_diverifikasi_ulang_ke_database(client, app, db, investor):
+async def test_br04_role_reverified_against_database(client, app, db, investor):
     """Token lama dengan role yang sudah berubah tidak boleh lolos."""
 
     @app.post("/_hanya_investor")
@@ -27,7 +27,7 @@ async def test_br04_role_diverifikasi_ulang_ke_database(client, app, db, investo
     assert res.status_code == 403
 
 
-async def test_peran_salah_ditolak_403_bukan_401(client, app, umkm):
+async def test_wrong_role_rejected_403_not_401(client, app, umkm):
     @app.post("/_hanya_investor")
     async def hanya_investor(
         user=Depends(require_role(Role.INVESTOR)),
@@ -39,7 +39,7 @@ async def test_peran_salah_ditolak_403_bukan_401(client, app, umkm):
     assert res.json()["error"]["code"] == "peran_tidak_berhak"
 
 
-async def test_tanpa_token_ditolak_401(client, app):
+async def test_without_token_rejected_401(client, app):
     @app.post("/_hanya_investor")
     async def hanya_investor(
         user=Depends(require_role(Role.INVESTOR)),

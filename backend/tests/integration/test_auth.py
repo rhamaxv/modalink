@@ -5,7 +5,7 @@ from app.schemas.auth import LoginIn
 from app.services.auth import InvalidCredentials, authenticate_user
 
 
-async def test_register_lalu_login(client):
+async def test_register_then_login(client):
     daftar = await client.post(
         "/api/v1/auth/register",
         json={
@@ -25,7 +25,7 @@ async def test_register_lalu_login(client):
     assert masuk.json()["token_type"] == "bearer"
 
 
-async def test_br03_password_hash_tidak_pernah_dikembalikan(client):
+async def test_br03_password_hash_never_returned(client):
     res = await client.post(
         "/api/v1/auth/register",
         json={
@@ -39,7 +39,7 @@ async def test_br03_password_hash_tidak_pernah_dikembalikan(client):
     assert "rahasia123" not in res.text
 
 
-async def test_login_salah_password_tidak_membocorkan_apakah_email_ada(client):
+async def test_login_wrong_password_does_not_leak_whether_email_exists(client):
     await client.post(
         "/api/v1/auth/register",
         json={
@@ -59,11 +59,11 @@ async def test_login_salah_password_tidak_membocorkan_apakah_email_ada(client):
     assert ada.json() == tidak_ada.json()
 
 
-async def test_br05_endpoint_me_butuh_token(client):
+async def test_br05_me_endpoint_requires_token(client):
     assert (await client.get("/api/v1/auth/me")).status_code == 401
 
 
-async def test_me_mengembalikan_profil_tanpa_password_hash(client):
+async def test_me_returns_profile_without_password_hash(client):
     await client.post(
         "/api/v1/auth/register",
         json={
@@ -90,7 +90,7 @@ async def test_me_mengembalikan_profil_tanpa_password_hash(client):
     assert "rahasia123" not in res.text
 
 
-async def test_br02_email_duplikat_ditolak_400_bukan_500(client):
+async def test_br02_duplicate_email_rejected_400_not_500(client):
     """Menutup celah balapan: pemeriksaan di Python bisa dilewati dua registrasi
     bersamaan, dan constraint database yang menangkapnya harus diterjemahkan
     menjadi error yang rapi, bukan bocor sebagai 500."""
@@ -166,7 +166,7 @@ async def test_t3_register_rejects_password_over_128_characters(client):
     assert res.status_code == 422
 
 
-async def test_login_argon2_tetap_jalan_untuk_email_tak_dikenal(db, monkeypatch):
+async def test_login_argon2_still_runs_for_unknown_email(db, monkeypatch):
     """Oracle waktu: tanpa HASH_UMPAN, email tak dikenal melewati argon2 lewat
     short-circuit `user is None`, sehingga responsnya terukur lebih cepat
     daripada password salah. Menghitung panggilan verify_password membuktikan

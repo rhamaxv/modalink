@@ -18,7 +18,7 @@ FILE_API = sorted(APP.glob("api/**/*.py"))
 
 
 @pytest.mark.parametrize("berkas", FILE_DOMAIN, ids=lambda p: p.name)
-def test_domain_tidak_mengimpor_database_atau_http(berkas):
+def test_domain_does_not_import_database_or_http(berkas):
     pohon = ast.parse(berkas.read_text())
     diimpor = {
         (node.module or "").split(".")[0]
@@ -37,7 +37,7 @@ def test_domain_tidak_mengimpor_database_atau_http(berkas):
 
 
 @pytest.mark.parametrize("berkas", FILE_DOMAIN, ids=lambda p: p.name)
-def test_br60_hanya_clock_yang_boleh_memanggil_datetime_now(berkas):
+def test_br60_only_clock_may_call_datetime_now(berkas):
     if berkas.name == "clock.py":
         pytest.skip("clock.py adalah satu-satunya yang berhak")
     assert "datetime.now(" not in berkas.read_text(), (
@@ -46,14 +46,14 @@ def test_br60_hanya_clock_yang_boleh_memanggil_datetime_now(berkas):
 
 
 @pytest.mark.parametrize("berkas", FILE_SERVICES, ids=lambda p: p.name)
-def test_br60_services_tidak_memanggil_datetime_now(berkas):
+def test_br60_services_do_not_call_datetime_now(berkas):
     assert "datetime.now(" not in berkas.read_text(), (
         f"{berkas.name} memanggil datetime.now() langsung. Pakai Clock (BR-60)."
     )
 
 
 @pytest.mark.parametrize("berkas", FILE_API, ids=lambda p: p.name)
-def test_br60_api_tidak_memanggil_datetime_now(berkas):
+def test_br60_api_does_not_call_datetime_now(berkas):
     assert "datetime.now(" not in berkas.read_text(), (
         f"{berkas.name} memanggil datetime.now() langsung. Pakai Clock (BR-60)."
     )

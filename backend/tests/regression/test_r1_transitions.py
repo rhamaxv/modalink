@@ -36,7 +36,7 @@ SCORING_KOMBINASI = list(itertools.product(ScoringStatus, ScoringEvent))
 
 
 @pytest.mark.parametrize("status,event", PROPOSAL_KOMBINASI)
-def test_r1_proposal_setiap_kombinasi_sesuai_peta(status, event):
+def test_r1_proposal_every_combination_matches_map(status, event):
     if (status, event) in PROPOSAL_MAP:
         assert apply_proposal(status, event) is PROPOSAL_MAP[(status, event)]
     else:
@@ -45,7 +45,7 @@ def test_r1_proposal_setiap_kombinasi_sesuai_peta(status, event):
 
 
 @pytest.mark.parametrize("status,event", MILESTONE_KOMBINASI)
-def test_r1_milestone_setiap_kombinasi_sesuai_peta(status, event):
+def test_r1_milestone_every_combination_matches_map(status, event):
     if (status, event) in MILESTONE_MAP:
         assert apply_milestone(status, event) is MILESTONE_MAP[(status, event)]
     else:
@@ -54,7 +54,7 @@ def test_r1_milestone_setiap_kombinasi_sesuai_peta(status, event):
 
 
 @pytest.mark.parametrize("status,event", REPORT_KOMBINASI)
-def test_r1_report_setiap_kombinasi_sesuai_peta(status, event):
+def test_r1_report_every_combination_matches_map(status, event):
     if (status, event) in REPORT_MAP:
         assert apply_report(status, event) is REPORT_MAP[(status, event)]
     else:
@@ -63,7 +63,7 @@ def test_r1_report_setiap_kombinasi_sesuai_peta(status, event):
 
 
 @pytest.mark.parametrize("status,event", CAMPAIGN_KOMBINASI)
-def test_r1_campaign_setiap_kombinasi_sesuai_peta(status, event):
+def test_r1_campaign_every_combination_matches_map(status, event):
     if (status, event) in CAMPAIGN_MAP:
         assert apply_campaign(status, event) is CAMPAIGN_MAP[(status, event)]
     else:
@@ -72,7 +72,7 @@ def test_r1_campaign_setiap_kombinasi_sesuai_peta(status, event):
 
 
 @pytest.mark.parametrize("status,event", SCORING_KOMBINASI)
-def test_r1_scoring_setiap_kombinasi_sesuai_peta(status, event):
+def test_r1_scoring_every_combination_matches_map(status, event):
     if (status, event) in SCORING_MAP:
         assert apply_scoring(status, event) is SCORING_MAP[(status, event)]
     else:
@@ -80,25 +80,25 @@ def test_r1_scoring_setiap_kombinasi_sesuai_peta(status, event):
             apply_scoring(status, event)
 
 
-def test_r1_jumlah_transisi_proposal_sesuai_spec():
+def test_r1_proposal_transition_count_matches_spec():
     """Mengunci jumlahnya ke spec. Menambah transisi tanpa memperbarui
     08-state-machines.md akan membuat test ini merah."""
     assert len(PROPOSAL_MAP) == 9  # T-01 sampai T-09
 
 
-def test_r1_jumlah_transisi_milestone_sesuai_spec():
+def test_r1_milestone_transition_count_matches_spec():
     assert len(MILESTONE_MAP) == 4  # T-20 sampai T-23
 
 
-def test_r1_jumlah_transisi_laporan_sesuai_spec():
+def test_r1_report_transition_count_matches_spec():
     assert len(REPORT_MAP) == 2  # T-30, T-31
 
 
-def test_r1_jumlah_transisi_campaign_sesuai_spec():
+def test_r1_campaign_transition_count_matches_spec():
     assert len(CAMPAIGN_MAP) == 2  # T-40, T-41
 
 
-def test_r1_jumlah_transisi_scoring_sesuai_spec():
+def test_r1_scoring_transition_count_matches_spec():
     assert len(SCORING_MAP) == 4  # T-50 sampai T-53
 
 
@@ -110,5 +110,5 @@ def test_r1_jumlah_transisi_scoring_sesuai_spec():
         ProposalStatus.COMPLETED,
     ],
 )
-def test_r1_status_terminal_tidak_punya_jalan_keluar(terminal):
+def test_r1_terminal_status_has_no_way_out(terminal):
     assert not any(s is terminal for s, _ in PROPOSAL_MAP)
