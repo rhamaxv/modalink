@@ -23,9 +23,22 @@ type AuthState =
 // begitu /auth/me selesai, pengguna yang sudah masuk melihat kedipan
 // keadaan yang salah sesaat sebelum keadaan yang benar muncul. Jelajahi dan
 // ThemeToggle tidak menunggu apa pun, jadi tetap tampil dari awal.
+//
+// State awal SELALU "checking", bukan membaca getToken() di initializer
+// useState seperti sebelumnya: initializer itu berjalan juga saat SSR (lewat
+// next dev/next start), di mana localStorage tidak ada dan getToken() selalu
+// null -> "guest", sedangkan render pertama di klien sungguh membaca
+// localStorage sungguhan. Untuk akun yang sedang masuk, HTML server
+// ("guest": tautan Masuk/Daftar) berbeda dari tebakan pertama klien
+// ("checking": slot nav kosong), dan React membuang hasil hidrasi
+// (laporan Fase 11 Task 12: dibuktikan e2e lewat navigasi penuh/reload
+// sungguhan sebagai akun yang sudah masuk, bukan navigasi client-side yang
+// tidak pernah memicu SSR ulang). Sama seperti ThemeToggle (lihat
+// e2e/no-flash.spec.ts): initializer tidak boleh membaca apa pun yang hanya
+// ada di klien.
 export function AppHeader() {
   const router = useRouter();
-  const [auth, setAuth] = useState<AuthState>(() => (getToken() ? { status: "checking" } : { status: "guest" }));
+  const [auth, setAuth] = useState<AuthState>({ status: "checking" });
 
   useEffect(() => {
     if (!getToken()) {
