@@ -64,7 +64,6 @@ export function ProposalForm({
   const [milestones, setMilestones] = useState<MilestoneDraft[]>(
     Array.from({ length: MIN_MILESTONES }, () => ({ title: "", description: "", amount: "" })),
   );
-  const [touched, setTouched] = useState(false);
 
   const requestedAmountValue = Number(requestedAmountInput) || 0;
   const milestoneTotal = totalMilestone(milestones);
@@ -89,9 +88,35 @@ export function ProposalForm({
 
   const tidakBisaDikirim = Boolean(disabledReason) || !formValid || submitting;
 
+  // Pesan di bawah muncul begitu pengguna sudah mengisi sesuatu tapi belum
+  // cukup, bukan menunggu klik tombol kirim yang sudah nonaktif: validasi
+  // ini ada supaya jawabannya terlihat sebelum request dikirim, jadi ia
+  // tidak boleh bergantung pada tombol yang justru dinonaktifkan olehnya.
+  const errorNamaUsaha =
+    businessName.length > 0 && namaUsahaKurangPanjang
+      ? `Nama usaha minimal ${MIN_BUSINESS_NAME} karakter.`
+      : undefined;
+  const errorProfilUsaha =
+    businessProfile.length > 0 && kurangBusinessProfile > 0
+      ? `Profil usaha masih kurang ${kurangBusinessProfile} karakter dari minimum ${MIN_BUSINESS_PROFILE}.`
+      : undefined;
+  const errorJumlahDiminta =
+    requestedAmountInput.length > 0 && jumlahDimintaTerlaluKecil
+      ? "Dana yang diminta minimal Rp500.000."
+      : requestedAmountInput.length > 0 && jumlahDimintaMelebihiTarget
+        ? "Dana yang diminta tidak boleh melebihi target campaign."
+        : undefined;
+  const errorRencanaDana =
+    fundUsagePlan.length > 0 && kurangFundUsagePlan > 0
+      ? `Rencana penggunaan dana masih kurang ${kurangFundUsagePlan} karakter dari minimum ${MIN_FUND_USAGE_PLAN}.`
+      : undefined;
+  const errorProyeksi =
+    businessProjection.length > 0 && kurangBusinessProjection > 0
+      ? `Proyeksi usaha masih kurang ${kurangBusinessProjection} karakter dari minimum ${MIN_BUSINESS_PROJECTION}.`
+      : undefined;
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    setTouched(true);
     if (tidakBisaDikirim) return;
     onSubmit?.({
       business_name: businessName,
@@ -118,68 +143,48 @@ export function ProposalForm({
         </p>
       )}
 
-      <Field label="Nama usaha" value={businessName} onChange={setBusinessName} required />
-      {touched && namaUsahaKurangPanjang && (
-        <p role="alert" className="text-[0.8125rem] text-danger">
-          Nama usaha minimal {MIN_BUSINESS_NAME} karakter.
-        </p>
-      )}
+      <Field
+        label="Nama usaha"
+        value={businessName}
+        onChange={setBusinessName}
+        error={errorNamaUsaha}
+        required
+      />
 
       <TextAreaField
         label="Profil usaha"
         hint="Jenis usaha, lama berjalan, lokasi, jumlah pekerja."
         value={businessProfile}
         onChange={setBusinessProfile}
+        error={errorProfilUsaha}
         required
       />
-      {touched && kurangBusinessProfile > 0 && (
-        <p role="alert" className="text-[0.8125rem] text-danger">
-          Profil usaha masih kurang {kurangBusinessProfile} karakter dari minimum {MIN_BUSINESS_PROFILE}.
-        </p>
-      )}
 
       <Field
         label="Jumlah dana yang diminta"
         value={requestedAmountInput}
         onChange={(value) => setRequestedAmountInput(value.replace(/[^0-9]/g, ""))}
+        error={errorJumlahDiminta}
         required
       />
-      {touched && jumlahDimintaTerlaluKecil && (
-        <p role="alert" className="text-[0.8125rem] text-danger">
-          Dana yang diminta minimal Rp500.000.
-        </p>
-      )}
-      {touched && jumlahDimintaMelebihiTarget && (
-        <p role="alert" className="text-[0.8125rem] text-danger">
-          Dana yang diminta tidak boleh melebihi target campaign.
-        </p>
-      )}
 
       <TextAreaField
         label="Rencana penggunaan dana"
         hint="Rincian penggunaan dana per pos."
         value={fundUsagePlan}
         onChange={setFundUsagePlan}
+        error={errorRencanaDana}
         required
       />
-      {touched && kurangFundUsagePlan > 0 && (
-        <p role="alert" className="text-[0.8125rem] text-danger">
-          Rencana penggunaan dana masih kurang {kurangFundUsagePlan} karakter dari minimum {MIN_FUND_USAGE_PLAN}.
-        </p>
-      )}
 
       <TextAreaField
         label="Proyeksi usaha"
         hint="Proyeksi omzet atau dampak."
         value={businessProjection}
         onChange={setBusinessProjection}
+        error={errorProyeksi}
         required
       />
-      {touched && kurangBusinessProjection > 0 && (
-        <p role="alert" className="text-[0.8125rem] text-danger">
-          Proyeksi usaha masih kurang {kurangBusinessProjection} karakter dari minimum {MIN_BUSINESS_PROJECTION}.
-        </p>
-      )}
 
       <div>
         <h2 className="text-[1.125rem] font-semibold text-ink">Rencana milestone</h2>
@@ -212,16 +217,19 @@ type TextAreaFieldProps = {
   hint?: string;
   value: string;
   onChange: (value: string) => void;
+  error?: string;
   required?: boolean;
 };
 
 // Field (fase 10) hanya merender <input>, tidak <textarea>, dan field ini
 // bukan bagian dari file-file yang boleh disentuh stream ini. TextAreaField
-// mengulang kontrak aksesibilitas yang sama (htmlFor, aria-describedby)
-// khusus untuk area teks panjang di formulir proposal.
-function TextAreaField({ label, hint, value, onChange, required }: TextAreaFieldProps) {
+// mengulang kontrak aksesibilitas yang sama (htmlFor, aria-describedby,
+// aria-invalid) khusus untuk area teks panjang di formulir proposal.
+function TextAreaField({ label, hint, value, onChange, error, required }: TextAreaFieldProps) {
   const id = useId();
   const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
   return (
     <div className="flex flex-col gap-space-1">
       <label htmlFor={id} className="text-[0.8125rem] font-medium text-muted">
@@ -238,10 +246,16 @@ function TextAreaField({ label, hint, value, onChange, required }: TextAreaField
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
-        aria-describedby={hint ? hintId : undefined}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
         rows={4}
         className="min-h-[88px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink"
       />
+      {error && (
+        <p id={errorId} role="alert" className="text-[0.8125rem] text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
