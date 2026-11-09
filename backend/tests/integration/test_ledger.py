@@ -52,6 +52,19 @@ async def test_br55_idempotency_key_mencegah_entri_ganda(db, listed_proposal):
     assert jumlah == 1
 
 
+async def test_0a_catat_entri_nol_mengangkat_integrity_error_bukan_menelan(
+    db, listed_proposal
+):
+    """catat_entri hanya boleh menelan pelanggaran unique idempotency_key
+    (BR-55). Pelanggaran CHECK (amount > 0, BR-54) wajib tetap meledak,
+    bukan diam-diam dikembalikan sebagai None yang di seluruh kode ini
+    berarti 'aman, sudah pernah tercatat'."""
+    with pytest.raises(IntegrityError):
+        await catat_entri(
+            db, listed_proposal.id, EntryType.PLEDGE_IN, 0, "uji:nol-ditelan"
+        )
+
+
 async def test_br55_entri_berikutnya_setelah_duplikat_tetap_tersimpan(
     db, listed_proposal
 ):

@@ -23,6 +23,13 @@ from app.models.pledge import Pledge, PledgeStatus
 MASUK = {EntryType.PLEDGE_IN}
 KELUAR = {EntryType.REFUND_OUT, EntryType.DISBURSEMENT_OUT}
 
+# sqlstate Postgres untuk unique_violation. exc.orig dari dialect asyncpg
+# sqlalchemy memuat atribut .sqlstate langsung (dibuktikan lewat probe manual
+# terhadap UniqueViolationError dan CheckViolationError sungguhan, bukan
+# ditebak dari dokumentasi): tidak perlu menelusuri __cause__ untuk sampai ke
+# asyncpg.exceptions.UniqueViolationError di baliknya.
+SQLSTATE_UNIQUE_VIOLATION = "23505"
+
 # Instance tunggal dari Clock, bukan memanggil jam sistem langsung: catat_entri
 # tetap butuh jam meski pemanggil (termasuk test brief ini) tidak selalu
 # menyediakannya, jadi fallback-nya memakai Clock sungguhan, sama seperti
@@ -83,7 +90,13 @@ async def catat_entri(
         async with session.begin_nested():
             session.add(entri)
             await session.flush()
-    except IntegrityError:
+    except IntegrityError as exc:
+        # Hanya unique_violation pada idempotency_key berarti "sudah pernah
+        # tercatat, aman diabaikan" (BR-55). CHECK (amount > 0) atau FK yang
+        # gagal berarti pemanggil salah menghitung nominal, dan menelannya
+        # di sini akan membuat entri uang hilang tanpa satu pun error muncul.
+        if getattr(exc.orig, "sqlstate", None) != SQLSTATE_UNIQUE_VIOLATION:
+            raise
         return None
     return entri
 
