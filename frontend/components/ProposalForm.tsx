@@ -73,12 +73,14 @@ export function ProposalForm({
   const kurangBusinessProfile = kurangKarakter(businessProfile, MIN_BUSINESS_PROFILE);
   const kurangBusinessProjection = kurangKarakter(businessProjection, MIN_BUSINESS_PROJECTION);
   const namaUsahaKurangPanjang = businessName.trim().length < MIN_BUSINESS_NAME;
+  const namaUsahaTerlaluPanjang = businessName.trim().length > MAX_BUSINESS_NAME;
   const jumlahDimintaTerlaluKecil = requestedAmountValue < MIN_REQUESTED_AMOUNT;
   const jumlahDimintaMelebihiTarget =
     maxAmount !== undefined && requestedAmountValue > maxAmount;
 
   const formValid =
     !namaUsahaKurangPanjang &&
+    !namaUsahaTerlaluPanjang &&
     kurangBusinessProfile === 0 &&
     !jumlahDimintaTerlaluKecil &&
     !jumlahDimintaMelebihiTarget &&
@@ -95,7 +97,9 @@ export function ProposalForm({
   const errorNamaUsaha =
     businessName.length > 0 && namaUsahaKurangPanjang
       ? `Nama usaha minimal ${MIN_BUSINESS_NAME} karakter.`
-      : undefined;
+      : namaUsahaTerlaluPanjang
+        ? `Nama usaha maksimal ${MAX_BUSINESS_NAME} karakter.`
+        : undefined;
   const errorProfilUsaha =
     businessProfile.length > 0 && kurangBusinessProfile > 0
       ? `Profil usaha masih kurang ${kurangBusinessProfile} karakter dari minimum ${MIN_BUSINESS_PROFILE}.`
