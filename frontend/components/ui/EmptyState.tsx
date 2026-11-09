@@ -20,7 +20,7 @@ export function EmptyState({ reason, action }: EmptyStateProps) {
         <button
           type="button"
           onClick={action.onClick}
-          className="min-h-[44px] rounded-sm bg-accent px-space-3 py-space-2 text-base leading-[1.6] font-semibold text-ink"
+          className="min-h-[44px] rounded-sm bg-accent px-space-3 py-space-2 text-base leading-[1.6] font-semibold text-on-accent"
         >
           {action.label}
         </button>

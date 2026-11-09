@@ -87,7 +87,7 @@ export function PledgeForm({ proposalId = "", sisa, onSukses }: PledgeFormProps)
         type="submit"
         disabled={submitting || !nominalValid || melebihiSisa}
         aria-busy={submitting}
-        className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-ink disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+        className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
       >
         Danai
       </button>

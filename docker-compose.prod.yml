@@ -18,6 +18,8 @@ services:
   backend:
     build: ./backend
     environment:
+      # Eksplisit meski default-nya sudah prod: deployment ini yang menentukan,
+      # bukan default kode, dan pembaca file ini harus melihatnya.
       ENV: prod
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}

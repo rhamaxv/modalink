@@ -347,7 +347,7 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
                     </span>
                     <p className="text-base font-semibold leading-[1.6] text-ink">{milestone.title}</p>
                     {milestone.id === milestoneAktifId && (
-                      <span className="rounded-sm bg-accent px-space-2 py-space-1 text-[0.8125rem] font-semibold text-ink">
+                      <span className="rounded-sm bg-accent px-space-2 py-space-1 text-[0.8125rem] font-semibold text-on-accent">
                         Tahap aktif
                       </span>
                     )}

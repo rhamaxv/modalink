@@ -62,7 +62,7 @@ function StageActions({ milestone, onApprove, onReject }: StageActionsProps) {
           type="button"
           onClick={() => onApprove?.(milestoneId)}
           aria-label={`Setujui pencairan tahap ${milestone.seq}: ${milestone.title}`}
-          className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-ink"
+          className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-on-accent"
         >
           Setujui
         </button>
@@ -171,7 +171,7 @@ export function MilestoneTimeline({
             <div className="flex flex-wrap items-center gap-space-2">
               <p className="text-[1.125rem] font-semibold text-ink">{milestone.title}</p>
               {aktif && (
-                <span className="inline-flex w-fit items-center rounded-sm bg-accent px-space-2 py-space-1 text-[0.8125rem] font-semibold text-ink">
+                <span className="inline-flex w-fit items-center rounded-sm bg-accent px-space-2 py-space-1 text-[0.8125rem] font-semibold text-on-accent">
                   Tahap berjalan
                 </span>
               )}

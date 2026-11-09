@@ -108,7 +108,7 @@ export default function Beranda() {
           </p>
           <Link
             href="/daftar"
-            className="inline-flex min-h-[44px] items-center rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-ink"
+            className="inline-flex min-h-[44px] items-center rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-on-accent"
           >
             Daftar sekarang
           </Link>

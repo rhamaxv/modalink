@@ -11,7 +11,13 @@ _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
-    env: str = "dev"
+    # Default "prod", bukan "dev", karena nilai ini memagari router internal
+    # (BR-63) dan salah satu endpoint di baliknya memajukan jam global tanpa
+    # autentikasi apa pun: satu request anonim menggagalkan setiap proposal
+    # yang tenggatnya lewat dan merefund setiap pledge aktif, untuk semua
+    # pengguna, permanen. Default yang permisif berarti deployment mana pun
+    # yang lupa menyetel ENV membuka itu ke internet. Gagal ke arah tertutup.
+    env: str = "prod"
     # No default: a missing value must fail startup loudly instead of silently
     # pointing at a database, secret, or key nobody configured.
     database_url: str

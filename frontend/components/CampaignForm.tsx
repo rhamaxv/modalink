@@ -211,7 +211,7 @@ export function CampaignForm({ mode, campaignId, initialValues, submitLabel, onS
         type="submit"
         disabled={submitting}
         aria-busy={submitting}
-        className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-ink disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+        className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
       >
         {submitLabel ?? (mode === "create" ? "Buat campaign" : "Simpan perubahan")}
       </button>

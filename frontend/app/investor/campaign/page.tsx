@@ -23,7 +23,7 @@ export default function MyCampaignsPage() {
         </div>
         <Link
           href="/investor/campaign/baru"
-          className="inline-flex min-h-[44px] items-center rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-ink"
+          className="inline-flex min-h-[44px] items-center rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-on-accent"
         >
           Buat campaign baru
         </Link>

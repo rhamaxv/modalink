@@ -166,7 +166,7 @@ export default function MilestoneLapor() {
             type="submit"
             disabled={submitting || narrative.trim().length < MIN_NARRATIVE}
             aria-busy={submitting}
-            className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-ink disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+            className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
           >
             Kirim laporan
           </button>

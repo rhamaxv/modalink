@@ -113,7 +113,7 @@ function SignInFormInner() {
         // dan 3.62:1 di tema terang, gagal 4.5:1. Diganti pasangan token yang
         // sudah terukur lolos: --muted di atas --surface (6.25:1 terang,
         // 6.50:1 gelap).
-        className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-ink disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+        className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
       >
         Masuk
       </button>

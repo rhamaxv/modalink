@@ -9,6 +9,13 @@
   --muted: #5C574E;
   --line: #DCD5C7;
   --accent: #FFC94A;
+  /* Teks di atas aksen. Bukan --ink: --ink berbalik menjadi terang di tema
+     gelap, sementara --accent tidak pernah berubah, sehingga `text-ink` di
+     atas `bg-accent` menghasilkan #F2EEE6 pada #FFC94A = 1.32:1 di tema
+     gelap, lebih buruk daripada putih-pada-kuning 1.53:1 yang DESIGN.md
+     larang eksplisit. Token ini sengaja tidak punya pasangan di blok
+     [data-theme="dark"]. */
+  --on-accent: #1A1917;
   --ok: #2F6B3A;
   --warn: #A3561F;
   --danger: #A32C1F;
