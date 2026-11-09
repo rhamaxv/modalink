@@ -29,9 +29,13 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
-    environment:
-      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
+    # NEXT_PUBLIC_API_URL harus masuk sebagai build arg, bukan `environment:`:
+    # Next.js meng-inline variabel NEXT_PUBLIC_* ke bundle saat build, dan
+    # frontend/lib/api.ts membaca nama ini, bukan NEXT_PUBLIC_API_BASE.
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     depends_on: [backend]
     restart: unless-stopped
 
