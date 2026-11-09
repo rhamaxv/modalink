@@ -12,10 +12,23 @@ menemukan apa-apa (C-31: terbukti lewat test_persistence_commit.py yang
 menjalankan jalur ini tanpa dependency_overrides).
 """
 
+import asyncio
+
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.jobs.runner import CoroFactory
+
+# Satu semaphore proses-tunggal, bukan satu per InlineRunner: setiap request
+# yang submit proposal membuat InlineRunner barunya sendiri (lihat
+# api/v1/proposals.py), jadi batas konkurensi hanya berarti kalau dibagi
+# lintas seluruh instance, bukan di-reset jadi penuh lagi untuk setiap
+# request (review keamanan Finding 2 -- "bounded worker pool"). Job yang
+# melebihi batas tidak ditolak, hanya MENUNGGU gilirannya; D-09 tetap
+# berlaku karena menunggu bukan kegagalan, scoring_status tidak berubah
+# sampai job itu benar-benar berjalan.
+_SCORING_SEMAPHORE = asyncio.Semaphore(settings.scoring_max_concurrent_jobs)
 
 
 class InlineRunner:
@@ -39,4 +52,5 @@ class InlineRunner:
         # (app/db/session.py) membuat ini aman dilakukan di sini -- objek
         # yang sudah diserialisasi ke response tidak ikut berubah.
         await self._session.commit()
-        await coro_factory()
+        async with _SCORING_SEMAPHORE:
+            await coro_factory()

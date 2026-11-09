@@ -156,6 +156,12 @@ async def listed_proposal_committed(investor_a, investor_b, clock):
     yield proposal
 
     async with SessionLocal() as session:
+        # ledger_entries sekarang punya trigger append-only (review keamanan
+        # Finding 3): DELETE biasa ditolak database. SET LOCAL ini adalah
+        # escape hatch yang hanya dipakai infrastruktur test, tidak pernah
+        # oleh kode aplikasi, supaya teardown data uji tetap bisa membersihkan
+        # baris yang dibuat test ini sendiri lewat commit sungguhan.
+        await session.execute(text("SET LOCAL modalink.ledger_cleanup_override = 'on'"))
         for table in (
             "ledger_entries",
             "pledges",

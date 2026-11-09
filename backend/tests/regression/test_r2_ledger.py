@@ -12,7 +12,8 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from uuid import UUID
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import DBAPIError
 
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.proposal import Proposal
@@ -147,17 +148,42 @@ async def test_r2_calling_the_same_disbursement_twice_does_not_add_a_row(
 
 
 async def _ledger_fingerprint(db, proposal_id: UUID) -> frozenset[tuple]:
-    """Himpunan (id, entry_type, amount, idempotency_key) seluruh baris
-    ledger milik satu proposal. Himpunan lama yang tetap jadi himpunan bagian
-    dari yang baru membuktikan tidak ada baris yang berubah atau hilang; UPDATE
-    mengubah elemen di posisi id yang sama, DELETE menghapusnya, keduanya
-    membuat anggota lama hilang dari himpunan baru."""
+    """Himpunan SELURUH kolom seluruh baris ledger milik satu proposal.
+    Himpunan lama yang tetap jadi himpunan bagian dari yang baru membuktikan
+    tidak ada baris yang berubah atau hilang; UPDATE mengubah elemen di posisi
+    id yang sama, DELETE menghapusnya, keduanya membuat anggota lama hilang
+    dari himpunan baru.
+
+    Review keamanan Finding 3: versi sebelumnya hanya membandingkan
+    (id, entry_type, amount, idempotency_key) dan mengabaikan proposal_id,
+    ref_type, ref_id, actor_id, created_at -- sebuah UPDATE yang menulis ulang
+    jejak audit (misal mengganti actor_id atau created_at tanpa menyentuh
+    empat kolom itu) akan lolos tanpa terdeteksi fingerprint lama. Catatan
+    ini TIDAK membuat test ini bisa merah sendirian: `catat_entri` memang
+    tidak punya jalur UPDATE sama sekali, jadi assertion ini masih belum
+    pernah terbukti bisa gagal karena alasan yang benar. Pagar yang
+    sebenarnya menolak UPDATE/DELETE ada di database (lihat migrasi
+    a72b47da4fb7 dan test_r2_ledger_entries_update_is_rejected_by_database
+    di bawah, yang menguji dengan benar-benar mencoba menulis yang dilarang)."""
     entries = (
         await db.scalars(
             select(LedgerEntry).where(LedgerEntry.proposal_id == proposal_id)
         )
     ).all()
-    return frozenset((e.id, e.entry_type, e.amount, e.idempotency_key) for e in entries)
+    return frozenset(
+        (
+            e.id,
+            e.proposal_id,
+            e.entry_type,
+            e.amount,
+            e.ref_type,
+            e.ref_id,
+            e.actor_id,
+            e.idempotency_key,
+            e.created_at,
+        )
+        for e in entries
+    )
 
 
 async def test_r2_ledger_rows_are_never_altered_after_insert(
@@ -174,3 +200,59 @@ async def test_r2_ledger_rows_are_never_altered_after_insert(
     )
     after = await _ledger_fingerprint(db, funded_proposal.id)
     assert before <= after, "ada baris lama yang berubah atau hilang"
+
+
+async def test_r2_ledger_entries_update_is_rejected_by_database(db, funded_proposal):
+    """Review keamanan Finding 3: pagar sebelumnya (test di atas) tidak
+    pernah bisa merah karena `catat_entri` memang tidak punya jalur UPDATE --
+    ia tidak membuktikan apa pun tentang database itu sendiri. Test ini
+    benar-benar MENCOBA menulis UPDATE yang dilarang (migrasi
+    a72b47da4fb7) dan membuktikan database menolaknya, bukan mengandalkan
+    kode aplikasi untuk tidak pernah mencobanya.
+
+    `db.begin_nested()`, bukan UPDATE langsung di transaksi test: Postgres
+    mengabort seluruh transaksi luar begitu satu statement di dalamnya gagal
+    ("current transaction is aborted"), dan savepoint ini membatasi
+    kegagalan itu supaya assertion sesudahnya (baris ledger tidak berubah)
+    masih bisa dibaca lewat sesi yang sama, pola yang sama dengan
+    `catat_entri` menangkap IntegrityError idempotensi (services/ledger.py).
+    """
+    before = await _ledger_fingerprint(db, funded_proposal.id)
+    satu_baris = (
+        await db.scalars(
+            select(LedgerEntry).where(LedgerEntry.proposal_id == funded_proposal.id)
+        )
+    ).first()
+    assert satu_baris is not None, "skenario butuh minimal satu baris ledger"
+
+    with pytest.raises(DBAPIError, match="append-only"):
+        async with db.begin_nested():
+            await db.execute(
+                text("UPDATE ledger_entries SET amount = amount + 1 WHERE id = :id"),
+                {"id": str(satu_baris.id)},
+            )
+
+    after = await _ledger_fingerprint(db, funded_proposal.id)
+    assert before == after, "UPDATE yang seharusnya ditolak malah mengubah baris"
+
+
+async def test_r2_ledger_entries_delete_is_rejected_by_database(db, funded_proposal):
+    """Pasangan test di atas untuk DELETE, lihat docstring-nya untuk alasan
+    `begin_nested()`."""
+    before = await _ledger_fingerprint(db, funded_proposal.id)
+    satu_baris = (
+        await db.scalars(
+            select(LedgerEntry).where(LedgerEntry.proposal_id == funded_proposal.id)
+        )
+    ).first()
+    assert satu_baris is not None, "skenario butuh minimal satu baris ledger"
+
+    with pytest.raises(DBAPIError, match="append-only"):
+        async with db.begin_nested():
+            await db.execute(
+                text("DELETE FROM ledger_entries WHERE id = :id"),
+                {"id": str(satu_baris.id)},
+            )
+
+    after = await _ledger_fingerprint(db, funded_proposal.id)
+    assert before == after, "DELETE yang seharusnya ditolak malah menghapus baris"

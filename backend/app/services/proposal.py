@@ -24,7 +24,7 @@ from app.models.proposal import (
 from app.models.user import User
 from app.schemas.proposal import ProposalIn
 from app.services.campaign import STATUS_PROPOSAL_PUBLIK
-from app.services.expiry import evaluasi_kedaluwarsa
+from app.services.expiry import evaluasi_kedaluwarsa_banyak
 from app.services.ledger import jumlah_terkumpul_subquery
 
 MINIMAL_REQUESTED_AMOUNT = 500_000  # BR-12: di bawah ini biaya screening tidak sepadan.
@@ -188,10 +188,13 @@ async def daftar_proposal_publik(
 
     # D-06/BR-61: daftar ini juga "pembacaan proposal", jadi proposal yang
     # funding_deadline-nya lewat harus ikut direkonsiliasi di sini, bukan
-    # hanya saat dibaca satu-satu lewat GET /proposals/{id}. Hanya baris di
-    # halaman ini, bukan seluruh tabel -- konsisten dengan tujuan paginasi.
-    for p, _ in baris:
-        await evaluasi_kedaluwarsa(session, p, clock)
+    # hanya saat dibaca satu-satu lewat GET /proposals/{id}. Lewat fungsi
+    # _banyak, bukan loop per baris dalam urutan tampil di atas: urutan tampil
+    # created_at DESC, id DESC bukan urutan yang aman dipakai mengunci baris
+    # (review keamanan Finding 1, lihat docstring evaluasi_kedaluwarsa_banyak).
+    # Hanya baris di halaman ini, bukan seluruh tabel, konsisten dengan
+    # tujuan paginasi.
+    await evaluasi_kedaluwarsa_banyak(session, [p for p, _ in baris], clock)
 
     return [
         ProposalDenganTerkumpul(proposal=p, collected_amount=int(jumlah))
