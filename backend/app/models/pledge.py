@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, CheckConstraint, Column
+from sqlalchemy import BigInteger, CheckConstraint, Column, Index
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
@@ -24,7 +24,18 @@ class PledgeStatus(StrEnum):
 
 class Pledge(SQLModel, table=True):
     __tablename__ = "pledges"
-    __table_args__ = (CheckConstraint("amount > 0", name="ck_pledges_amount_positif"),)
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_pledges_amount_positif"),
+        # Mirror dari index komposit yang ditambahkan lewat migrasi tersendiri
+        # (09-data-model.md:135). Tanpa baris ini, `alembic revision
+        # --autogenerate` berikutnya mengusulkan menghapus index yang baru
+        # dibuat, karena metadata SQLAlchemy tidak tahu index itu ada
+        # (pola yang sama dengan uq_proposal_aktif_per_umkm_per_campaign di
+        # models/proposal.py). Query "pledge aktif pada proposal ini"
+        # (recompute_funding_status, total_pledge_aktif) menyaring persis
+        # dua kolom ini bersamaan.
+        Index("ix_pledges_proposal_id_status", "proposal_id", "status"),
+    )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     proposal_id: UUID = Field(foreign_key="proposals.id", index=True)

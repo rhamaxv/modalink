@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, CheckConstraint, Column
+from sqlalchemy import BigInteger, CheckConstraint, Column, Index
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
@@ -25,7 +25,14 @@ class LedgerEntry(SQLModel, table=True):
     meng-UPDATE atau menghapus baris di tabel ini (BR-51)."""
 
     __tablename__ = "ledger_entries"
-    __table_args__ = (CheckConstraint("amount > 0", name="ck_ledger_amount_positif"),)
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_ledger_amount_positif"),
+        # Mirror dari index komposit yang ditambahkan lewat migrasi tersendiri
+        # (09-data-model.md:156); lihat komentar yang sama di models/pledge.py
+        # soal kenapa __table_args__ ini bukan formalitas. total_terkumpul_proposal
+        # dan R2 selalu menyaring proposal_id lalu mengurutkan created_at.
+        Index("ix_ledger_entries_proposal_id_created_at", "proposal_id", "created_at"),
+    )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     proposal_id: UUID = Field(foreign_key="proposals.id", index=True)
