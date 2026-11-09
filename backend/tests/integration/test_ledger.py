@@ -52,7 +52,9 @@ async def test_br55_idempotency_key_prevents_duplicate_entry(db, listed_proposal
     assert jumlah == 1
 
 
-async def test_0a_catat_entri_zero_amount_raises_integrity_error(db, listed_proposal):
+async def test_br54_catat_entri_does_not_swallow_zero_amount_integrity_error(
+    db, listed_proposal
+):
     """catat_entri hanya boleh menelan pelanggaran unique idempotency_key
     (BR-55). Pelanggaran CHECK (amount > 0, BR-54) wajib tetap meledak,
     bukan diam-diam dikembalikan sebagai None yang di seluruh kode ini
