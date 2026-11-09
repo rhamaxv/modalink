@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 
-describe("keadaan kosong", () => {
-  it("menyebut sebabnya dan satu aksi berikutnya", () => {
+describe("empty state", () => {
+  it("names the reason and offers one next action", () => {
     render(<EmptyState
       reason="Belum ada proposal masuk ke campaign ini."
       action={{ label: "Bagikan tautan campaign", onClick: () => {} }} />);
@@ -12,28 +12,28 @@ describe("keadaan kosong", () => {
       .toBeInTheDocument();
   });
 
-  it("tidak pernah menampilkan teks 'Tidak ada data'", () => {
+  it("never shows an empty 'Tidak ada data' label", () => {
     // R-27: keadaan kosong harus menyebut sebab dan aksi, bukan label hampa.
     render(<EmptyState reason="Belum ada pledge." />);
     expect(screen.queryByText(/tidak ada data/i)).toBeNull();
   });
 });
 
-describe("keadaan muat", () => {
-  it("menyebut apa yang sedang dimuat", () => {
+describe("loading state", () => {
+  it("names what is loading", () => {
     render(<LoadingState label="Memuat daftar proposal" />);
     expect(screen.getByText(/Memuat daftar proposal/)).toBeInTheDocument();
   });
 
-  it("memesan ruang dengan tinggi yang diminta supaya layout tidak melompat", () => {
+  it("reserves the requested height so the layout does not shift", () => {
     render(<LoadingState label="Memuat daftar proposal" minHeight={240} />);
     const container = screen.getByTestId("loading-state");
     expect(container.style.minHeight).toBe("240px");
   });
 });
 
-describe("keadaan galat", () => {
-  it("menyebut penyebab dan menyediakan tombol coba lagi", () => {
+describe("error state", () => {
+  it("names the cause and provides a retry button", () => {
     const retry = vi.fn();
     render(<ErrorState message="Koneksi ke server bermasalah." onRetry={retry} />);
     expect(screen.getByText(/Koneksi ke server bermasalah/)).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe("keadaan galat", () => {
     expect(retry).toHaveBeenCalledOnce();
   });
 
-  it("mengumumkan dirinya ke pembaca layar", () => {
+  it("announces itself to screen readers", () => {
     render(<ErrorState message="Gagal memuat." onRetry={() => {}} />);
     expect(screen.getByRole("alert")).toBeInTheDocument();
   });

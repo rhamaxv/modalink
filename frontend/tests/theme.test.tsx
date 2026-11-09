@@ -13,27 +13,27 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe("sakelar tema", () => {
-  it("mengubah data-theme di elemen html", async () => {
+describe("theme toggle", () => {
+  it("changes data-theme on the html element", async () => {
     render(<ThemeToggle />);
     await userEvent.click(screen.getByRole("button", { name: /tema/i }));
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
-  it("bisa dioperasikan dengan keyboard", async () => {
+  it("can be operated with the keyboard", async () => {
     render(<ThemeToggle />);
     await userEvent.tab();
     await userEvent.keyboard("{Enter}");
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
-  it("menyimpan pilihan dan memulihkannya", () => {
+  it("persists the choice and restores it", () => {
     localStorage.setItem("theme", "dark");
     render(<ThemeToggle />);
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
-  it("aria-pressed mencerminkan status tema saat ini", async () => {
+  it("aria-pressed reflects the current theme state", async () => {
     render(<ThemeToggle />);
     const button = screen.getByRole("button", { name: /tema/i });
     expect(button).toHaveAttribute("aria-pressed", "false");

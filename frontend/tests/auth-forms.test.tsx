@@ -30,14 +30,14 @@ afterEach(() => {
   }
 });
 
-describe("form masuk", () => {
-  it("setiap kolom punya label yang terhubung", () => {
+describe("sign in form", () => {
+  it("every field has a connected label", () => {
     render(<SignInForm />);
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 
-  it("pesan error terhubung ke kolomnya lewat aria-describedby", async () => {
+  it("connects the error message to its field via aria-describedby", async () => {
     render(<SignInForm />);
     await userEvent.click(screen.getByRole("button", { name: /masuk/i }));
     const field = screen.getByLabelText(/email/i);
@@ -46,7 +46,7 @@ describe("form masuk", () => {
     expect(document.getElementById(messageId!)).toHaveTextContent(/email/i);
   });
 
-  it("menampilkan pesan dari backend apa adanya, bukan pesan generik", async () => {
+  it("shows the backend message as is, not a generic message", async () => {
     vi.stubGlobal("fetch", () => fakeResponse(401, {
       error: { code: "kredensial_salah", message: "Email atau password salah." },
     }));
@@ -56,7 +56,7 @@ describe("form masuk", () => {
       .toHaveTextContent("Email atau password salah.");
   });
 
-  it("tombol kirim nonaktif selama permintaan berjalan", async () => {
+  it("disables the submit button while the request is in flight", async () => {
     vi.stubGlobal("fetch", () => new Promise(() => {
       // Sengaja tidak pernah selesai, untuk mengamati status nonaktif saat permintaan berjalan.
     }));
@@ -65,7 +65,7 @@ describe("form masuk", () => {
     expect(screen.getByRole("button", { name: /masuk/i })).toBeDisabled();
   });
 
-  it("menyimpan token ke localStorage saat berhasil masuk", async () => {
+  it("stores the token in localStorage on a successful sign in", async () => {
     vi.stubGlobal("fetch", () => fakeResponse(200, { access_token: "token-palsu" }));
     render(<SignInForm />);
     await fillAndSubmitSignIn();
@@ -75,8 +75,8 @@ describe("form masuk", () => {
   });
 });
 
-describe("form daftar", () => {
-  it("setiap kolom punya label yang terhubung", () => {
+describe("sign up form", () => {
+  it("every field has a connected label", () => {
     render(<SignUpForm />);
     expect(screen.getByLabelText(/^nama/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
@@ -84,7 +84,7 @@ describe("form daftar", () => {
     expect(screen.getByLabelText(/peran/i)).toBeInTheDocument();
   });
 
-  it("menampilkan pesan dari backend apa adanya saat gagal daftar", async () => {
+  it("shows the backend message as is when sign up fails", async () => {
     vi.stubGlobal("fetch", () => fakeResponse(409, {
       error: { code: "email_terdaftar", message: "Email sudah terdaftar." },
     }));
