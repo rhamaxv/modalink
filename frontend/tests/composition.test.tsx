@@ -175,10 +175,8 @@ describe("public proposal list on the explore page", () => {
                   campaign_id: "c1",
                   umkm_id: "u1",
                   business_name: "Kopi Senja",
-                  business_profile:
+                  business_profile_excerpt:
                     "Usaha kopi rumahan yang sudah berjalan tiga tahun dan ingin memperluas kapasitas produksi.",
-                  fund_usage_plan: "Mesin roasting baru.",
-                  business_projection: "Naik dua kali lipat.",
                   requested_amount: 25_000_000,
                   status: "listed",
                   scoring_status: "done",
@@ -191,9 +189,7 @@ describe("public proposal list on the explore page", () => {
                   campaign_id: "c1",
                   umkm_id: "u2",
                   business_name: "Batik Lereng",
-                  business_profile: "Usaha batik tulis.",
-                  fund_usage_plan: "Bahan baku.",
-                  business_projection: "Stabil.",
+                  business_profile_excerpt: "Usaha batik tulis.",
                   requested_amount: 15_000_000,
                   status: "partially_funded",
                   scoring_status: "done",

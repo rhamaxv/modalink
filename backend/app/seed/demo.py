@@ -61,7 +61,7 @@ from app.services.scoring import jalankan_scoring
 # alasannya sengaja identik dan mencolok, bukan disamarkan jadi kuat tapi acak.
 DEMO_PASSWORD = "Demo#Modalink2026"
 
-DEMO_EMAIL_DOMAIN = "demo.modalink.test"
+DEMO_EMAIL_DOMAIN = "demo.example.com"
 SEED_SENTINEL_EMAIL = f"investor1@{DEMO_EMAIL_DOMAIN}"
 
 # Dipakai test untuk menyaring baris yang benar-benar milik seed ini saja,

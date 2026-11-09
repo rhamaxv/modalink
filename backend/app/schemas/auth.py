@@ -12,20 +12,16 @@ from app.models.user import Role
 
 def _validasi_email(value: str) -> str:
     """Pengganti `EmailStr` bawaan Pydantic, bukan dipakai langsung: EmailStr
-    menolak domain reserved RFC 2606 (`.test`, `.example`, dst) tanpa opsi
-    untuk melonggarkannya per-field, dan `app/seed/demo.py` sengaja memakai
-    `demo.modalink.test` untuk akun demo juri (konvensi domain yang tidak
-    pernah dikirim email sungguhan). `test_environment=True` membuka
-    pengecualian itu secara eksplisit sambil tetap menolak "not-an-email"
-    (review keamanan) -- bukan mematikan validasi, hanya mengakui bahwa TLD
-    reserved itu valid secara sintaks untuk proyek yang tidak pernah benar-
-    benar mengirim email. `check_deliverability=False` tetap seperti
-    default EmailStr: tidak ada resolusi DNS saat request masuk.
+    menolak domain reserved RFC 2606 (`.test`, `.example`, dst), dan itu
+    dibiarkan apa adanya: `app/seed/demo.py` memakai `demo.example.com`, yang
+    sama-sama dicadangkan RFC 2606 dan dijamin tidak pernah resolve, tapi lolos
+    validasi standar. Melonggarkan validasi secara global demi data demo adalah
+    arah yang terbalik, karena kelonggarannya ikut berlaku di produksi.
+    `check_deliverability=False` tetap seperti default EmailStr: tidak ada
+    resolusi DNS saat request masuk.
     """
     try:
-        hasil = email_validator.validate_email(
-            value, check_deliverability=False, test_environment=True
-        )
+        hasil = email_validator.validate_email(value, check_deliverability=False)
     except email_validator.EmailNotValidError as exc:
         raise ValueError(f"Alamat email tidak valid: {exc}") from exc
     return hasil.normalized

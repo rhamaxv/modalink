@@ -123,14 +123,14 @@ async def test_t3_register_rejects_malformed_email(client):
 
 async def test_t3_register_accepts_reserved_test_tld_used_by_seed_demo_data(client):
     """Bukan kelonggaran yang terlewat: app/seed/demo.py sengaja memakai
-    domain `*.demo.modalink.test` untuk akun demo juri, dan EmailStr bawaan
+    domain `*.demo.example.com` untuk akun demo juri, dan EmailStr bawaan
     Pydantic menolak TLD reserved RFC 2606 itu tanpa opsi pengecualian.
     Test ini membuktikan `test_environment=True` di schemas/auth.py tidak
     diam-diam melonggarkan validasi format lain (lihat test di atas)."""
     res = await client.post(
         "/api/v1/auth/register",
         json={
-            "email": "juri@demo.modalink.test",
+            "email": "juri@demo.example.com",
             "password": "rahasia123",
             "name": "Juri",
             "role": "investor",

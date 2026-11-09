@@ -104,6 +104,11 @@ class ProposalListItemOut(BaseModel):
     campaign_id: UUID
     umkm_id: UUID
     business_name: str
+    # Cuplikan, bukan field penuh: kartu proposal di daftar memang menampilkan
+    # ringkasan usaha, dan tanpa field ini kartunya kehilangan deskripsinya.
+    # Dipotong di server supaya respons daftar tidak kembali membesar seiring
+    # panjang rencana bisnis, yang justru alasan ketiga field panjang dibuang.
+    business_profile_excerpt: str
     requested_amount: int
     collected_amount: int
     status: ProposalStatus

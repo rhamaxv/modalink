@@ -52,6 +52,16 @@ class ProposalDenganTerkumpul:
     def __getattr__(self, name: str):
         return getattr(self.proposal, name)
 
+    @property
+    def business_profile_excerpt(self) -> str:
+        """Cuplikan profil usaha untuk kartu di endpoint daftar.
+
+        Dipotong di sini, bukan di browser: memotong di klien berarti seluruh
+        rencana bisnis tetap dikirim, dan itu justru yang membuat respons
+        daftar mencapai 7,2 MB untuk dua belas proposal."""
+        penuh = self.proposal.business_profile
+        return penuh if len(penuh) <= 200 else penuh[:200].rstrip() + "..."
+
 
 async def submit_proposal(
     session: AsyncSession,

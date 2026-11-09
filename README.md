@@ -464,13 +464,13 @@ mana pun, jadi tidak ada alamat email sungguhan milik siapa pun yang terpakai di
 
 | Peran | Email | Password |
 | --- | --- | --- |
-| Investor | `investor1@demo.modalink.test` | `Demo#Modalink2026` |
-| Investor | `investor2@demo.modalink.test` | `Demo#Modalink2026` |
-| Investor | `investor3@demo.modalink.test` | `Demo#Modalink2026` |
-| UMKM | `umkm1@demo.modalink.test` | `Demo#Modalink2026` |
-| UMKM | `umkm2@demo.modalink.test` | `Demo#Modalink2026` |
-| UMKM | `umkm3@demo.modalink.test` | `Demo#Modalink2026` |
-| UMKM | `umkm4@demo.modalink.test` | `Demo#Modalink2026` |
+| Investor | `investor1@demo.example.com` | `Demo#Modalink2026` |
+| Investor | `investor2@demo.example.com` | `Demo#Modalink2026` |
+| Investor | `investor3@demo.example.com` | `Demo#Modalink2026` |
+| UMKM | `umkm1@demo.example.com` | `Demo#Modalink2026` |
+| UMKM | `umkm2@demo.example.com` | `Demo#Modalink2026` |
+| UMKM | `umkm3@demo.example.com` | `Demo#Modalink2026` |
+| UMKM | `umkm4@demo.example.com` | `Demo#Modalink2026` |
 
 Password ini memang publik, dan itu disengaja: ketujuh akun hanya ada di deployment
 demonstrasi, tidak memegang data siapa pun, dan dibuat ulang kapan saja oleh perintah di

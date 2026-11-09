@@ -14,7 +14,9 @@ import { ApiError, api } from "@/lib/api";
 export type Proposal = {
   id: string;
   business_name: string;
-  business_profile: string;
+  // Cuplikan, bukan profil penuh: GET /proposals sengaja tidak lagi
+  // mengirim rencana bisnis lengkap, dan pemotongannya dilakukan server.
+  business_profile_excerpt: string;
   requested_amount: number;
   status: string;
   scoring_status: string;
@@ -60,9 +62,7 @@ export function ProposalCard({ proposal, featured = false, index }: ProposalCard
       />
       {featured && (
         <p className="max-w-measure text-base leading-[1.6] text-muted">
-          {proposal.business_profile.length > 160
-            ? `${proposal.business_profile.slice(0, 160)}...`
-            : proposal.business_profile}
+          {proposal.business_profile_excerpt}
         </p>
       )}
       {proposal.scoring_status === "failed" && (
