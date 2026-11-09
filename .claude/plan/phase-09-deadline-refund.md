@@ -290,6 +290,29 @@ git commit -am "feat: add lazy deadline evaluation and simulated refunds"
 ```python
 # backend/tests/regression/test_r4_failure_paths.py
 """R4: jalur-jalur yang berakhir tanpa pendanaan atau ditolak."""
+
+
+async def test_r4_tidak_ada_failed_yang_masih_memegang_pledge_aktif(db):
+    """Invarian, bukan skenario: diperiksa untuk semua proposal failed yang ada.
+
+    Dua jalan menuju keadaan rusak ini sudah pernah direproduksi terhadap database
+    sungguhan di review fase 06: pledge yang diterima setelah funding_deadline lewat,
+    dan pembatalan yang menjatuhkan total di bawah target setelah tenggat. Keduanya
+    meninggalkan pledge_in tanpa refund_out dan escrow menggantung.
+
+    Memeriksa seluruh proposal failed, bukan satu yang diketahui, supaya jalan ketiga
+    yang belum terpikirkan pun tertangkap.
+    """
+    gagal = (await db.scalars(
+        select(Proposal).where(Proposal.status == ProposalStatus.FAILED)
+    )).all()
+
+    for p in gagal:
+        aktif = await total_pledge_aktif(db, p.id)
+        assert aktif == 0, (
+            f"proposal {p.id} berstatus failed tapi masih memegang pledge aktif "
+            f"senilai {aktif}; uang investor terjebak tanpa refund_out"
+        )
 import pytest
 
 async def test_r4_deadline_lewat_merefund_seluruh_pledge(client, db, listed_proposal,

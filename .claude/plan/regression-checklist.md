@@ -86,6 +86,12 @@ File: `backend/tests/regression/test_r4_failure_paths.py`
 - Milestone 2 dilaporkan sebelum milestone 1 cair, ditolak `409`.
 - Investor yang bukan lead investor mencoba approve, ditolak `403`.
 - Proposal yang sudah `funded` menerima pledge baru, ditolak `409`.
+- **Tidak ada keadaan di mana proposal `failed` memegang pledge `active`.** Ini invarian, bukan
+  skenario: ia dijaga apa pun jalan yang membuat proposal itu gagal, termasuk pledge yang masuk
+  setelah `funding_deadline` lewat dan pembatalan yang menjatuhkan total di bawah target setelah
+  tenggat. Review fase 06 mereproduksi keduanya terhadap database sungguhan, dan keduanya
+  meninggalkan `pledge_in` tanpa `refund_out` dengan escrow menggantung. Testnya memeriksa
+  seluruh proposal `failed` di akhir skenario, bukan satu proposal yang diketahui.
 
 ## R5. Matriks RBAC
 
