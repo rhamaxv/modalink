@@ -79,6 +79,7 @@ async def evaluasi_kedaluwarsa(
             EntryType.REFUND_OUT,
             p.amount,
             idempotency_key=f"refund:{p.id}",
+            clock=clock,
             ref_type="pledge",
             ref_id=p.id,
             actor_id=p.investor_id,

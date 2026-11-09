@@ -34,7 +34,7 @@ def pledge(db, clock):
         db.add(p)
         await db.flush()
         await catat_entri(
-            db, proposal.id, EntryType.PLEDGE_IN, amount, f"pledge:{p.id}"
+            db, proposal.id, EntryType.PLEDGE_IN, amount, f"pledge:{p.id}", clock=clock
         )
         return p
 
@@ -42,11 +42,16 @@ def pledge(db, clock):
 
 
 @pytest.fixture
-def batalkan(db):
+def batalkan(db, clock):
     async def _batalkan(p: Pledge) -> None:
         p.status = PledgeStatus.CANCELLED
         await catat_entri(
-            db, p.proposal_id, EntryType.REFUND_OUT, p.amount, f"refund:{p.id}"
+            db,
+            p.proposal_id,
+            EntryType.REFUND_OUT,
+            p.amount,
+            f"refund:{p.id}",
+            clock=clock,
         )
         await db.flush()
 

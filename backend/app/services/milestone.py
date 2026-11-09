@@ -211,6 +211,7 @@ async def approve_milestone(
         EntryType.DISBURSEMENT_OUT,
         milestone.amount,
         idempotency_key=f"disburse:{milestone.id}",
+        clock=clock,
         ref_type="milestone",
         ref_id=milestone.id,
         actor_id=aktor.id,

@@ -1,6 +1,7 @@
 """R4: jalur-jalur yang berakhir tanpa pendanaan atau ditolak."""
 
 from dataclasses import dataclass
+from datetime import timedelta
 from uuid import UUID
 
 import pytest
@@ -127,6 +128,34 @@ async def test_r4_deadline_past_refunds_all_pledges(
     assert hitung_saldo(entri) == 0
     await db.refresh(listed_proposal)
     assert listed_proposal.status is ProposalStatus.FAILED
+
+
+async def test_br60_lazy_expiry_refund_uses_injected_clock_not_wall_clock(
+    client, db, listed_proposal, investor_a, majukan
+):
+    """Finding 4: catat_entri dulu punya jam sendiri (SystemClock module-level)
+    lepas dari clock yang disuntikkan permintaan. Refund yang ditulis lazy
+    expiry (evaluasi_kedaluwarsa) tetap tertanggal mendekati jam dinding,
+    bukan tanggal virtual yang memicunya -- padahal pledge_in yang sama
+    sudah tercatat jauh lebih awal. GET /internal/ledger/{id}, yang
+    diurutkan created_at supaya juri bisa mengaudit uang, bisa menampilkan
+    refund SEBELUM deadline virtual yang menyebabkannya."""
+    await pledge(client, investor_a, listed_proposal, 3_000_000)
+    pledge_in = next(
+        e
+        for e in await ambil_ledger(db, listed_proposal.id)
+        if e.entry_type is EntryType.PLEDGE_IN
+    )
+
+    await majukan(hari=30)
+    await client.get(f"/api/v1/proposals/{listed_proposal.id}")
+
+    refund = next(
+        e
+        for e in await ambil_ledger(db, listed_proposal.id)
+        if e.entry_type is EntryType.REFUND_OUT
+    )
+    assert refund.created_at - pledge_in.created_at >= timedelta(days=29)
 
 
 async def test_r4_pledge_exceeding_remaining_includes_correct_remaining_amount(
