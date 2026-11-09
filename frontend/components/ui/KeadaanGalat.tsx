@@ -16,7 +16,9 @@ export function KeadaanGalat({ pesan, onCobaLagi }: KeadaanGalatProps) {
       <button
         type="button"
         onClick={onCobaLagi}
-        className="min-h-[44px] rounded-kecil border border-line px-ruang-3 py-ruang-2 text-sm font-semibold text-ink"
+        // border-ink, bukan border-line: border-line hanya 1.27:1 terhadap
+        // bg-surface, gagal ambang 3:1 untuk batas elemen interaktif.
+        className="min-h-[44px] rounded-kecil border border-ink px-ruang-3 py-ruang-2 text-sm font-semibold text-ink"
       >
         Coba lagi
       </button>
