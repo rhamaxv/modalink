@@ -14,3 +14,16 @@ class TickIn(BaseModel):
 
 class ClockOut(BaseModel):
     virtual_now: datetime
+
+
+class SeedOut(BaseModel):
+    """Ringkasan `POST /internal/seed`, dibangun dari `HasilSeed`
+    (app/seed/demo.py) supaya test lokal bisa memeriksa idempotensinya lewat
+    HTTP tanpa menghitung baris sendiri."""
+
+    sudah_pernah_disemai: bool
+    jumlah_user: int
+    jumlah_campaign: int
+    jumlah_proposal: int
+    jumlah_pledge: int
+    jumlah_ledger_entry: int

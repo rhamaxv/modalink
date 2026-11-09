@@ -187,6 +187,11 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # mencapainya di ENV=dev boleh memajukan jam. 422 di sini karena body
     # kosong kehilangan `hari`, bukan karena ditolak perannya.
     ("POST", "/api/v1/internal/clock/tick", None, 422),
+    # Fase 13 Task 1: sama seperti baris tick di atas (BR-63, tidak ada pagar
+    # role), tapi body-nya kosong jadi tidak ada field wajib yang membuatnya
+    # 422 -- 200 di sini membuktikan endpointnya memang jalan tanpa token,
+    # bukan ditolak diam-diam oleh pagar yang tidak ada.
+    ("POST", "/api/v1/internal/seed", None, 200),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

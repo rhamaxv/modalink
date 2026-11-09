@@ -20,6 +20,7 @@ juri, keputusan itu harus diambil ulang secara eksplisit, bukan dengan
 menyalakan ENV=dev di server publik.
 """
 
+from dataclasses import asdict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -27,8 +28,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
 from app.errors import NotFoundError
-from app.schemas.internal import ClockOut, TickIn
+from app.schemas.internal import ClockOut, SeedOut, TickIn
 from app.schemas.ledger import LedgerOut
+from app.seed.demo import seed_demo_data
 from app.services.clock_service import ambil_clock, majukan_jam
 from app.services.ledger import ambil_ledger_proposal
 from app.services.proposal import ambil_proposal
@@ -47,6 +49,19 @@ async def tick_endpoint(
     await majukan_jam(session, body.hari)
     clock = await ambil_clock(session)
     return ClockOut(virtual_now=clock.now())
+
+
+@router.post("/api/v1/internal/seed", response_model=SeedOut)
+async def seed_endpoint(session: AsyncSession = Depends(get_session)) -> SeedOut:
+    """Dipakai test lokal dan demo tanpa server produksi (10-api-contract.md:97).
+
+    Logikanya sendiri hidup di app/seed/demo.py, dipakai juga oleh
+    `python -m app.seed` untuk server produksi (lihat peringatan di
+    `.claude/plan/phase-13-submission.md` soal kenapa endpoint ini tidak
+    bisa dipakai di sana: ENV=prod tidak pernah mendaftarkannya).
+    """
+    hasil = await seed_demo_data(session)
+    return SeedOut(**asdict(hasil))
 
 
 @router.get("/api/v1/internal/ledger/{proposal_id}", response_model=LedgerOut)
