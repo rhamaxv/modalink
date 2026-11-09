@@ -185,25 +185,7 @@ async def catat_entri(session, proposal_id, entry_type, amount, idempotency_key,
 Run: `pytest tests/unit/test_ledger_saldo.py tests/integration/test_ledger.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Tolak nominal bukan integer di batas HTTP (RF-2)**
-
-```python
-# backend/tests/integration/test_pledge_nominal.py
-import pytest
-
-@pytest.mark.parametrize("nilai", ["1e9", 1_000_000.5, "5.000.000", -1, 0,
-                                   9_223_372_036_854_775_808])
-async def test_rf2_nominal_tidak_sah_ditolak_422(client, investor, listed_proposal, nilai):
-    res = await client.post(f"/api/v1/proposals/{listed_proposal.id}/pledges",
-                            headers=investor.headers, json={"amount": nilai})
-    assert res.status_code == 422, f"nilai {nilai!r} lolos padahal seharusnya ditolak"
-```
-
-Schema Pydantic memakai `Annotated[int, Field(strict=True, gt=0, le=MAX_RUPIAH)]`.
-`strict=True` yang menolak `1_000_000.5` dan `"1e9"`; tanpa itu Pydantic akan membulatkannya
-diam-diam.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git commit -am "feat: add append-only ledger entries with idempotency keys"
@@ -407,12 +389,30 @@ async def buat_pledge(session, investor, proposal, amount, clock) -> Pledge:
 Run: `pytest tests/integration/test_pledge.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Perbarui RBAC_MATRIX, jalankan R5**
+- [ ] **Step 5: Tolak nominal bukan integer di batas HTTP (RF-2)**
+
+```python
+# backend/tests/integration/test_pledge_nominal.py
+import pytest
+
+@pytest.mark.parametrize("nilai", ["1e9", 1_000_000.5, "5.000.000", -1, 0,
+                                   9_223_372_036_854_775_808])
+async def test_rf2_nominal_tidak_sah_ditolak_422(client, investor, listed_proposal, nilai):
+    res = await client.post(f"/api/v1/proposals/{listed_proposal.id}/pledges",
+                            headers=investor.headers, json={"amount": nilai})
+    assert res.status_code == 422, f"nilai {nilai!r} lolos padahal seharusnya ditolak"
+```
+
+Schema Pydantic memakai `Annotated[int, Field(strict=True, gt=0, le=MAX_RUPIAH)]`.
+`strict=True` yang menolak `1_000_000.5` dan `"1e9"`; tanpa itu Pydantic akan membulatkannya
+diam-diam.
+
+- [ ] **Step 6: Perbarui RBAC_MATRIX, jalankan R5**
 
 Run: `pytest tests/regression -v`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git commit -am "feat: add co-funding pledges that reject amounts over the remainder"

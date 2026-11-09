@@ -54,7 +54,7 @@ dipasangkan ke task yang memiliki kodenya.
 | # | Kondisi | Yang diharapkan orang waras | Dipasang di |
 | --- | --- | --- | --- |
 | RF-1 | Dua investor pledge nyaris bersamaan pada sisa dana yang sama | Salah satunya ditolak `409`. Total tidak pernah melampaui `requested_amount`. Butuh penguncian baris proposal | Fase 06, Task 4 |
-| RF-2 | `amount` dikirim sebagai `"1e9"`, `1000000.5`, atau melebihi jangkauan `BIGINT` | `422` dengan pesan yang jelas. Tidak ada pembulatan diam-diam, tidak ada crash | Fase 06, Task 1 |
+| RF-2 | `amount` dikirim sebagai `"1e9"`, `1000000.5`, atau melebihi jangkauan `BIGINT` | `422` dengan pesan yang jelas. Tidak ada pembulatan diam-diam, tidak ada crash | Fase 06, Task 3 |
 | RF-3 | Gemini mengembalikan `evidence` yang tidak ada di isi proposal (kutipan halusinasi) | Red flag itu dibuang atau ditandai, tidak pernah ditampilkan ke UMKM sebagai bukti palsu | Fase 05, Task 3 |
 | RF-4 | Lead investor membatalkan pledge terbesarnya tepat saat proposal mencapai target | Status turun kembali ke `partially_funded` dan lead investor berpindah. Tidak pernah ada `funded` dengan total kurang dari target | Fase 06, Task 5 |
 | RF-5 | Approve milestone terakhir dikirim dua kali nyaris bersamaan | Hanya satu `disbursement_out` dan satu transisi ke `completed` | Fase 07, Task 4 |
