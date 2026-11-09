@@ -46,7 +46,7 @@ async def tick_endpoint(
     body: TickIn,
     session: AsyncSession = Depends(get_session),
 ) -> ClockOut:
-    await majukan_jam(session, body.hari)
+    await majukan_jam(session, body.advance_days)
     clock = await ambil_clock(session)
     return ClockOut(virtual_now=clock.now())
 

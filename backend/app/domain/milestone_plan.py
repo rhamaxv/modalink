@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from app.domain.money import Rupiah, format_rupiah, parse_rupiah
 
 MINIMAL_MILESTONE = 2
+# T-3 (bounds audit): schema sudah membatasi panjang daftar milestone lewat
+# Field(max_length=...), tapi pemanggil service lain (termasuk test dan
+# kode yang menyusun Proposal langsung) bisa melewati Pydantic sama sekali.
+# Diulang di sini, bukan hanya di schemas/proposal.py, dengan alasan yang
+# sama dengan pengulangan MIN_PLEDGE_AMOUNT di services/pledge.py.
+MAKSIMAL_MILESTONE = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +27,8 @@ def validate_milestone_plan(
 ) -> None:
     if len(milestones) < MINIMAL_MILESTONE:
         raise ValueError("Rencana milestone harus berisi minimal dua tahap.")
+    if len(milestones) > MAKSIMAL_MILESTONE:
+        raise ValueError(f"Rencana milestone maksimal {MAKSIMAL_MILESTONE} tahap.")
 
     for m in milestones:
         parse_rupiah(m.amount)  # menolak nol, negatif, dan bentuk bukan integer

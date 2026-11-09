@@ -36,3 +36,13 @@ def test_br15_seq_harus_berurutan_dari_satu():
 def test_br16_amount_nol_ditolak():
     with pytest.raises(ValueError):
         validate_milestone_plan([draft(1, 10_000_000), draft(2, 0)], 10_000_000)
+
+
+def test_t3_milestone_plan_over_maximum_count_rejected():
+    """Diulang di domain, bukan hanya di schemas/proposal.py Field(max_length
+    =30): pemanggil lain (test, job batch) bisa menyusun MilestoneDraft
+    langsung tanpa lewat ProposalIn sama sekali, sama seperti alasan
+    MIN_PLEDGE_AMOUNT diulang di services/pledge.py."""
+    drafts = [draft(i, 1) for i in range(1, 32)]
+    with pytest.raises(ValueError, match="maksimal 30"):
+        validate_milestone_plan(drafts, 31)

@@ -58,6 +58,22 @@ class Proposal(SQLModel, table=True):
         CheckConstraint(
             "requested_amount > 0", name="ck_proposal_requested_amount_positif"
         ),
+        # Lapisan kedua di belakang Field(max_length=...) di ProposalIn
+        # (Task 3 review keamanan, migrasi a061fd4c5ee6): batas Pydantic saja
+        # bisa dilewati pemanggil yang menyusun Proposal langsung tanpa
+        # lewat skema (fixture test, service lain), batas database tidak.
+        CheckConstraint(
+            "length(business_profile) BETWEEN 100 AND 5000",
+            name="ck_proposals_business_profile_length",
+        ),
+        CheckConstraint(
+            "length(fund_usage_plan) BETWEEN 100 AND 5000",
+            name="ck_proposals_fund_usage_plan_length",
+        ),
+        CheckConstraint(
+            "length(business_projection) BETWEEN 50 AND 3000",
+            name="ck_proposals_business_projection_length",
+        ),
         # Mirror dari index partial di migrasi b7d1fab085fd (BR-13). Index itu
         # sendiri sudah ada di database; baris ini hanya supaya metadata
         # SQLAlchemy tahu soal dia, karena tanpa ini `alembic revision

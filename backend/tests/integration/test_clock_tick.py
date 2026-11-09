@@ -89,11 +89,22 @@ async def test_tick_endpoint_advances_clock_seen_by_real_proposal_read(
     """D-06 hanya bermanfaat untuk demo juri kalau tick sungguhan lewat HTTP
     ikut mempengaruhi get_clock produksi, bukan cuma fixture test `majukan`
     yang memasang FrozenClock langsung lewat dependency_overrides."""
-    res = await client.post("/api/v1/internal/clock/tick", json={"hari": 30})
+    res = await client.post("/api/v1/internal/clock/tick", json={"advance_days": 30})
     assert res.status_code == 200
 
     detail = (await client.get(f"/api/v1/proposals/{listed_proposal.id}")).json()
     assert detail["status"] == "failed"
+
+
+async def test_t3_advance_days_above_ceiling_rejected_with_422_not_overflow_error(
+    client,
+):
+    """Review keamanan: `hari=10**9` dulu lolos gt=0 tanpa batas atas, lalu
+    meledak sebagai OverflowError saat timedelta(days=...) di
+    services/clock_service.py, dan itu keluar sebagai 500. le=3650 menolaknya
+    di pintu HTTP sebagai 422, jauh sebelum sampai ke timedelta."""
+    res = await client.post("/api/v1/internal/clock/tick", json={"advance_days": 10**9})
+    assert res.status_code == 422
 
 
 async def test_ck_system_clock_tunggal_rejects_second_row(db):
