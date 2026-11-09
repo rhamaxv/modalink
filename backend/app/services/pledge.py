@@ -155,7 +155,20 @@ async def cancel_pledge(
 ) -> Pledge:
     """Membatalkan pledge: mencatat refund, bukan menghapus (BR-25, BR-26).
     `proposal` wajib hasil `get_locked_proposal` dan harus proposal pemilik
-    `pledge` (pemanggil yang menjamin pasangan ini benar)."""
+    `pledge` (pemanggil yang menjamin pasangan ini benar).
+
+    `pledge` sendiri dibaca di luar lock proposal (api/deps.py `get_own_pledge`
+    memanggil `get_pledge`, bukan `get_locked_proposal`), jadi pengecekan
+    `pledge.status is not ACTIVE` di bawah membaca snapshot yang bisa basi:
+    dua pembatalan hampir bersamaan pada pledge yang sama bisa-bisa keduanya
+    lolos pengecekan itu. Yang sebenarnya menutup balapan itu bukan lock
+    baris proposal -- pledge memang tidak pernah dikunci sendiri -- melainkan
+    idempotency_key `refund:{pledge.id}` di `catat_entri`: kalau keduanya
+    lolos, keduanya sama-sama mencoba INSERT ledger dengan kunci yang sama,
+    dan yang kedua kalah lewat unique constraint, bukan lewat baris Python
+    ini. Window ini sudah dicoba dipaksa lewat forced interleaving 0.4 detik
+    dan gagal direproduksi, justru karena pagar idempotensi itu yang menahan
+    (review f06-b Finding 1)."""
     if proposal.status is ProposalStatus.FUNDED:
         raise ConflictError(
             "proposal_sudah_funded",
