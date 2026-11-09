@@ -52,6 +52,13 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # jalan, jadi 422 di sini untuk peran manapun. Cakupan aturan akses baca
     # proposal yang sesungguhnya ada di tests/integration/test_proposal_akses.py.
     ("GET", "/api/v1/proposals/{proposal_id}", None, 422),
+    # Beda dari baris di atas: dua endpoint ini dijaga require_role, dan
+    # dependency itu gagal (401) sebelum literal "{proposal_id}" sempat
+    # dicoba divalidasi sebagai UUID. Cakupan peran dan status sungguhan
+    # (403 komunitas, 202/409 rescore) ada di tests/integration/test_scoring_flow.py
+    # dan tests/regression/test_r6_ai_failure.py.
+    ("POST", "/api/v1/proposals/{proposal_id}/rescore", None, 401),
+    ("GET", "/api/v1/proposals/{proposal_id}/scoring", None, 401),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

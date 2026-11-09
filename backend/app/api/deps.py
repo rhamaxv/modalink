@@ -7,6 +7,8 @@ from uuid import UUID
 from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.engine import ScoringEngine, build_engine
+from app.config import settings
 from app.db.session import get_session
 from app.domain.clock import Clock, SystemClock
 from app.errors import DomainError, ForbiddenError, NotFoundError
@@ -14,6 +16,28 @@ from app.models.campaign import Campaign
 from app.models.user import Role, User
 from app.services.auth import ambil_user, decode_token
 from app.services.campaign import ambil_campaign
+from app.services.scoring import SessionFactory, sesi_job_produksi
+
+# Instance tunggal dibangun sekali saat modul ini diimpor, bukan satu engine
+# baru per request: GeminiEngine.from_settings membangun genai.Client sendiri,
+# dan membangunnya ulang di setiap request membuang kerja tanpa manfaat.
+# Efek sampingnya disengaja: SCORING_ENGINE=gemini tanpa GEMINI_API_KEY
+# membuat proses gagal start, bukan gagal samar di request pertama.
+_scoring_engine = build_engine(settings)
+
+
+def get_scoring_engine() -> ScoringEngine:
+    return _scoring_engine
+
+
+def get_session_factory() -> SessionFactory:
+    # Dependency, bukan import langsung: test fase ini mengganti ini lewat
+    # dependency_overrides agar job latar belakang memakai session transaksi
+    # yang sama dengan test, bukan koneksi baru yang tidak melihat baris yang
+    # baru di-flush dan belum dikomit. Implementasinya sendiri ada di
+    # services/scoring.py, bukan di sini: pagar AST menolak berkas di app/api
+    # menyentuh session.<metode> secara langsung.
+    return sesi_job_produksi
 
 
 class TidakTerautentikasi(DomainError):

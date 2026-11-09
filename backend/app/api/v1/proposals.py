@@ -6,22 +6,39 @@ dengan tidak pernah menulisnya, bukan dengan menolaknya di runtime.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_clock, pengguna_opsional, require_role
+from app.ai.engine import ScoringEngine
+from app.api.deps import (
+    get_clock,
+    get_scoring_engine,
+    get_session_factory,
+    pengguna_opsional,
+    require_role,
+)
 from app.db.session import get_session
 from app.domain.clock import Clock
 from app.errors import NotFoundError
+from app.jobs.inline import InlineRunner
 from app.models.proposal import Proposal
+from app.models.scoring import ScoringResult
 from app.models.user import Role, User
 from app.schemas.proposal import ProposalIn, ProposalListOut, ProposalOut
+from app.schemas.scoring import ScoringResultOut
 from app.services.campaign import ambil_campaign
 from app.services.proposal import (
     ambil_proposal,
     boleh_melihat,
     daftar_proposal_publik,
     submit_proposal,
+)
+from app.services.scoring import (
+    SessionFactory,
+    ambil_proposal_untuk_rescore,
+    ambil_scoring_terbaru,
+    jalankan_scoring_job,
+    minta_rescore,
 )
 
 router = APIRouter(tags=["proposals"])
@@ -35,14 +52,23 @@ router = APIRouter(tags=["proposals"])
 async def submit_proposal_endpoint(
     campaign_id: UUID,
     body: ProposalIn,
+    background_tasks: BackgroundTasks,
     umkm: User = Depends(require_role(Role.UMKM)),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    engine: ScoringEngine = Depends(get_scoring_engine),
+    session_factory: SessionFactory = Depends(get_session_factory),
 ) -> Proposal:
     campaign = await ambil_campaign(session, campaign_id)
     if campaign is None:
         raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")
-    return await submit_proposal(session, umkm, campaign, body, clock)
+    proposal = await submit_proposal(session, umkm, campaign, body, clock)
+    # Proposal masuk langsung dinilai, tanpa menunggu AI sebelum 201 dikirim
+    # (10-api-contract.md): job jalan di latar belakang lewat JobRunner.
+    InlineRunner(background_tasks).submit(
+        lambda: jalankan_scoring_job(session_factory, proposal.id, engine, clock)
+    )
+    return proposal
 
 
 @router.get("/api/v1/proposals", response_model=ProposalListOut)
@@ -70,3 +96,39 @@ async def ambil_proposal_endpoint(
         # dilihat sudah jadi kebocoran tersendiri.
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
     return proposal
+
+
+@router.post(
+    "/api/v1/proposals/{proposal_id}/rescore",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def rescore_proposal_endpoint(
+    proposal_id: UUID,
+    background_tasks: BackgroundTasks,
+    _: User = Depends(require_role(Role.UMKM, Role.INVESTOR)),
+    session: AsyncSession = Depends(get_session),
+    clock: Clock = Depends(get_clock),
+    engine: ScoringEngine = Depends(get_scoring_engine),
+    session_factory: SessionFactory = Depends(get_session_factory),
+) -> dict[str, str]:
+    proposal = await ambil_proposal_untuk_rescore(session, proposal_id)
+    await minta_rescore(session, proposal)
+    InlineRunner(background_tasks).submit(
+        lambda: jalankan_scoring_job(session_factory, proposal.id, engine, clock)
+    )
+    return {"scoring_status": proposal.scoring_status.value}
+
+
+@router.get(
+    "/api/v1/proposals/{proposal_id}/scoring",
+    response_model=ScoringResultOut,
+)
+async def ambil_scoring_endpoint(
+    proposal_id: UUID,
+    # Peran saja, bukan kepemilikan: red flag dan brief disembunyikan dari
+    # komunitas (BR-35), sementara UMKM pemilik dan investor manapun boleh
+    # melihatnya (10-api-contract.md).
+    _: User = Depends(require_role(Role.UMKM, Role.INVESTOR)),
+    session: AsyncSession = Depends(get_session),
+) -> ScoringResult:
+    return await ambil_scoring_terbaru(session, proposal_id)

@@ -8,6 +8,7 @@ from app.models.proposal import (
     ProposalStatus,
     ScoringStatus,
 )
+from app.models.scoring import ScoringResult, ScoringVerdict
 from app.models.user import Role, User
 
 __all__ = [
@@ -18,7 +19,9 @@ __all__ = [
     "ProposalMilestone",
     "ProposalStatus",
     "Role",
+    "ScoringResult",
     "ScoringStatus",
+    "ScoringVerdict",
     "Sector",
     "User",
 ]

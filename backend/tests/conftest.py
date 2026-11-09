@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -5,7 +7,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_clock
+from app.ai.mock_engine import MockScoringEngine
+from app.api.deps import get_clock, get_session_factory
 from app.db.session import engine, get_session
 from app.domain.clock import FrozenClock, SystemClock
 from app.main import create_app
@@ -13,6 +16,7 @@ from app.models.campaign import Campaign, CampaignStatus, Sector
 from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
 from app.models.user import Role, User
 from app.services.auth import hash_password, issue_token
+from app.services.scoring import jalankan_scoring
 
 
 @pytest.fixture
@@ -37,6 +41,18 @@ async def db():
 async def app(db):
     application = create_app()
     application.dependency_overrides[get_session] = lambda: db
+
+    # Job scoring latar belakang memakai session yang sama dengan request:
+    # `db` dibungkus satu transaksi yang baru di-rollback di akhir test (lihat
+    # fixture db di atas), bukan dikomit, jadi job yang membuka koneksi baru
+    # lewat SessionLocal() sungguhan tidak akan melihat baris yang baru
+    # di-flush. Produksi memakai _sesi_job_latar_belakang yang sesungguhnya
+    # (app/api/deps.py), yang membuka dan mengomit session sendiri.
+    @asynccontextmanager
+    async def _sesi_job_uji() -> AsyncIterator[AsyncSession]:
+        yield db
+
+    application.dependency_overrides[get_session_factory] = lambda: _sesi_job_uji
     return application
 
 
@@ -89,6 +105,15 @@ async def investor_lain(db):
 async def umkm_lain(db):
     """UMKM kedua: bukan pemilik proposal manapun di test, dipakai BR-13 dan akses baca."""
     return await _buat_akun(db, "umkm-lain-teruji@contoh.id", Role.UMKM)
+
+
+@pytest.fixture
+async def umkm_ketiga(db):
+    """UMKM ketiga: dipakai rejected_proposal supaya transisi sementaranya
+    lewat submitted (sebelum jalankan_scoring menolaknya) tidak bertabrakan
+    dengan submitted_proposal atau listed_proposal pada campaign yang sama,
+    yang keduanya juga aktif menurut partial unique index (BR-13)."""
+    return await _buat_akun(db, "umkm-ketiga-teruji@contoh.id", Role.UMKM)
 
 
 @pytest.fixture
@@ -145,11 +170,8 @@ async def campaign_kedaluwarsa(db, investor):
 
 
 def _isi_proposal_minimal(campaign_id, umkm_id, status: ProposalStatus) -> Proposal:
-    """Baris proposal lengkap secara kolom, dipakai fixture status manapun.
-
-    Scoring belum ada sampai fase 05 (lihat laporan fase ini), jadi status
-    diset langsung di sini alih-alih lewat mesin skoring sungguhan.
-    """
+    """Baris proposal lengkap secara kolom, dipakai fixture yang statusnya
+    sudah final secara artifisial (BR-13, bukan lewat mesin skoring)."""
     return Proposal(
         campaign_id=campaign_id,
         umkm_id=umkm_id,
@@ -159,13 +181,59 @@ def _isi_proposal_minimal(campaign_id, umkm_id, status: ProposalStatus) -> Propo
         business_projection="x" * 50,
         requested_amount=10_000_000,
         status=status,
-        scoring_status=ScoringStatus.DONE,
+        scoring_status=ScoringStatus.PENDING,
     )
 
 
+def _proposal_submitted(campaign_id, umkm_id, **ubah) -> Proposal:
+    """Baris proposal berstatus submitted, scoring_status pending: titik awal
+    sebelum mesin skoring sungguhan dijalankan di atasnya."""
+    isi = {
+        "campaign_id": campaign_id,
+        "umkm_id": umkm_id,
+        "business_name": "Warung Kopi Mbak Sri",
+        "business_profile": "x" * 110,
+        "fund_usage_plan": "x" * 110,
+        "business_projection": "x" * 60,
+        "requested_amount": 10_000_000,
+        "status": ProposalStatus.SUBMITTED,
+        "scoring_status": ScoringStatus.PENDING,
+    }
+    isi.update(ubah)
+    return Proposal(**isi)
+
+
 @pytest.fixture
-async def listed_proposal(db, campaign, umkm_lain):
-    """Satu proposal lolos skoring untuk campaign fixture, demi BR-77.
+def clock():
+    return FrozenClock(SystemClock().now())
+
+
+@pytest.fixture
+def engine_mock():
+    return MockScoringEngine()
+
+
+class _EngineMeledak:
+    """Engine yang selalu meledak, dipakai menguji D-09/BR-74 lewat jalur
+    orkestrasi sungguhan, bukan status yang diset langsung."""
+
+    name = "meledak"
+    model = "meledak"
+
+    async def score(self, proposal, campaign):
+        raise RuntimeError("engine meledak")
+
+
+@pytest.fixture
+def engine_meledak():
+    return _EngineMeledak()
+
+
+@pytest.fixture
+async def listed_proposal(db, campaign, umkm_lain, clock):
+    """Satu proposal lolos skoring untuk campaign fixture, dicapai lewat
+    MockScoringEngine dan orkestrasi sungguhan (BR-73), bukan status yang
+    diset langsung sekarang mesin skoring sudah ada.
 
     Dimiliki umkm_lain, bukan umkm: submitted_proposal di bawah ini juga
     aktif menurut BR-13 pada campaign yang sama, dan partial unique index
@@ -173,9 +241,15 @@ async def listed_proposal(db, campaign, umkm_lain):
     yang butuh keduanya sekaligus (daftar proposal per campaign) akan gagal
     dengan IntegrityError kalau kedua fixture berbagi umkm yang sama.
     """
-    p = _isi_proposal_minimal(campaign.id, umkm_lain.user.id, ProposalStatus.LISTED)
+    p = _proposal_submitted(
+        campaign.id,
+        umkm_lain.user.id,
+        business_profile="x" * 110 + " [[SCORE:80]]",  # threshold campaign 60
+    )
     db.add(p)
     await db.flush()
+    await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+    await db.refresh(p)
     return p
 
 
@@ -183,20 +257,45 @@ async def listed_proposal(db, campaign, umkm_lain):
 async def submitted_proposal(db, campaign, umkm):
     """Proposal yang belum dinilai, dimiliki `umkm` karena test kepemilikan
     (test_proposal_submitted_terlihat_oleh_pemiliknya) memverifikasi lewat akun ini."""
-    p = _isi_proposal_minimal(campaign.id, umkm.user.id, ProposalStatus.SUBMITTED)
+    p = _proposal_submitted(campaign.id, umkm.user.id)
     db.add(p)
     await db.flush()
     return p
 
 
 @pytest.fixture
-async def rejected_proposal(db, campaign, umkm):
-    """Proposal yang sudah mati. Status rejected dikecualikan dari partial
-    unique index (BR-13), sehingga aman berbagi umkm dengan submitted_proposal
-    pada campaign yang sama."""
-    p = _isi_proposal_minimal(campaign.id, umkm.user.id, ProposalStatus.REJECTED)
+async def rejected_proposal(db, campaign, umkm_ketiga, clock):
+    """Proposal yang ditolak scoring sungguhan lewat red flag kritis (BR-72),
+    dicapai lewat orkestrasi, bukan status yang diset langsung. Statusnya
+    melewati submitted dulu (aktif menurut BR-13) sebelum jalankan_scoring
+    menolaknya, jadi pemiliknya harus berbeda dari submitted_proposal dan
+    listed_proposal yang berbagi campaign yang sama dan tetap aktif di sana
+    (lihat umkm_ketiga)."""
+    p = _proposal_submitted(
+        campaign.id,
+        umkm_ketiga.user.id,
+        business_projection="x" * 60 + " [[RED_FLAG:critical]]",
+    )
     db.add(p)
     await db.flush()
+    await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+    await db.refresh(p)
+    return p
+
+
+@pytest.fixture
+async def proposal_scoring_gagal(db, campaign, umkm, clock, engine_meledak):
+    """Proposal yang penilaiannya gagal secara teknis: status tetap submitted,
+    scoring_status failed, dicapai lewat orkestrasi sungguhan dengan engine
+    yang meledak (D-09), supaya fixture ini menguji jalur yang sama dengan
+    produksi, bukan status yang diset langsung."""
+    p = _proposal_submitted(
+        campaign.id, umkm.user.id, business_name="Warung Gagal Nilai"
+    )
+    db.add(p)
+    await db.flush()
+    await jalankan_scoring(db, p.id, engine_meledak, clock)
+    await db.refresh(p)
     return p
 
 
