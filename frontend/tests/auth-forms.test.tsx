@@ -15,6 +15,35 @@ function fakeResponse(status: number, body: unknown) {
   return Promise.resolve(new Response(JSON.stringify(body), { status }));
 }
 
+// POST /auth/register mengembalikan UserOut (tanpa access_token); hanya
+// POST /auth/login mengembalikan TokenOut. Mock ini meniru kedua endpoint
+// berbeda itu secara terpisah, persis seperti backend sungguhan
+// (.claude/prd/10-api-contract.md).
+function stubRegisterThenLogin(loginBody: unknown, loginStatus = 200) {
+  vi.stubGlobal("fetch", (url: string) => {
+    if (url.includes("/auth/register")) {
+      return fakeResponse(201, {
+        id: "u1",
+        email: "budi@contoh.id",
+        name: "Budi Santoso",
+        role: "umkm",
+        created_at: "2026-01-01T00:00:00Z",
+      });
+    }
+    if (url.includes("/auth/login")) {
+      return fakeResponse(loginStatus, loginBody);
+    }
+    throw new Error(`permintaan fetch tak terduga ke ${url}`);
+  });
+}
+
+async function fillAndSubmitSignUp() {
+  await userEvent.type(screen.getByLabelText(/^nama/i), "Budi Santoso");
+  await userEvent.type(screen.getByLabelText(/email/i), "budi@contoh.id");
+  await userEvent.type(screen.getByLabelText(/password/i), "rahasia123");
+  await userEvent.click(screen.getByRole("button", { name: /daftar/i }));
+}
+
 async function fillAndSubmitSignIn() {
   await userEvent.type(screen.getByLabelText(/email/i), "investor@contoh.id");
   await userEvent.type(screen.getByLabelText(/password/i), "rahasia123");
@@ -89,10 +118,39 @@ describe("sign up form", () => {
       error: { code: "email_terdaftar", message: "Email sudah terdaftar." },
     }));
     render(<SignUpForm />);
-    await userEvent.type(screen.getByLabelText(/^nama/i), "Budi Santoso");
-    await userEvent.type(screen.getByLabelText(/email/i), "budi@contoh.id");
-    await userEvent.type(screen.getByLabelText(/password/i), "rahasia123");
-    await userEvent.click(screen.getByRole("button", { name: /daftar/i }));
+    await fillAndSubmitSignUp();
     expect(await screen.findByRole("alert")).toHaveTextContent("Email sudah terdaftar.");
+  });
+
+  it("stores the real login token after a successful sign up, never the literal string undefined", async () => {
+    // POST /auth/register tidak mengembalikan access_token sama sekali
+    // (lihat backend/app/schemas/auth.py: UserOut). Mengambil
+    // result.access_token langsung dari respons register menghasilkan
+    // undefined, dan localStorage.setItem mengubahnya jadi string literal
+    // "undefined" yang lolos pemeriksaan truthy di lib/api.ts: pengguna
+    // tampak masuk padahal setiap permintaan berikutnya mengirim
+    // "Authorization: Bearer undefined". Token yang benar hanya datang dari
+    // POST /auth/login yang dipanggil ulang dengan kredensial yang sama
+    // setelah register sukses.
+    stubRegisterThenLogin({ access_token: "token-asli", token_type: "bearer" });
+    render(<SignUpForm />);
+    await fillAndSubmitSignUp();
+    await vi.waitFor(() => {
+      expect(localStorage.getItem("modalink_token")).toBe("token-asli");
+    });
+    expect(localStorage.getItem("modalink_token")).not.toBe("undefined");
+  });
+
+  it("keeps the created account and shows the login error when auto sign in fails after sign up", async () => {
+    stubRegisterThenLogin(
+      { error: { code: "jaringan_bermasalah", message: "Koneksi ke server bermasalah." } },
+      503,
+    );
+    render(<SignUpForm />);
+    await fillAndSubmitSignUp();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Koneksi ke server bermasalah/);
+    // Akun tetap tercatat dibuat oleh backend; hanya auto-masuknya yang gagal,
+    // jadi tidak ada token palsu yang tersimpan.
+    expect(localStorage.getItem("modalink_token")).toBeNull();
   });
 });

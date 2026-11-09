@@ -18,13 +18,29 @@ type FieldErrors = {
   password?: string;
 };
 
+// POST /auth/register mengembalikan UserOut (lihat backend/app/schemas/auth.py),
+// bukan token: akun baru tidak otomatis membawa sesi. Mengambil access_token
+// dari respons register akan selalu undefined, dan localStorage.setItem
+// mengubahnya jadi string literal "undefined" yang lolos pemeriksaan truthy
+// di lib/api.ts, membuat pengguna mengira sudah masuk padahal setiap
+// permintaan berikutnya mengirim header Authorization yang tidak valid.
+type RegisterResponse = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  created_at: string;
+};
+
 type LoginResponse = {
   access_token: string;
 };
 
 // Form daftar: body mengikuti POST /auth/register (email, password, name,
-// role), lalu auto-login dengan token yang dikembalikan backend, konsisten
-// dengan SignInForm.
+// role) sesuai .claude/prd/10-api-contract.md. Register tidak mengembalikan
+// token, jadi auto-masuk dilakukan dengan memanggil POST /auth/login memakai
+// kredensial yang sama persis seperti SignInForm, dan token disimpan dari
+// respons login itu, bukan dari respons register.
 export function SignUpForm() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -51,20 +67,27 @@ export function SignUpForm() {
 
     setSubmitting(true);
     try {
-      const result = await api.post<LoginResponse>("/auth/register", {
-        name,
-        email,
-        password,
-        role,
-      });
+      await api.post<RegisterResponse>("/auth/register", { name, email, password, role });
+    } catch (error) {
+      setFormError(error instanceof ApiError ? error.message : "Terjadi kesalahan. Coba lagi sebentar lagi.");
+      setSubmitting(false);
+      return;
+    }
+
+    // Akun sudah benar-benar terbuat di titik ini. Kegagalan di bawah ini
+    // hanya berarti auto-masuk gagal, bukan bahwa pendaftaran gagal, jadi
+    // pesannya tidak menimpa fakta bahwa akunnya sudah ada.
+    try {
+      const login = await api.post<LoginResponse>("/auth/login", { email, password });
       try {
-        localStorage.setItem("modalink_token", result.access_token);
+        localStorage.setItem("modalink_token", login.access_token);
       } catch {
-        // Tanpa localStorage, akun tetap terbuat tapi sesi tidak tersimpan.
+        // Tanpa localStorage, token tidak tersimpan tapi login tetap sukses secara server.
       }
       router.push("/");
     } catch (error) {
-      setFormError(error instanceof ApiError ? error.message : "Terjadi kesalahan. Coba lagi sebentar lagi.");
+      const sebab = error instanceof ApiError ? error.message : "Terjadi kesalahan. Coba lagi sebentar lagi.";
+      setFormError(`Akun berhasil dibuat, tetapi masuk otomatis gagal: ${sebab}`);
     } finally {
       setSubmitting(false);
     }
