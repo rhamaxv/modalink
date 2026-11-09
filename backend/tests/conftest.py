@@ -6,6 +6,7 @@ from datetime import timedelta
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from app.ai.mock_engine import MockScoringEngine
 from app.api.deps import get_clock, get_session_factory
@@ -14,9 +15,16 @@ from app.domain.clock import FrozenClock, SystemClock
 from app.main import create_app
 from app.models.campaign import Campaign, CampaignStatus, Sector
 from app.models.pledge import Pledge
-from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
+from app.models.proposal import (
+    Proposal,
+    ProposalMilestone,
+    ProposalStatus,
+    ScoringStatus,
+)
 from app.models.user import Role, User
+from app.schemas.milestone import MilestoneReportIn
 from app.services.auth import hash_password, issue_token
+from app.services.milestone import approve_milestone, submit_report
 from app.services.pledge import create_pledge
 from app.services.scoring import jalankan_scoring
 
@@ -262,6 +270,20 @@ async def listed_proposal(db, campaign, umkm_lain, clock):
     await db.flush()
     await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
     await db.refresh(p)
+    # Dua milestone yang jumlahnya persis sama dengan requested_amount
+    # (BR-14), dipakai fixture milestone (funded_proposal.milestones) di
+    # tests/integration/test_milestone_lapor.py.
+    for seq, judul in ((1, "Beli mesin"), (2, "Bahan baku")):
+        db.add(
+            ProposalMilestone(
+                proposal_id=p.id,
+                seq=seq,
+                title=judul,
+                description="x" * 20,
+                amount=p.requested_amount // 2,
+            )
+        )
+    await db.flush()
     return p
 
 
@@ -279,6 +301,7 @@ class ProposalWithPledge:
 
     proposal: Proposal
     pledges: list[Pledge]
+    milestones: list[ProposalMilestone]
 
     def __getattr__(self, name: str):
         return getattr(self.proposal, name)
@@ -294,12 +317,26 @@ async def funded_proposal(db, listed_proposal, investor, clock):
     yang memakai fixture ini membatalkan lewat akun `investor` -- kalau
     pledge-nya milik akun lain, test itu akan berhenti di pemeriksaan
     kepemilikan (403) sebelum sempat membuktikan BR-25 (409).
+
+    `.milestones` adalah dua baris dari `listed_proposal`, terurut `seq`:
+    dipakai tests/integration/test_milestone_lapor.py lewat
+    `funded_proposal.milestones[0]` / `[1]`, bukan lewat relationship ORM
+    (Proposal sengaja tidak punya itu, lihat docstring ProposalWithPledge).
     """
     pledge = await create_pledge(
         db, investor.user, listed_proposal, listed_proposal.requested_amount, clock
     )
     await db.refresh(listed_proposal)
-    return ProposalWithPledge(proposal=listed_proposal, pledges=[pledge])
+    milestones = (
+        await db.scalars(
+            select(ProposalMilestone)
+            .where(ProposalMilestone.proposal_id == listed_proposal.id)
+            .order_by(ProposalMilestone.seq)
+        )
+    ).all()
+    return ProposalWithPledge(
+        proposal=listed_proposal, pledges=[pledge], milestones=list(milestones)
+    )
 
 
 @pytest.fixture
@@ -416,3 +453,27 @@ def body_proposal():
         return isi | ubah
 
     return _body
+
+
+@pytest.fixture
+async def milestone_reported(db, funded_proposal, umkm_lain, investor, clock):
+    """Milestone kedua `funded_proposal`, sudah dilaporkan (`reported`),
+    dipakai menguji approve/reject laporan (T-30, T-31). Dicapai lewat
+    orkestrasi sungguhan -- approve_milestone untuk mencairkan milestone
+    pertama tanpa laporan (D-13), lalu submit_report untuk yang kedua --
+    bukan status yang diset langsung.
+
+    `umkm_lain`, bukan `umkm`: `funded_proposal` (lewat `listed_proposal`)
+    dimiliki `umkm_lain`, lihat docstring fixture itu soal BR-13.
+    """
+    m1, m2 = funded_proposal.milestones
+    await approve_milestone(db, m1, investor.user, clock)
+    await submit_report(
+        db,
+        umkm_lain.user,
+        m2,
+        MilestoneReportIn(narrative="x" * 60, metrics=None),
+        clock,
+    )
+    await db.refresh(m2)
+    return m2

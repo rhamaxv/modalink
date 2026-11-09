@@ -14,10 +14,11 @@ from app.domain.clock import Clock, SystemClock
 from app.errors import DomainError, ForbiddenError, NotFoundError
 from app.models.campaign import Campaign
 from app.models.pledge import Pledge
-from app.models.proposal import Proposal
+from app.models.proposal import Proposal, ProposalMilestone
 from app.models.user import Role, User
 from app.services.auth import ambil_user, decode_token
 from app.services.campaign import ambil_campaign
+from app.services.milestone import get_milestone
 from app.services.pledge import get_pledge
 from app.services.proposal import ambil_proposal
 from app.services.scoring import (
@@ -172,3 +173,40 @@ async def jaga_akses_scoring_milik_sendiri(
         proposal = await ambil_proposal(session, proposal_id)
         if proposal is None or proposal.umkm_id != user.id:
             raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
+
+
+async def get_own_milestone_for_report(
+    milestone_id: UUID,
+    umkm: User = Depends(require_role(Role.UMKM)),
+    session: AsyncSession = Depends(get_session),
+) -> ProposalMilestone:
+    """Kepemilikan laporan: hanya UMKM pemilik proposal induk milestone ini
+    yang boleh melaporkan progresnya (04-feature-umkm.md). 404 untuk UMKM
+    lain, bukan 403, supaya keberadaan milestone proposal orang lain tidak
+    ikut terkonfirmasi, sama seperti ambil_proposal_untuk_rescore_milik_sendiri
+    di atas.
+    """
+    milestone = await get_milestone(session, milestone_id)
+    if milestone is None:
+        raise NotFoundError("milestone_tidak_ada", "Milestone tidak ditemukan.")
+    proposal = await ambil_proposal(session, milestone.proposal_id)
+    if proposal is None or proposal.umkm_id != umkm.id:
+        raise NotFoundError("milestone_tidak_ada", "Milestone tidak ditemukan.")
+    return milestone
+
+
+async def get_milestone_for_review(
+    milestone_id: UUID,
+    investor: User = Depends(require_role(Role.INVESTOR)),
+    session: AsyncSession = Depends(get_session),
+) -> ProposalMilestone:
+    """BR-44 membatasi approve/reject ke lead investor; pemeriksaan identitas
+    lead investor yang sesungguhnya ditambahkan task berikutnya fase ini
+    bersama penguncian baris proposal (lihat docstring services/milestone.py).
+    Dependency ini untuk sekarang hanya menjaga perannya investor dan
+    memastikan milestone-nya ada.
+    """
+    milestone = await get_milestone(session, milestone_id)
+    if milestone is None:
+        raise NotFoundError("milestone_tidak_ada", "Milestone tidak ditemukan.")
+    return milestone

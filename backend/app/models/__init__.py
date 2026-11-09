@@ -2,6 +2,8 @@
 
 from app.models.campaign import Campaign, CampaignStatus, Sector
 from app.models.ledger import EntryType, LedgerEntry
+from app.models.milestone_report import MilestoneReport
+from app.models.milestone_report import ReportStatus as MilestoneReportStatus
 from app.models.pledge import Pledge, PledgeStatus
 from app.models.proposal import (
     MilestoneStatus,
@@ -18,6 +20,8 @@ __all__ = [
     "CampaignStatus",
     "EntryType",
     "LedgerEntry",
+    "MilestoneReport",
+    "MilestoneReportStatus",
     "MilestoneStatus",
     "Pledge",
     "PledgeStatus",

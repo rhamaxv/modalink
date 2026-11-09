@@ -83,6 +83,48 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # divalidasi sebagai UUID. Kasus peran benar tapi bukan pemilik (403) dan
     # pembatalan sungguhan ada di tests/integration/test_pledge.py.
     ("DELETE", "/api/v1/pledges/{pledge_id}", "investor", 422),
+    ("POST", "/api/v1/milestones/{milestone_id}/reports", None, 401),
+    (
+        "POST",
+        "/api/v1/milestones/{milestone_id}/reports",
+        "investor",
+        403,
+    ),  # peran salah
+    (
+        "POST",
+        "/api/v1/milestones/{milestone_id}/reports",
+        "community",
+        403,
+    ),  # peran salah
+    # UMKM lolos pagar peran; 422 karena literal "{milestone_id}" gagal
+    # divalidasi sebagai UUID sekaligus body kosong kehilangan `narrative`.
+    # Kasus peran benar tapi bukan pemilik (403/404) dan pengiriman laporan
+    # sungguhan ada di tests/integration/test_milestone_lapor.py.
+    ("POST", "/api/v1/milestones/{milestone_id}/reports", "umkm", 422),
+    ("POST", "/api/v1/milestones/{milestone_id}/approve", None, 401),
+    ("POST", "/api/v1/milestones/{milestone_id}/approve", "umkm", 403),  # peran salah
+    (
+        "POST",
+        "/api/v1/milestones/{milestone_id}/approve",
+        "community",
+        403,
+    ),  # peran salah
+    # Investor lolos pagar peran; 422 karena literal "{milestone_id}" gagal
+    # divalidasi sebagai UUID. Approve sungguhan ada di
+    # tests/integration/test_milestone_lapor.py.
+    ("POST", "/api/v1/milestones/{milestone_id}/approve", "investor", 422),
+    ("POST", "/api/v1/milestones/{milestone_id}/reject", None, 401),
+    ("POST", "/api/v1/milestones/{milestone_id}/reject", "umkm", 403),  # peran salah
+    (
+        "POST",
+        "/api/v1/milestones/{milestone_id}/reject",
+        "community",
+        403,
+    ),  # peran salah
+    # Investor lolos pagar peran; 422 karena literal "{milestone_id}" gagal
+    # divalidasi sebagai UUID sekaligus body kosong kehilangan `note`. Reject
+    # sungguhan (BR-45, T-23, T-31) ada di tests/integration/test_milestone_lapor.py.
+    ("POST", "/api/v1/milestones/{milestone_id}/reject", "investor", 422),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 
