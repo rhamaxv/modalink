@@ -29,6 +29,24 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     gemini_timeout_s: int = 60
+    # Review keamanan Finding 2: tanpa batas ini, setiap proposal yang
+    # diterima langsung memicu job scoring tanpa batas konkurensi apa pun
+    # (app/api/v1/proposals.py), dan BackgroundTasks milik FastAPI tidak
+    # memberi batas sendiri -- sebanyak apa pun request bersamaan, sebanyak
+    # itu pula panggilan Gemini konkuren. Angka kecil sengaja: proyek ini
+    # satu container (D-01), bukan armada worker.
+    scoring_max_concurrent_jobs: int = 3
+    # Batas kasar ukuran prompt sebelum dikirim ke Gemini (app/ai/gemini_engine.py).
+    # Dihitung dari panjang isi proposal yang dirakit, bukan dari batas
+    # panjang per-field skema (app/schemas/proposal.py) -- field itu
+    # membatasi satu kolom, ini membatasi gabungan ketiganya yang benar-
+    # benar dikirim ke model.
+    gemini_max_prompt_chars: int = 12_000
+    # Kuota harian kasar, gagal tertutup (menolak memanggil, bukan diam-diam
+    # melewatinya) begitu tercapai. Lihat docstring _DailyBudget di
+    # gemini_engine.py untuk alasan lengkap kenapa ini ada DI SAMPING rate
+    # limit per-IP/akun, bukan menggantikannya.
+    gemini_daily_budget: int = 200
 
 
 settings = Settings()

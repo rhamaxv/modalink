@@ -208,9 +208,7 @@ async def dua_proposal_kedaluwarsa_overlap(investor, investor_pledge, umkm, umkm
         # Finding 3): DELETE biasa ditolak database. SET LOCAL ini adalah
         # escape hatch yang hanya dipakai infrastruktur test, tidak pernah
         # oleh kode aplikasi.
-        await session.execute(
-            text("SET LOCAL modalink.ledger_cleanup_override = 'on'")
-        )
+        await session.execute(text("SET LOCAL modalink.ledger_cleanup_override = 'on'"))
         for table in ("ledger_entries", "pledges", "scoring_results"):
             await session.execute(
                 text(f"DELETE FROM {table} WHERE proposal_id IN (:a, :b)"),
@@ -261,10 +259,14 @@ async def test_r61_concurrent_anonymous_listing_does_not_deadlock(
     (lihat laporan hardening untuk angka reproduksinya)."""
     campaign_id, p1_id, p2_id = dua_proposal_kedaluwarsa_overlap
 
-    status_list = await _tembak_concurrent(campaign_id, jumlah_publik=12, jumlah_campaign=12)
+    status_list = await _tembak_concurrent(
+        campaign_id, jumlah_publik=12, jumlah_campaign=12
+    )
 
     gagal = [s for s in status_list if s >= 500]
-    assert gagal == [], f"{len(gagal)} dari {len(status_list)} request gagal 500: {gagal}"
+    assert gagal == [], (
+        f"{len(gagal)} dari {len(status_list)} request gagal 500: {gagal}"
+    )
 
     async with SessionLocal() as session:
         p1 = await session.get(Proposal, p1_id)

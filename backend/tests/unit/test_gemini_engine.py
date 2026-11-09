@@ -2,10 +2,17 @@
 sampai ke pemilik usaha sebagai alasan penolakan."""
 
 from dataclasses import dataclass
+from datetime import UTC, date, datetime
 
 import pytest
 
-from app.ai.gemini_engine import GeminiEngine, buang_evidence_halusinasi
+from app.ai.gemini_engine import (
+    GeminiEngine,
+    KuotaHarianTerlampaui,
+    PromptTerlaluBesar,
+    _DailyBudget,
+    buang_evidence_halusinasi,
+)
 from app.ai.models import Brief, ProposalScore, RedFlag
 from app.config import Settings, settings
 
@@ -128,7 +135,9 @@ def campaign_gemini_draft() -> _CampaignLengkap:
     )
 
 
-def _bangun_engine_dengan_stub(stub: _StubClient) -> GeminiEngine:
+def _bangun_engine_dengan_stub(
+    stub: _StubClient, max_prompt_chars: int = 100_000, daily_budget: int = 1_000
+) -> GeminiEngine:
     # __new__, bukan GeminiEngine(client, model, timeout_s): __init__
     # membungkus client lewat instructor.from_genai(client, use_async=True),
     # yang menolak objek selain genai.Client sungguhan. Stub ini menggantikan
@@ -138,6 +147,10 @@ def _bangun_engine_dengan_stub(stub: _StubClient) -> GeminiEngine:
     engine._client = stub
     engine.model = "gemini-2.5-flash"
     engine._timeout_s = 20
+    # Default longgar sengaja: test yang tidak menguji batas prompt/kuota
+    # (review keamanan Finding 2) tidak boleh ikut tersandung olehnya.
+    engine._max_prompt_chars = max_prompt_chars
+    engine._budget = _DailyBudget(daily_budget)
     return engine
 
 
@@ -178,3 +191,54 @@ async def test_score_memanggil_stub_dan_membuang_evidence_halusinasi(
     assert proposal_draft.fund_usage_plan in prompt_terkirim
     assert proposal_draft.business_projection in prompt_terkirim
     assert str(proposal_draft.requested_amount) in prompt_terkirim
+
+
+async def test_rf2_score_rejects_a_prompt_larger_than_the_configured_cap(
+    proposal_draft, campaign_gemini_draft
+):
+    """Review keamanan Finding 2: batas prompt ditegakkan SEBELUM panggilan
+    jaringan terjadi, bukan sesudahnya. stub tidak pernah terpanggil kalau
+    ini benar."""
+    stub = _StubClient(skor_dengan("evidence apa pun"))
+    engine = _bangun_engine_dengan_stub(stub, max_prompt_chars=10)
+
+    with pytest.raises(PromptTerlaluBesar):
+        await engine.score(proposal_draft, campaign_gemini_draft)
+
+    assert stub.chat.completions.messages_terkirim is None, (
+        "panggilan model tidak boleh terjadi saat prompt melebihi batas"
+    )
+
+
+async def test_rf2_score_is_rejected_once_the_daily_budget_is_exhausted(
+    proposal_draft, campaign_gemini_draft
+):
+    """Kuota harian gagal tertutup: panggilan ke-(limit+1) harus ditolak
+    tanpa pernah menyentuh stub/jaringan, bukan diam-diam lolos."""
+    stub = _StubClient(skor_dengan("evidence apa pun"))
+    engine = _bangun_engine_dengan_stub(stub, daily_budget=2)
+
+    await engine.score(proposal_draft, campaign_gemini_draft)
+    await engine.score(proposal_draft, campaign_gemini_draft)
+    with pytest.raises(KuotaHarianTerlampaui):
+        await engine.score(proposal_draft, campaign_gemini_draft)
+
+
+def test_rf2_daily_budget_resets_on_a_new_day():
+    hari_1 = [date(2026, 11, 9)]
+    anggaran = _DailyBudget(limit=1)
+    anggaran._tanggal = hari_1[0]
+    anggaran._terpakai = 1
+
+    class _JamBesok:
+        def now(self):
+            return datetime(2026, 11, 10, tzinfo=UTC)
+
+    import app.ai.gemini_engine as modul_gemini
+
+    asli = modul_gemini._clock
+    modul_gemini._clock = _JamBesok()
+    try:
+        anggaran.pakai()  # tidak melempar: hari baru, hitungan direset
+    finally:
+        modul_gemini._clock = asli

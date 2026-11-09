@@ -180,9 +180,7 @@ async def _bersihkan_proposal(proposal_id, lead_id) -> None:
         # escape hatch yang hanya dipakai infrastruktur test, tidak pernah
         # oleh kode aplikasi, supaya teardown data uji tetap bisa membersihkan
         # baris yang dibuat test ini sendiri lewat commit sungguhan.
-        await session.execute(
-            text("SET LOCAL modalink.ledger_cleanup_override = 'on'")
-        )
+        await session.execute(text("SET LOCAL modalink.ledger_cleanup_override = 'on'"))
         await session.execute(
             text(
                 "DELETE FROM milestone_reports WHERE milestone_id IN "

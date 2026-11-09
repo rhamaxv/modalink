@@ -161,9 +161,7 @@ async def listed_proposal_committed(investor_a, investor_b, clock):
         # escape hatch yang hanya dipakai infrastruktur test, tidak pernah
         # oleh kode aplikasi, supaya teardown data uji tetap bisa membersihkan
         # baris yang dibuat test ini sendiri lewat commit sungguhan.
-        await session.execute(
-            text("SET LOCAL modalink.ledger_cleanup_override = 'on'")
-        )
+        await session.execute(text("SET LOCAL modalink.ledger_cleanup_override = 'on'"))
         for table in (
             "ledger_entries",
             "pledges",
