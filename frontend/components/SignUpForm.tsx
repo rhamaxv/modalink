@@ -124,7 +124,11 @@ export function SignUpForm() {
         type="submit"
         disabled={submitting}
         aria-busy={submitting}
-        className="min-h-[44px] rounded-kecil bg-accent px-ruang-4 py-ruang-2 text-base leading-[1.6] font-semibold text-ink disabled:opacity-60"
+        // disabled:opacity-60 di atas bg-accent terukur 1.26:1 di tema gelap
+        // dan 3.62:1 di tema terang, gagal 4.5:1. Diganti pasangan token yang
+        // sudah terukur lolos: --muted di atas --surface (6.25:1 terang,
+        // 6.50:1 gelap).
+        className="min-h-[44px] rounded-kecil bg-accent px-ruang-4 py-ruang-2 text-base leading-[1.6] font-semibold text-ink disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
       >
         Daftar
       </button>
