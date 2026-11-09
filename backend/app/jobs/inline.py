@@ -2,7 +2,7 @@
 
 coro_factory yang diserahkan ke submit() wajib membuka session database-nya
 sendiri (lewat session_factory, lihat app/api/deps.py), bukan memakai session
-request, karena FastAPI menjalankan BackgroundTasks SEBELUM exit code
+request, karena FastAPI menjalankan BackgroundTasks sebelum exit code
 dependency `yield` (Depends(get_session), yang meng-commit session request)
 berjalan -- urutan ini didokumentasikan resmi oleh FastAPI sendiri, bukan hal
 yang kebetulan. Tanpa commit eksplisit di _jalankan di bawah, job yang
@@ -27,7 +27,7 @@ class InlineRunner:
 
     def submit(self, coro_factory: CoroFactory) -> None:
         # add_task(coro_factory) langsung tidak cukup: coro_factory adalah
-        # lambda biasa yang MENGEMBALIKAN coroutine, bukan coroutine function
+        # lambda biasa yang mengembalikan coroutine, bukan coroutine function
         # itu sendiri, jadi Starlette menganggapnya sinkron dan menjalankannya
         # di threadpool tanpa pernah di-await, membuat coroutine di dalamnya
         # tidak pernah benar-benar berjalan.
