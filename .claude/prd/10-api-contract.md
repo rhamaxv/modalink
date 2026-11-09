@@ -9,7 +9,7 @@ Setiap error mengembalikan bentuk yang sama, sehingga frontend hanya perlu satu 
 ```json
 {
   "error": {
-    "code": "pledge_exceeds_remaining",
+    "code": "pledge_melebihi_sisa",
     "message": "Pledge melebihi sisa dana yang dibutuhkan.",
     "detail": { "remaining_amount": 3000000 }
   }

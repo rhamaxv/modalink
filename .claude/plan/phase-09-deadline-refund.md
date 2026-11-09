@@ -76,6 +76,34 @@ async def test_br63_endpoint_tick_tidak_terdaftar_saat_env_prod(monkeypatch):
 Test terakhir menegakkan [BR-63](../prd/07-business-rules.md) secara struktural: endpointnya tidak
 sekadar mengembalikan `404`, melainkan tidak pernah didaftarkan.
 
+```python
+async def test_br62_failed_dengan_pledge_aktif_tetap_direfund(
+    client, db, listed_proposal, investor, clock, majukan
+):
+    """Proposal yang sudah failed tapi masih memegang pledge aktif wajib ikut direkonsiliasi.
+
+    Kasus ini nyata: pledge yang diterima tepat setelah funding_deadline lewat
+    membuat recompute_funding_status menulis failed sementara pledge-nya tetap
+    aktif. Kalau evaluasi_kedaluwarsa menyaring status saja, proposal itu
+    dilewati selamanya dan uangnya tidak pernah kembali.
+    """
+    await client.post(f"/api/v1/proposals/{listed_proposal.id}/pledges",
+                      headers=investor.headers, json={"amount": 4_000_000})
+    await majukan(hari=30)
+
+    # Paksa keadaan yang dilaporkan review f06-b: failed, tapi pledge masih aktif.
+    listed_proposal.status = ProposalStatus.FAILED
+    await db.flush()
+
+    await client.get(f"/api/v1/proposals/{listed_proposal.id}")
+
+    entri = await ambil_entri(db, listed_proposal.id)
+    assert any(e.entry_type is EntryType.REFUND_OUT for e in entri), (
+        "proposal failed dengan pledge aktif tidak direfund; uang investor terjebak"
+    )
+    assert await total_pledge_aktif(db, listed_proposal.id) == 0
+```
+
 - [ ] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `pytest tests/integration/test_clock_tick.py -v`
@@ -204,13 +232,20 @@ Expected: FAIL
 # backend/app/services/expiry.py
 AKTIF = {ProposalStatus.LISTED, ProposalStatus.PARTIALLY_FUNDED}
 
+# FAILED ikut diperiksa, dan ini bukan kehati-hatian berlebihan. Pledge bisa
+# masuk atau dibatalkan tepat setelah funding_deadline lewat; recompute_funding_status
+# langsung menulis failed, dan pledge aktifnya tertinggal tanpa refund_out.
+# Kalau fungsi ini menyaring status saja, proposal itu dilewati selamanya dan
+# uang investor lain tidak pernah kembali (BR-62).
+PERLU_REKONSILIASI = AKTIF | {ProposalStatus.FAILED}
+
 async def evaluasi_kedaluwarsa(session, proposal, clock) -> None:
     """Dipanggil di awal setiap pembacaan proposal (D-06, BR-61).
 
     Idempoten: kunci idempotensi refund berasal dari pledge, jadi pembacaan
     berulang tidak pernah menghasilkan entri ganda.
     """
-    if proposal.status not in AKTIF:
+    if proposal.status not in PERLU_REKONSILIASI:
         return
 
     campaign = await session.get(Campaign, proposal.campaign_id)
