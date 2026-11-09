@@ -118,3 +118,30 @@ async def daftar_proposal_publik(session: AsyncSession) -> list[Proposal]:
         .order_by(desc("created_at"), desc("id"))
     )
     return list(hasil)
+
+
+async def daftar_proposal_milik(session: AsyncSession, umkm_id: UUID) -> list[Proposal]:
+    """GET /proposals/mine (10-api-contract.md:57). Tidak menyaring status:
+    pemiliknya boleh melihat seluruh proposalnya sendiri termasuk rejected
+    dan failed, beda dari daftar_proposal_publik yang menyaring
+    STATUS_PROPOSAL_PUBLIK untuk pengunjung yang bukan pemilik."""
+    hasil = await session.scalars(
+        select(Proposal)
+        .where(Proposal.umkm_id == umkm_id)
+        .order_by(desc("created_at"), desc("id"))
+    )
+    return list(hasil)
+
+
+async def daftar_milestone_proposal(
+    session: AsyncSession, proposal_id: UUID
+) -> list[ProposalMilestone]:
+    """GET /proposals/{id}/milestones (10-api-contract.md:73), diurutkan
+    per tahap (seq), bukan per waktu dibuat: urutan tahap pendanaan memang
+    seq, bukan kapan baris itu ditulis ke database."""
+    hasil = await session.scalars(
+        select(ProposalMilestone)
+        .where(ProposalMilestone.proposal_id == proposal_id)
+        .order_by("seq")
+    )
+    return list(hasil)

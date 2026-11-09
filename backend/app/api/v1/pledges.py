@@ -5,13 +5,24 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_clock, get_own_pledge, require_role
+from app.api.deps import (
+    ambil_proposal_untuk_daftar_pledge,
+    get_clock,
+    get_own_pledge,
+    require_role,
+)
 from app.db.session import get_session
 from app.domain.clock import Clock
 from app.models.pledge import Pledge
+from app.models.proposal import Proposal
 from app.models.user import Role, User
-from app.schemas.pledge import PledgeIn, PledgeOut
-from app.services.pledge import cancel_pledge, create_pledge, get_locked_proposal
+from app.schemas.pledge import PledgeIn, PledgeListOut, PledgeOut
+from app.services.pledge import (
+    cancel_pledge,
+    create_pledge,
+    daftar_pledge_aktif,
+    get_locked_proposal,
+)
 
 router = APIRouter(tags=["pledges"])
 
@@ -30,6 +41,14 @@ async def create_pledge_endpoint(
 ) -> Pledge:
     proposal = await get_locked_proposal(session, proposal_id)
     return await create_pledge(session, investor, proposal, body.amount, clock)
+
+
+@router.get("/api/v1/proposals/{proposal_id}/pledges", response_model=PledgeListOut)
+async def daftar_pledge_endpoint(
+    proposal: Proposal = Depends(ambil_proposal_untuk_daftar_pledge),
+    session: AsyncSession = Depends(get_session),
+) -> PledgeListOut:
+    return PledgeListOut(items=await daftar_pledge_aktif(session, proposal))
 
 
 @router.delete("/api/v1/pledges/{pledge_id}", response_model=PledgeOut)

@@ -26,12 +26,19 @@ from app.jobs.inline import InlineRunner
 from app.models.proposal import Proposal
 from app.models.scoring import ScoringResult
 from app.models.user import Role, User
-from app.schemas.proposal import ProposalIn, ProposalListOut, ProposalOut
+from app.schemas.proposal import (
+    MilestoneListOut,
+    ProposalIn,
+    ProposalListOut,
+    ProposalOut,
+)
 from app.schemas.scoring import ScoringResultOut
 from app.services.campaign import ambil_campaign
 from app.services.proposal import (
     ambil_proposal,
     boleh_melihat,
+    daftar_milestone_proposal,
+    daftar_proposal_milik,
     daftar_proposal_publik,
     submit_proposal,
 )
@@ -77,6 +84,18 @@ async def daftar_proposal_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> ProposalListOut:
     return ProposalListOut(items=await daftar_proposal_publik(session))
+
+
+@router.get("/api/v1/proposals/mine", response_model=list[ProposalOut])
+async def daftar_proposal_mine_endpoint(
+    umkm: User = Depends(require_role(Role.UMKM)),
+    session: AsyncSession = Depends(get_session),
+) -> list[Proposal]:
+    # Didaftarkan sebelum GET /proposals/{proposal_id} di bawah: keduanya
+    # satu segmen setelah /proposals, dan FastAPI mencocokkan route sesuai
+    # urutan pendaftaran, jadi "mine" harus menang lebih dulu atau akan
+    # ditelan oleh {proposal_id} sebagai literal string yang gagal UUID.
+    return await daftar_proposal_milik(session, umkm.id)
 
 
 @router.get("/api/v1/proposals/{proposal_id}", response_model=ProposalOut)
@@ -128,3 +147,24 @@ async def ambil_scoring_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> ScoringResult:
     return await ambil_scoring_terbaru(session, proposal_id)
+
+
+@router.get(
+    "/api/v1/proposals/{proposal_id}/milestones", response_model=MilestoneListOut
+)
+async def daftar_milestone_endpoint(
+    proposal_id: UUID,
+    user: User | None = Depends(pengguna_opsional),
+    session: AsyncSession = Depends(get_session),
+) -> MilestoneListOut:
+    # Aturan akses baca sama persis dengan ambil_proposal_endpoint di atas
+    # (publik bila proposal publik, 10-api-contract.md:73): milestone bukan
+    # sumber daya yang punya aturan visibilitas sendiri, ia mewarisi
+    # visibilitas proposal induknya.
+    proposal = await ambil_proposal(session, proposal_id)
+    if proposal is None:
+        raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
+    campaign = await ambil_campaign(session, proposal.campaign_id)
+    if campaign is None or not boleh_melihat(proposal, campaign, user):
+        raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
+    return MilestoneListOut(items=await daftar_milestone_proposal(session, proposal_id))

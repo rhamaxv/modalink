@@ -116,6 +116,27 @@ async def total_terkumpul_proposal(session: AsyncSession, proposal_id: UUID) -> 
     )
 
 
+async def ambil_ledger_proposal(
+    session: AsyncSession, proposal_id: UUID
+) -> tuple[list[LedgerEntry], int]:
+    """GET /internal/ledger/{proposal_id} (10-api-contract.md:96): seluruh
+    entri plus saldo hasil penjumlahan atas entri yang sama, bukan dibaca
+    dari kolom manapun (BR-52). Urutan created_at lalu id, bukan untuk
+    ketepatan saldo (urutan penjumlahan tidak memengaruhi hasilnya) tapi
+    supaya juri yang membaca daftarnya melihat kronologi yang masuk akal."""
+    entri = (
+        await session.scalars(
+            select(LedgerEntry)
+            .where(LedgerEntry.proposal_id == proposal_id)
+            .order_by("created_at", "id")
+        )
+    ).all()
+    saldo = hitung_saldo(
+        EntriRingkas(entry_type=e.entry_type, amount=e.amount) for e in entri
+    )
+    return list(entri), saldo
+
+
 async def total_pledge_aktif(session: AsyncSession, proposal_id: UUID) -> int:
     """Query, dipakai R2b untuk mencocokkan status funding dengan jumlah pledge aktif."""
     total = await session.scalar(
