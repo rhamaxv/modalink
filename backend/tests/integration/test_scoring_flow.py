@@ -49,6 +49,54 @@ async def test_br76_rescore_menambah_baris_bukan_menimpa(
     assert jumlah >= 1
 
 
+async def test_br76_dua_percobaan_scoring_sungguhan_meninggalkan_dua_baris(
+    db, submitted_proposal, engine_mock, clock
+):
+    """H-3: test di atas mulai dari nol baris, jadi `jumlah >= 1` tidak bisa
+    membedakan "menambah" dari "menimpa" (kedua kasus lolos). Test ini
+    menjalankan scoring sungguhan dua kali dan memeriksa dua baris itu
+    berbeda dan keduanya tetap ada, bukan baris pertama tertimpa baris
+    kedua.
+
+    Proposal dipaksa balik ke submitted langsung di sini, bukan lewat
+    minta_rescore (yang hanya mengizinkan rescore dari status failed):
+    tujuannya murni membuktikan tabel scoring_results append-only, bukan
+    mengulang aturan kapan rescore boleh dipicu (sudah diuji R6/BR-75).
+    """
+    from app.services.scoring import jalankan_scoring
+
+    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+    await db.refresh(submitted_proposal)
+    baris_pertama = (
+        await db.scalars(
+            select(ScoringResult).where(
+                ScoringResult.proposal_id == submitted_proposal.id
+            )
+        )
+    ).one()
+
+    submitted_proposal.scoring_status = ScoringStatus.PENDING
+    submitted_proposal.status = ProposalStatus.SUBMITTED
+    # Penanda skor berbeda dari skor dasar baris pertama supaya kedua baris
+    # terbukti dibedakan oleh total_score, bukan cuma oleh id.
+    submitted_proposal.business_profile += " [[SCORE:80]]"
+    await db.flush()
+    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+
+    semua_baris = (
+        await db.scalars(
+            select(ScoringResult)
+            .where(ScoringResult.proposal_id == submitted_proposal.id)
+            .order_by("created_at", "id")
+        )
+    ).all()
+    assert len(semua_baris) == 2
+    assert baris_pertama.id in {b.id for b in semua_baris}
+    baris_kedua = next(b for b in semua_baris if b.id != baris_pertama.id)
+    assert baris_kedua.total_score == 80
+    assert baris_kedua.total_score != baris_pertama.total_score
+
+
 async def test_br75_job_terpicu_dua_kali_tidak_menghasilkan_dua_transisi(
     db, listed_proposal, engine_mock, clock
 ):
