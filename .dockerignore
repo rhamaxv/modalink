@@ -1,0 +1,35 @@
+# Context build Docker: menjaga image tetap kecil dan tidak membawa kredensial lokal.
+.git
+.env
+.env.*
+!.env.example
+.superpowers/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.vercel
+
+# Hasil test
+playwright-report/
+test-results/
+
+# OS dan editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
