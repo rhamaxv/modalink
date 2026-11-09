@@ -23,7 +23,7 @@ from app.models.user import User
 from app.services.ledger import catat_entri, total_terkumpul_proposal
 
 # BR-20: hanya proposal pada status ini yang boleh menerima pledge baru.
-PROPOSAL_STATUS_BISA_DIDANAI = {ProposalStatus.LISTED, ProposalStatus.PARTIALLY_FUNDED}
+FUNDABLE_PROPOSAL_STATUSES = {ProposalStatus.LISTED, ProposalStatus.PARTIALLY_FUNDED}
 
 
 async def get_locked_proposal(session: AsyncSession, proposal_id: UUID) -> Proposal:
@@ -32,7 +32,7 @@ async def get_locked_proposal(session: AsyncSession, proposal_id: UUID) -> Propo
     Setiap operasi yang membaca lalu menulis uang pada satu proposal wajib
     lewat sini, bukan `session.get(Proposal, ...)`. Tanpa `FOR UPDATE`, dua
     request bersamaan sama-sama membaca sisa yang sama lalu sama-sama lolos
-    (lihat test_pagar_penguncian.py dan test_rf1_* di
+    (lihat tests/unit/test_proposal_lock_guard.py dan test_rf1_* di
     tests/integration/test_pledge_concurrency.py).
     """
     proposal = await session.scalar(
@@ -46,8 +46,8 @@ async def get_locked_proposal(session: AsyncSession, proposal_id: UUID) -> Propo
 async def get_pledge(session: AsyncSession, pledge_id: UUID) -> Pledge | None:
     """Pledge tunggal lewat PK, dipakai dependency kepemilikan di api/deps.py.
 
-    Bukan Proposal, jadi tidak kena pagar test_pagar_penguncian.py: pledge
-    tidak pernah dikunci sendiri, locking selalu lewat baris proposal
+    Bukan Proposal, jadi tidak kena pagar tests/unit/test_proposal_lock_guard.py:
+    pledge tidak pernah dikunci sendiri, locking selalu lewat baris proposal
     induknya di get_locked_proposal.
     """
     return await session.get(Pledge, pledge_id)
@@ -62,7 +62,7 @@ async def create_pledge(
 ) -> Pledge:
     """Mencatat pledge baru dan menghitung ulang status funding (BR-20 sampai
     BR-24, BR-27, D-11, D-12). `proposal` wajib hasil `get_locked_proposal`."""
-    if proposal.status not in PROPOSAL_STATUS_BISA_DIDANAI:
+    if proposal.status not in FUNDABLE_PROPOSAL_STATUSES:
         # Brief task ini hanya menyebut pemeriksaan sisa dana (D-11); tanpa
         # pagar ini, proposal submitted yang belum lolos scoring bisa
         # langsung melompat ke partially_funded lewat recompute_funding_status
@@ -72,14 +72,14 @@ async def create_pledge(
             "Proposal ini belum bisa menerima pledge.",
         )
 
-    sisa = remaining_amount(
+    remaining = remaining_amount(
         await total_terkumpul_proposal(session, proposal.id), proposal.requested_amount
     )
-    if amount > sisa:
+    if amount > remaining:
         raise ConflictError(
             "pledge_melebihi_sisa",
-            f"Pledge melebihi sisa dana yang dibutuhkan, sisa {format_rupiah(sisa)}.",
-            detail={"remaining_amount": sisa},
+            f"Pledge melebihi sisa dana yang dibutuhkan, sisa {format_rupiah(remaining)}.",
+            detail={"remaining_amount": remaining},
         )
 
     pledge = Pledge(
