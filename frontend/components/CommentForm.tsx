@@ -5,12 +5,19 @@ import { ApiError, api } from "@/lib/api";
 
 const BATAS_PANJANG = 500;
 
+// Bentuk ini mengikuti CommentOut persis (backend/app/schemas/community.py):
+// tidak ada author_name atau is_mine di sini, karena backend memang tidak
+// mengirimkannya. Sebelumnya tipe ini mengira kedua field itu ada (laporan
+// Fase 11 Task 12: nama penulis dan kepemilikan komentar lalu selalu
+// undefined terhadap backend asli), jadi CommentList menghitung "milik saya"
+// sendiri dengan membandingkan user_id ke akun yang sedang masuk, bukan
+// membaca field yang tidak pernah dikirim.
 export type ApiComment = {
   id: string;
-  author_name: string;
+  proposal_id: string;
+  user_id: string;
   body: string;
   created_at: string;
-  is_mine: boolean;
 };
 
 type CommentFormProps = {

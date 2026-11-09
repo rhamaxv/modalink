@@ -3,13 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import type { ApiComment } from "@/components/CommentForm";
-import { ApiError, api } from "@/lib/api";
-
-type CommentsEnvelope = {
-  items: ApiComment[];
-  vote_count: number;
-  voted_by_me: boolean;
-};
+import { ApiError, api, daftarDariRespons } from "@/lib/api";
 
 type VoteOut = {
   voted: boolean;
@@ -18,6 +12,11 @@ type VoteOut = {
 
 type CommentListProps = {
   proposalId: string;
+  /** Id akun yang sedang masuk, atau null kalau anonim/belum diketahui.
+   * CommentOut (backend/app/schemas/community.py) tidak mengirim "is_mine":
+   * komponen ini menentukannya sendiri lewat perbandingan user_id, bukan
+   * membaca field yang tidak pernah ada (laporan Fase 11 Task 12). */
+  currentUserId?: string | null;
 };
 
 type Keadaan = "loading" | "error" | "loaded";
@@ -32,21 +31,30 @@ type Keadaan = "loading" | "error" | "loaded";
 // penuh oleh bilah funding, tombol pledge, dan penanda milestone aktif.
 // Vote memakai --ink dan --line, dan statusnya terbaca lewat aria-pressed,
 // bukan warna saja.
-export function CommentList({ proposalId }: CommentListProps) {
+export function CommentList({ proposalId, currentUserId = null }: CommentListProps) {
   const [keadaan, setKeadaan] = useState<Keadaan>("loading");
   const [pesanGalat, setPesanGalat] = useState("");
   const [items, setItems] = useState<ApiComment[]>([]);
-  const [voteCount, setVoteCount] = useState(0);
+  // null, bukan 0: GET .../comments (backend/app/schemas/community.py:
+  // CommentListOut) tidak mengirim vote_count maupun voted_by_me sama sekali
+  // -- keduanya dulu dibaca dari respons ini dan selalu undefined terhadap
+  // backend asli, yang membuat tombol vote kehilangan aria-pressed sama
+  // sekali (React menghilangkan atribut untuk nilai undefined) dan jumlah
+  // dukungan tampil sebagai "undefined dukungan" (laporan Fase 11 Task 12).
+  // null di sini berarti "belum diketahui", beda dari 0 ("diketahui kosong"),
+  // supaya layar tidak berbohong dengan angka yang kita tidak punya sumbernya.
+  // Satu-satunya cara jujur mendapatkan nilai sungguhan hari ini adalah dari
+  // respons POST /vote sendiri, sesudah pengguna menekannya.
+  const [voteCount, setVoteCount] = useState<number | null>(null);
   const [votedByMe, setVotedByMe] = useState(false);
   const [voteError, setVoteError] = useState<string | null>(null);
 
   const muat = useCallback(async () => {
     setKeadaan("loading");
+    const jalur = `/proposals/${proposalId}/comments`;
     try {
-      const data = await api.get<CommentsEnvelope>(`/proposals/${proposalId}/comments`);
-      setItems(data.items);
-      setVoteCount(data.vote_count);
-      setVotedByMe(data.voted_by_me);
+      const data = daftarDariRespons<ApiComment>(await api.get(jalur), jalur);
+      setItems(data);
       setKeadaan("loaded");
     } catch (error) {
       setPesanGalat(
@@ -101,7 +109,9 @@ export function CommentList({ proposalId }: CommentListProps) {
         >
           Dukung proposal ini
         </button>
-        <span className="tabular text-base leading-[1.6] text-muted">{voteCount} dukungan</span>
+        <span className="tabular text-base leading-[1.6] text-muted">
+          {voteCount === null ? "Jumlah dukungan belum tersedia" : `${voteCount} dukungan`}
+        </span>
       </div>
       {voteError && (
         <p role="alert" className="text-[0.8125rem] text-danger">
@@ -126,9 +136,16 @@ export function CommentList({ proposalId }: CommentListProps) {
         <ul className="flex flex-col gap-space-4">
           {items.map((item) => (
             <li key={item.id} className="max-w-measure border-t border-line pt-space-3 first:border-t-0 first:pt-0">
-              <p className="text-[0.8125rem] font-medium text-muted">{item.author_name}</p>
+              {/* CommentOut tidak membawa nama tampilan (backend/app/schemas/
+                  community.py), hanya user_id. Pola anonimisasi yang sama
+                  dipakai ProposalDetailView untuk investor_id pledge di
+                  bagian funding, supaya satu komentar tetap bisa dibedakan
+                  dari komentar lain tanpa membocorkan identitas penuh. */}
+              <p className="text-[0.8125rem] font-medium text-muted">
+                Pengguna &hellip;{item.user_id.slice(-4)}
+              </p>
               <p className="text-base leading-[1.6] text-ink">{item.body}</p>
-              {item.is_mine && (
+              {item.user_id === currentUserId && (
                 <button
                   type="button"
                   onClick={() => hapusKomentar(item.id)}

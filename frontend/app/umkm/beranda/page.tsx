@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EmptyState, ErrorState, LoadingState, Nominal } from "@/components/ui";
 // StatusBadge belum ada di barrel components/ui/index.ts (fase 10), jadi
@@ -155,6 +156,17 @@ function ProposalCard({ proposal }: { proposal: ProposalMine }) {
         <Nominal label="Dana yang diminta" nominal={proposal.requested_amount} ukuran="sedang" />
       </div>
       {proposal.scoring_status === "done" && <ScoreSummary proposalId={proposal.id} />}
+      {/* Tanpa tautan ini, dashboard UMKM tidak punya jalan sama sekali ke
+          /proposal/[id] -- satu-satunya halaman tempat pledge, milestone,
+          dan tautan "Lapor progres" berada. Ditemukan lewat e2e Fase 11
+          Task 12: card ini dulu hanya menampilkan ringkasan, tidak pernah
+          mengarahkan ke mana pun (laporan Fase 11 Task 12). */}
+      <Link
+        href={`/proposal/${proposal.id}`}
+        className="mt-space-3 inline-block text-base font-medium text-ink underline"
+      >
+        Baca proposal
+      </Link>
     </div>
   );
 }
