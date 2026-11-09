@@ -20,10 +20,15 @@ from app.models.proposal import Proposal, ProposalStatus
 async def recompute_funding_status(
     session: AsyncSession, proposal: Proposal, clock: Clock
 ) -> None:
-    """SATU-SATUNYA tempat status funding ditulis (D-05).
+    """Satu-satunya penulis status funding yang didorong pledge: `listed`,
+    `partially_funded`, dan `funded` (D-05).
 
-    Service lain yang mengubah pledge wajib memanggil fungsi ini di transaksi
-    yang sama. Regression test R2b yang menegakkannya.
+    Bukan satu-satunya penulis `proposal.status` secara keseluruhan: T-01
+    (`submitted` -> `listed` saat scoring lolos, lihat
+    `services/scoring.py:_majukan_proposal`) adalah pelistingan awal, bukan
+    akibat pledge, dan sengaja tidak lewat sini. Service yang mengubah pledge
+    wajib memanggil fungsi ini di transaksi yang sama. Regression test R2b
+    yang menegakkannya.
     """
     aktif = (
         await session.scalars(
