@@ -1,6 +1,7 @@
 """Re-ekspor model agar terdaftar ke SQLModel.metadata saat package ini diimpor."""
 
 from app.models.campaign import Campaign, CampaignStatus, Sector
+from app.models.comment import Comment
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.pledge import Pledge, PledgeStatus
 from app.models.proposal import (
@@ -12,10 +13,12 @@ from app.models.proposal import (
 )
 from app.models.scoring import ScoringResult, ScoringVerdict
 from app.models.user import Role, User
+from app.models.vote import Vote
 
 __all__ = [
     "Campaign",
     "CampaignStatus",
+    "Comment",
     "EntryType",
     "LedgerEntry",
     "MilestoneStatus",
@@ -30,4 +33,5 @@ __all__ = [
     "ScoringVerdict",
     "Sector",
     "User",
+    "Vote",
 ]

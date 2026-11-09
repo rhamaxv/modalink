@@ -120,6 +120,14 @@ async def umkm_lain(db):
 
 
 @pytest.fixture
+async def community_lain(db):
+    """Komunitas kedua: dipakai membuktikan BR-34 (bukan penulis komentar)
+    dengan dua akun sungguhan, bukan satu akun yang menghapus komentarnya
+    sendiri."""
+    return await _buat_akun(db, "warga-lain-teruji@contoh.id", Role.COMMUNITY)
+
+
+@pytest.fixture
 async def umkm_ketiga(db):
     """UMKM ketiga: dipakai rejected_proposal supaya transisi sementaranya
     lewat submitted (sebelum jalankan_scoring menolaknya) tidak bertabrakan
