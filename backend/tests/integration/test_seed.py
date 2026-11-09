@@ -25,7 +25,7 @@ from app.models.proposal import Proposal, ProposalMilestone, ProposalStatus
 from app.models.scoring import ScoringResult
 from app.models.user import Role, User
 from app.seed.demo import DEMO_EMAIL_DOMAIN, SEEDED_BUSINESS_NAMES
-from app.services.ledger import hitung_saldo, total_terkumpul
+from app.services.ledger import compute_balance, total_raised
 
 
 async def _jumlah_baris(db, model: type) -> int:
@@ -147,7 +147,7 @@ async def test_seed_leaves_one_proposal_partially_funded_for_live_pledging(clien
             select(LedgerEntry).where(LedgerEntry.proposal_id == proposal.id)
         )
     ).all()
-    terkumpul = total_terkumpul(entri)
+    terkumpul = total_raised(entri)
     assert 0 < terkumpul < proposal.requested_amount
 
 
@@ -201,9 +201,9 @@ async def test_seed_ledger_invariants_hold_for_every_seeded_proposal(client, db)
         disbursed = sum(
             e.amount for e in entri if e.entry_type is EntryType.DISBURSEMENT_OUT
         )
-        assert disbursed <= total_terkumpul(entri)
-        assert hitung_saldo(entri) >= 0
-        assert total_terkumpul(entri) <= p.requested_amount
+        assert disbursed <= total_raised(entri)
+        assert compute_balance(entri) >= 0
+        assert total_raised(entri) <= p.requested_amount
         kunci = [e.idempotency_key for e in entri]
         assert len(kunci) == len(set(kunci))
 

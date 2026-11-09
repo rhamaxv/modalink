@@ -23,9 +23,9 @@ from app.models.proposal import (
 )
 from app.models.user import User
 from app.schemas.proposal import ProposalIn
-from app.services.campaign import STATUS_PROPOSAL_PUBLIK
-from app.services.expiry import evaluasi_kedaluwarsa_banyak
-from app.services.ledger import jumlah_terkumpul_subquery
+from app.services.campaign import PUBLIC_PROPOSAL_STATUSES
+from app.services.expiry import evaluate_expiry_many
+from app.services.ledger import collected_amount_subquery
 
 MINIMAL_REQUESTED_AMOUNT = 500_000  # BR-12: di bawah ini biaya screening tidak sepadan.
 
@@ -39,10 +39,10 @@ PROPOSAL_PAGE_SIZE_MAX = 50
 
 
 @dataclass
-class ProposalDenganTerkumpul:
+class ProposalWithCollectedAmount:
     """Proposal dibungkus total dana terkumpul (BR-51, Task 1), khusus
-    bentuk balik `daftar_proposal_publik`/`daftar_proposal_milik`/endpoint
-    detail dan submit. Pola yang sama dengan `ProposalDenganSinyal` di
+    bentuk balik `list_public_proposals`/`list_own_proposals`/endpoint
+    detail dan submit. Pola yang sama dengan `ProposalWithSignals` di
     services/campaign.py: Proposal sengaja tidak boleh dititipi atribut
     bebas langsung (SQLModel/Pydantic v2 menolaknya)."""
 
@@ -134,52 +134,52 @@ async def submit_proposal(
     return proposal
 
 
-async def ambil_proposal(session: AsyncSession, proposal_id: UUID) -> Proposal | None:
+async def get_proposal(session: AsyncSession, proposal_id: UUID) -> Proposal | None:
     return await session.get(Proposal, proposal_id)
 
 
-def boleh_melihat(proposal: Proposal, campaign: Campaign, user: User | None) -> bool:
-    if proposal.status in STATUS_PROPOSAL_PUBLIK:
+def can_view(proposal: Proposal, campaign: Campaign, user: User | None) -> bool:
+    if proposal.status in PUBLIC_PROPOSAL_STATUSES:
         return True
     if user is None:
         return False
     return user.id in {proposal.umkm_id, campaign.investor_id}
 
 
-async def daftar_proposal_publik(
+async def list_public_proposals(
     session: AsyncSession,
     clock: Clock,
     page: int = 1,
     page_size: int = PROPOSAL_PAGE_SIZE_DEFAULT,
-) -> tuple[list[ProposalDenganTerkumpul], int]:
+) -> tuple[list[ProposalWithCollectedAmount], int]:
     """GET /proposals (Task 4, perluasan kontrak): paginasi server-enforced,
     bukan sekadar klien yang sopan -- `page_size` sudah diklem di
     api/v1/proposals.py lewat Query(le=PROPOSAL_PAGE_SIZE_MAX) sebelum sampai
     sini, jadi baris ini tidak lagi memanggil satu query SELECT COUNT per
     baris maupun mengambil seluruh tabel ke memori.
 
-    `collected_amount` ikut di-JOIN lewat `jumlah_terkumpul_subquery()`
+    `collected_amount` ikut di-JOIN lewat `collected_amount_subquery()`
     (Task 1), bukan dipanggil satu-satu per baris proposal: dengan dua belas
-    proposal publik, memanggil `total_terkumpul_proposal` di dalam loop
+    proposal publik, memanggil `collected_amount_for_proposal` di dalam loop
     berarti tiga belas query (satu daftar + dua belas ledger), dan jumlah itu
     bertambah linear seiring proposal baru (N+1 klasik).
     """
-    terkumpul = jumlah_terkumpul_subquery()
+    terkumpul = collected_amount_subquery()
     kueri_dasar = select(Proposal).where(
-        col(Proposal.status).in_(STATUS_PROPOSAL_PUBLIK)
+        col(Proposal.status).in_(PUBLIC_PROPOSAL_STATUSES)
     )
     total = await session.scalar(
         select(func.count()).select_from(kueri_dasar.subquery())
     )
 
-    # Urutan diputus created_at lalu id, sama seperti daftar_campaign (BR-05):
+    # Urutan diputus created_at lalu id, sama seperti list_campaigns (BR-05):
     # dua proposal dengan created_at identik tidak boleh bertukar posisi
     # antar-request/antar-halaman.
     baris = (
         await session.execute(
             select(Proposal, func.coalesce(terkumpul.c.collected_amount, 0))
             .outerjoin(terkumpul, terkumpul.c.proposal_id == Proposal.id)
-            .where(col(Proposal.status).in_(STATUS_PROPOSAL_PUBLIK))
+            .where(col(Proposal.status).in_(PUBLIC_PROPOSAL_STATUSES))
             .order_by(desc("created_at"), desc("id"))
             .limit(page_size)
             .offset((page - 1) * page_size)
@@ -191,28 +191,28 @@ async def daftar_proposal_publik(
     # hanya saat dibaca satu-satu lewat GET /proposals/{id}. Lewat fungsi
     # _banyak, bukan loop per baris dalam urutan tampil di atas: urutan tampil
     # created_at DESC, id DESC bukan urutan yang aman dipakai mengunci baris
-    # (review keamanan Finding 1, lihat docstring evaluasi_kedaluwarsa_banyak).
+    # (review keamanan Finding 1, lihat docstring evaluate_expiry_many).
     # Hanya baris di halaman ini, bukan seluruh tabel, konsisten dengan
     # tujuan paginasi.
-    await evaluasi_kedaluwarsa_banyak(session, [p for p, _ in baris], clock)
+    await evaluate_expiry_many(session, [p for p, _ in baris], clock)
 
     return [
-        ProposalDenganTerkumpul(proposal=p, collected_amount=int(jumlah))
+        ProposalWithCollectedAmount(proposal=p, collected_amount=int(jumlah))
         for p, jumlah in baris
     ], int(total or 0)
 
 
-async def daftar_proposal_milik(
+async def list_own_proposals(
     session: AsyncSession, umkm_id: UUID
-) -> list[ProposalDenganTerkumpul]:
+) -> list[ProposalWithCollectedAmount]:
     """GET /proposals/mine (10-api-contract.md:57). Tidak menyaring status:
     pemiliknya boleh melihat seluruh proposalnya sendiri termasuk rejected
-    dan failed, beda dari daftar_proposal_publik yang menyaring
-    STATUS_PROPOSAL_PUBLIK untuk pengunjung yang bukan pemilik.
+    dan failed, beda dari list_public_proposals yang menyaring
+    PUBLIC_PROPOSAL_STATUSES untuk pengunjung yang bukan pemilik.
 
-    `collected_amount` di-JOIN sama seperti daftar_proposal_publik, dengan
+    `collected_amount` di-JOIN sama seperti list_public_proposals, dengan
     alasan N+1 yang sama persis."""
-    terkumpul = jumlah_terkumpul_subquery()
+    terkumpul = collected_amount_subquery()
     baris = (
         await session.execute(
             select(Proposal, func.coalesce(terkumpul.c.collected_amount, 0))
@@ -222,17 +222,17 @@ async def daftar_proposal_milik(
         )
     ).all()
     return [
-        ProposalDenganTerkumpul(proposal=p, collected_amount=int(jumlah))
+        ProposalWithCollectedAmount(proposal=p, collected_amount=int(jumlah))
         for p, jumlah in baris
     ]
 
 
 @dataclass
-class MilestoneDenganLaporanTerbaru:
+class MilestoneWithLatestReport:
     """Milestone dibungkus laporan terbarunya, khusus bentuk balik
-    `daftar_milestone_proposal`. `ProposalMilestone` sengaja tidak boleh
+    `list_proposal_milestones`. `ProposalMilestone` sengaja tidak boleh
     dititipi atribut bebas seperti `.latest_report` langsung (SQLModel/
-    Pydantic v2 menolaknya), sama alasannya dengan `ProposalDenganSinyal`
+    Pydantic v2 menolaknya), sama alasannya dengan `ProposalWithSignals`
     di services/campaign.py."""
 
     milestone: ProposalMilestone
@@ -242,16 +242,16 @@ class MilestoneDenganLaporanTerbaru:
         return getattr(self.milestone, name)
 
 
-async def daftar_milestone_proposal(
+async def list_proposal_milestones(
     session: AsyncSession, proposal_id: UUID
-) -> list[MilestoneDenganLaporanTerbaru]:
+) -> list[MilestoneWithLatestReport]:
     """GET /proposals/{id}/milestones (10-api-contract.md:73), diurutkan
     per tahap (seq), bukan per waktu dibuat: urutan tahap pendanaan memang
     seq, bukan kapan baris itu ditulis ke database.
 
     Laporan terbaru per milestone diambil lewat satu query DISTINCT ON,
     bukan satu query per milestone: pola yang sama dengan skor terbaru di
-    daftar_proposal_campaign (services/campaign.py). milestone_reports tidak
+    list_campaign_proposals (services/campaign.py). milestone_reports tidak
     punya kolom proposal_id (hanya milestone_id), jadi join ke
     proposal_milestones yang menyaring proposalnya.
     """
@@ -281,8 +281,6 @@ async def daftar_milestone_proposal(
     }
 
     return [
-        MilestoneDenganLaporanTerbaru(
-            milestone=m, latest_report=oleh_milestone.get(m.id)
-        )
+        MilestoneWithLatestReport(milestone=m, latest_report=oleh_milestone.get(m.id))
         for m in milestones
     ]

@@ -1,4 +1,4 @@
-"""Jam virtual tersimpan: ambil_clock, majukan_jam, reset_jam (D-06, BR-60, BR-63)."""
+"""Jam virtual tersimpan: fetch_clock, advance_clock, reset_clock (D-06, BR-60, BR-63)."""
 
 from datetime import timedelta
 from typing import Any
@@ -23,39 +23,39 @@ def _semua_path(routes: list[Any]) -> set[str]:
 
 async def test_without_offset_uses_real_clock(db):
     from app.domain.clock import SystemClock
-    from app.services.clock_service import ambil_clock
+    from app.services.clock_service import fetch_clock
 
-    selisih = abs((await ambil_clock(db)).now() - SystemClock().now())
+    selisih = abs((await fetch_clock(db)).now() - SystemClock().now())
     assert selisih < timedelta(seconds=2)
 
 
 async def test_tick_advances_clock(db):
-    from app.services.clock_service import ambil_clock, majukan_jam
+    from app.services.clock_service import advance_clock, fetch_clock
 
-    sebelum = (await ambil_clock(db)).now()
-    await majukan_jam(db, hari=30)
-    sesudah = (await ambil_clock(db)).now()
+    sebelum = (await fetch_clock(db)).now()
+    await advance_clock(db, hari=30)
+    sesudah = (await fetch_clock(db)).now()
     assert (
         timedelta(days=29, hours=23) < sesudah - sebelum < timedelta(days=30, hours=1)
     )
 
 
 async def test_tick_is_cumulative(db):
-    from app.services.clock_service import ambil_clock, majukan_jam
+    from app.services.clock_service import advance_clock, fetch_clock
 
-    sebelum = (await ambil_clock(db)).now()
-    await majukan_jam(db, hari=10)
-    await majukan_jam(db, hari=10)
-    assert (await ambil_clock(db)).now() - sebelum > timedelta(days=19)
+    sebelum = (await fetch_clock(db)).now()
+    await advance_clock(db, hari=10)
+    await advance_clock(db, hari=10)
+    assert (await fetch_clock(db)).now() - sebelum > timedelta(days=19)
 
 
 async def test_reset_returns_to_real_clock(db):
     from app.domain.clock import SystemClock
-    from app.services.clock_service import ambil_clock, majukan_jam, reset_jam
+    from app.services.clock_service import advance_clock, fetch_clock, reset_clock
 
-    await majukan_jam(db, hari=100)
-    await reset_jam(db)
-    assert abs((await ambil_clock(db)).now() - SystemClock().now()) < timedelta(
+    await advance_clock(db, hari=100)
+    await reset_clock(db)
+    assert abs((await fetch_clock(db)).now() - SystemClock().now()) < timedelta(
         seconds=2
     )
 

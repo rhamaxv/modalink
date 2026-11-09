@@ -2,7 +2,7 @@
 tanpa menunggu (D-06, BR-60, BR-63).
 
 Satu baris saja per database: `CHECK id = 1` yang memaksanya, bukan sekadar
-konvensi. `virtual_now = None` berarti belum ada offset -- `ambil_clock()`
+konvensi. `virtual_now = None` berarti belum ada offset -- `fetch_clock()`
 jatuh balik ke `SystemClock()`.
 """
 

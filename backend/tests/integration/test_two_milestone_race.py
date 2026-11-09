@@ -47,7 +47,7 @@ from app.models.user import Role, User
 from app.services.auth import hash_password
 from app.services.milestone import approve_milestone
 from app.services.pledge import create_pledge, get_locked_proposal
-from app.services.scoring import jalankan_scoring
+from app.services.scoring import run_scoring
 
 AMOUNT_M1 = 5_000_000
 AMOUNT_M2 = 5_000_000
@@ -128,7 +128,7 @@ async def _buat_proposal_siap_race(
         )
         session.add(proposal)
         await session.flush()
-        await jalankan_scoring(session, proposal.id, MockScoringEngine(), clock)
+        await run_scoring(session, proposal.id, MockScoringEngine(), clock)
 
         m1 = ProposalMilestone(
             proposal_id=proposal.id,

@@ -2,7 +2,7 @@ import pytest
 
 import app.services.auth as auth_service
 from app.schemas.auth import LoginIn
-from app.services.auth import KredensialSalah, authenticate_user
+from app.services.auth import InvalidCredentials, authenticate_user
 
 
 async def test_register_lalu_login(client):
@@ -181,7 +181,7 @@ async def test_login_argon2_tetap_jalan_untuk_email_tak_dikenal(db, monkeypatch)
 
     monkeypatch.setattr(auth_service, "verify_password", terhitung)
 
-    with pytest.raises(KredensialSalah):
+    with pytest.raises(InvalidCredentials):
         await authenticate_user(
             db, LoginIn(email="tidak-ada@contoh.id", password="apa saja")
         )

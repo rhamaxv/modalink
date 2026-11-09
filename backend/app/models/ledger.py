@@ -29,7 +29,7 @@ class LedgerEntry(SQLModel, table=True):
         CheckConstraint("amount > 0", name="ck_ledger_amount_positif"),
         # Mirror dari index komposit yang ditambahkan lewat migrasi tersendiri
         # (09-data-model.md:156); lihat komentar yang sama di models/pledge.py
-        # soal kenapa __table_args__ ini bukan formalitas. total_terkumpul_proposal
+        # soal kenapa __table_args__ ini bukan formalitas. collected_amount_for_proposal
         # dan R2 selalu menyaring proposal_id lalu mengurutkan created_at.
         Index("ix_ledger_entries_proposal_id_created_at", "proposal_id", "created_at"),
     )
@@ -53,7 +53,7 @@ class LedgerEntry(SQLModel, table=True):
     amount: int = Field(sa_column=Column(BigInteger, nullable=False))
     # Default "" / None, bukan wajib diisi: dipakai menjejak sumber entri
     # (misal ref_type="pledge", ref_id=pledge.id) tapi belum setiap pemanggil
-    # catat_entri punya itu di task ini.
+    # record_entry punya itu di task ini.
     ref_type: str = Field(default="")
     ref_id: UUID | None = Field(default=None, nullable=True)
     actor_id: UUID | None = Field(default=None, foreign_key="users.id", nullable=True)

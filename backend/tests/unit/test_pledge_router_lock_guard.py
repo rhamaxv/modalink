@@ -1,7 +1,7 @@
 """RF-1 lewat jalur HTTP: router pledge wajib memanggil get_locked_proposal,
-bukan ambil_proposal() yang tidak terkunci (app/services/proposal.py).
+bukan get_proposal() yang tidak terkunci (app/services/proposal.py).
 
-test_proposal_lock_guard.py memagari services/, bukan api/: ambil_proposal
+test_proposal_lock_guard.py memagari services/, bukan api/: get_proposal
 diimpor dan dipakai endpoint lain (rescore, scoring) secara sah, jadi
 melarangnya di seluruh app/api/ akan salah sasaran. Pagar ini AST, hanya
 atas app/api/v1/pledges.py, dan hanya atas dua fungsi route pledge --
@@ -50,8 +50,8 @@ def test_pledge_route_fetches_proposal_via_locked_fetch(route_name: str) -> None
         "sungguhan dilewati investor tidak terbukti memakai baris proposal "
         "yang terkunci (RF-1)."
     )
-    assert not _calls_name(function_node, "ambil_proposal"), (
-        f"{route_name} memanggil ambil_proposal(), yang tidak mengunci baris "
+    assert not _calls_name(function_node, "get_proposal"), (
+        f"{route_name} memanggil get_proposal(), yang tidak mengunci baris "
         "proposal (app/services/proposal.py). Dua request pledge bersamaan "
         "lewat endpoint ini akan sama-sama lolos pengecekan sisa dana yang sama."
     )
@@ -62,11 +62,11 @@ def test_guard_actually_catches_the_one_line_swap() -> None:
     apa pun: simulasikan tepat swap satu baris yang disebut review f06-b."""
     swapped = ast.parse(
         "async def create_pledge_endpoint(proposal_id, body, investor, session, clock):\n"
-        "    proposal = await ambil_proposal(session, proposal_id)\n"
+        "    proposal = await get_proposal(session, proposal_id)\n"
         "    return await create_pledge(session, investor, proposal, body.amount, clock)\n"
     )
     function_node = next(
         node for node in ast.walk(swapped) if isinstance(node, ast.AsyncFunctionDef)
     )
-    assert _calls_name(function_node, "ambil_proposal")
+    assert _calls_name(function_node, "get_proposal")
     assert not _calls_name(function_node, "get_locked_proposal")

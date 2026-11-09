@@ -2,7 +2,7 @@
 proyek ini yang boleh memanggil jaringan untuk menilai proposal.
 
 RF-3 ditegakkan di sini: evidence yang tidak ada di isi proposal adalah
-kutipan halusinasi, dan buang_evidence_halusinasi() membuangnya sebelum hasil
+kutipan halusinasi, dan drop_hallucinated_evidence() membuangnya sebelum hasil
 dipakai, supaya tidak pernah ditampilkan ke UMKM sebagai alasan penolakan.
 """
 
@@ -30,16 +30,16 @@ PROMPT = (Path(__file__).parent / "prompts" / "score_proposal.md").read_text()
 _clock = SystemClock()
 
 
-class PromptTerlaluBesar(ValueError):
+class PromptTooLarge(ValueError):
     """Isi proposal yang dirakit melebihi batas prompt (review keamanan
     Finding 2). ValueError, bukan DomainError: modul ini tidak pernah
-    tersentuh app/api/, dan jalankan_scoring (services/scoring.py) sudah
+    tersentuh app/api/, dan run_scoring (services/scoring.py) sudah
     menangkap *semua* Exception dari engine.score dan menjadikannya
     scoring_status=failed (D-09) -- tidak ada penanganan khusus yang perlu
     ditambahkan di sana untuk kelas ini."""
 
 
-class KuotaHarianTerlampaui(RuntimeError):
+class DailyQuotaExceeded(RuntimeError):
     """Kuota harian panggilan Gemini (lihat _DailyBudget) sudah tercapai."""
 
 
@@ -59,32 +59,34 @@ class _DailyBudget:
     tengah jam sibuk judging adalah risiko yang jauh lebih kecil daripada
     kuota terbakar oleh crawler.
 
-    Gagal tertutup: `pakai()` melempar, bukan diam-diam meloloskan, begitu
+    Gagal tertutup: `use()` melempar, bukan diam-diam meloloskan, begitu
     kuota tercapai.
     """
 
     def __init__(self, limit: int) -> None:
         self._limit = limit
-        self._tanggal: date | None = None
-        self._terpakai = 0
+        self._date: date | None = None
+        self._used = 0
 
-    def pakai(self) -> None:
+    def use(self) -> None:
         hari_ini = _clock.now().date()
-        if self._tanggal != hari_ini:
-            self._tanggal = hari_ini
-            self._terpakai = 0
-        if self._terpakai >= self._limit:
-            raise KuotaHarianTerlampaui(
+        if self._date != hari_ini:
+            self._date = hari_ini
+            self._used = 0
+        if self._used >= self._limit:
+            raise DailyQuotaExceeded(
                 f"Kuota harian panggilan Gemini ({self._limit}) sudah tercapai."
             )
-        self._terpakai += 1
+        self._used += 1
 
 
-def _normalkan(teks: str) -> str:
+def _normalize(teks: str) -> str:
     return re.sub(r"\s+", " ", teks).strip().casefold()
 
 
-def buang_evidence_halusinasi(score: ProposalScore, isi_proposal: str) -> ProposalScore:
+def drop_hallucinated_evidence(
+    score: ProposalScore, isi_proposal: str
+) -> ProposalScore:
     """Red flag dengan kutipan yang tidak ada di proposal dibuang (RF-3).
 
     Kutipan karangan yang ditampilkan ke UMKM sebagai alasan penolakan lebih
@@ -92,8 +94,8 @@ def buang_evidence_halusinasi(score: ProposalScore, isi_proposal: str) -> Propos
     berarti red flag kritis ikut terbuang dan verdict berubah dari rejected
     jadi listed; itu konsekuensi yang disengaja, bukan efek samping.
     """
-    sumber = _normalkan(isi_proposal)
-    bersih = [f for f in score.red_flags if _normalkan(f.evidence) in sumber]
+    sumber = _normalize(isi_proposal)
+    bersih = [f for f in score.red_flags if _normalize(f.evidence) in sumber]
     return score.model_copy(update={"red_flags": bersih})
 
 
@@ -166,7 +168,7 @@ class GeminiEngine:
     async def score(
         self, proposal: ProposalLike, campaign: CampaignLike
     ) -> ProposalScore:
-        isi = self._rakit_isi(proposal, campaign)
+        isi = self._assemble_content(proposal, campaign)
         panjang_prompt = len(PROMPT.format(**isi))
         if panjang_prompt > self._max_prompt_chars:
             # Review keamanan Finding 2: proposal bisa diterima apa adanya
@@ -177,11 +179,11 @@ class GeminiEngine:
             # yang sungguh dikirim. ValueError, bukan diam-diam dipotong:
             # memotong isi proposal diam-diam membuat model menilai teks
             # yang sudah terpenggal tanpa UMKM tahu bagian mana yang hilang.
-            raise PromptTerlaluBesar(
+            raise PromptTooLarge(
                 f"Prompt {panjang_prompt} karakter melebihi batas "
                 f"{self._max_prompt_chars}."
             )
-        self._budget.pakai()
+        self._budget.use()
         hasil = await self._client.chat.completions.create(
             model=self.model,
             response_model=ProposalScore,
@@ -191,9 +193,9 @@ class GeminiEngine:
             max_retries=2,
             messages=[{"role": "user", "content": PROMPT.format(**isi)}],
         )
-        return buang_evidence_halusinasi(hasil, isi["isi_proposal"])
+        return drop_hallucinated_evidence(hasil, isi["isi_proposal"])
 
-    def _rakit_isi(
+    def _assemble_content(
         self, proposal: ProposalLike, campaign: CampaignLike
     ) -> dict[str, str]:
         isi_proposal = (

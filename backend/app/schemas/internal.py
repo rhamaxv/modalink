@@ -23,7 +23,7 @@ class ClockOut(BaseModel):
 
 
 class SeedOut(BaseModel):
-    """Ringkasan `POST /internal/seed`, dibangun dari `HasilSeed`
+    """Ringkasan `POST /internal/seed`, dibangun dari `SeedResult`
     (app/seed/demo.py) supaya test lokal bisa memeriksa idempotensinya lewat
     HTTP tanpa menghitung baris sendiri."""
 

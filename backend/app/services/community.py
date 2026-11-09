@@ -17,16 +17,16 @@ from app.models.comment import Comment
 from app.models.proposal import Proposal
 from app.models.user import User
 from app.models.vote import Vote
-from app.services.campaign import STATUS_PROPOSAL_PUBLIK
+from app.services.campaign import PUBLIC_PROPOSAL_STATUSES
 
 # BR-30: "listed ke atas" adalah definisi yang sama dipakai untuk kelihatan
 # publik (services/campaign.py) -- proposal yang belum listed memang belum
 # pernah ditampilkan ke siapa pun selain pemiliknya, jadi tidak ada yang bisa
 # ia vote atau komentari.
-DAPAT_DIVOTE_DAN_DIKOMENTARI = STATUS_PROPOSAL_PUBLIK
+VOTABLE_AND_COMMENTABLE_STATUSES = PUBLIC_PROPOSAL_STATUSES
 
 
-async def hitung_vote(session: AsyncSession, proposal_id: UUID) -> int:
+async def count_votes(session: AsyncSession, proposal_id: UUID) -> int:
     jumlah = await session.scalar(
         select(func.count()).select_from(Vote).where(Vote.proposal_id == proposal_id)
     )
@@ -36,7 +36,7 @@ async def hitung_vote(session: AsyncSession, proposal_id: UUID) -> int:
 async def toggle_vote(
     session: AsyncSession, user: User, proposal: Proposal
 ) -> tuple[bool, int]:
-    if proposal.status not in DAPAT_DIVOTE_DAN_DIKOMENTARI:
+    if proposal.status not in VOTABLE_AND_COMMENTABLE_STATUSES:
         raise ConflictError(
             "proposal_belum_terbuka",
             "Proposal ini belum terbuka untuk dukungan publik.",
@@ -57,14 +57,14 @@ async def toggle_vote(
     # sinyal bagi investor, bukan mekanisme promosi: proposal yang viral
     # tidak boleh mengalahkan proposal yang lebih baik secara AI dan
     # pendanaan semata karena jejaring sosialnya lebih luas.
-    jumlah = await hitung_vote(session, proposal.id)
+    jumlah = await count_votes(session, proposal.id)
     return voted, jumlah
 
 
-async def buat_komentar(
+async def create_comment(
     session: AsyncSession, user: User, proposal: Proposal, body: str, clock: Clock
 ) -> Comment:
-    if proposal.status not in DAPAT_DIVOTE_DAN_DIKOMENTARI:
+    if proposal.status not in VOTABLE_AND_COMMENTABLE_STATUSES:
         raise ConflictError(
             "proposal_belum_terbuka",
             "Proposal ini belum terbuka untuk komentar publik.",
@@ -77,7 +77,7 @@ async def buat_komentar(
     return komentar
 
 
-async def daftar_komentar(session: AsyncSession, proposal_id: UUID) -> list[Comment]:
+async def list_comments(session: AsyncSession, proposal_id: UUID) -> list[Comment]:
     hasil = await session.scalars(
         select(Comment)
         .where(Comment.proposal_id == proposal_id, col(Comment.deleted_at).is_(None))
@@ -86,9 +86,7 @@ async def daftar_komentar(session: AsyncSession, proposal_id: UUID) -> list[Comm
     return list(hasil)
 
 
-async def ambil_komentar_aktif(
-    session: AsyncSession, comment_id: UUID
-) -> Comment | None:
+async def get_active_comment(session: AsyncSession, comment_id: UUID) -> Comment | None:
     """Komentar yang belum dihapus. Komentar yang sudah soft-deleted dianggap
     tidak ada lagi untuk pemeriksaan kepemilikan maupun penghapusan ulang."""
     komentar = await session.get(Comment, comment_id)
@@ -97,7 +95,7 @@ async def ambil_komentar_aktif(
     return komentar
 
 
-async def hapus_komentar(
+async def delete_comment(
     session: AsyncSession, komentar: Comment, clock: Clock
 ) -> None:
     """Soft delete (BR-34). `komentar` wajib hasil `get_own_comment`, yang

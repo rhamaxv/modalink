@@ -22,19 +22,19 @@ _hasher = PasswordHasher()
 _clock = SystemClock()
 
 
-class TokenKedaluwarsa(DomainError):
+class TokenExpired(DomainError):
     status = 401
 
 
-class TokenTidakSah(DomainError):
+class TokenInvalid(DomainError):
     status = 401
 
 
-class KredensialSalah(DomainError):
+class InvalidCredentials(DomainError):
     status = 401
 
 
-class EmailTerpakai(DomainError):
+class EmailAlreadyUsed(DomainError):
     """Email sudah dipakai akun lain."""
 
     status = 400
@@ -81,11 +81,9 @@ def decode_token(token: str) -> TokenClaims:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
-        raise TokenKedaluwarsa(
-            "token_kedaluwarsa", "Token sudah kedaluwarsa."
-        ) from None
+        raise TokenExpired("token_kedaluwarsa", "Token sudah kedaluwarsa.") from None
     except jwt.InvalidTokenError:
-        raise TokenTidakSah("token_tidak_sah", "Token tidak sah.") from None
+        raise TokenInvalid("token_tidak_sah", "Token tidak sah.") from None
     return TokenClaims(sub=UUID(payload["sub"]), role=payload["role"])
 
 
@@ -110,11 +108,11 @@ async def register_user(session: AsyncSession, body: RegisterIn) -> User:
             and "ix_users_email" not in str(exc.orig).lower()
         ):
             raise
-        raise EmailTerpakai("email_terpakai", "Email ini sudah terdaftar.") from None
+        raise EmailAlreadyUsed("email_terpakai", "Email ini sudah terdaftar.") from None
     return user
 
 
-async def ambil_user(session: AsyncSession, user_id: UUID) -> User | None:
+async def get_user(session: AsyncSession, user_id: UUID) -> User | None:
     return await session.get(User, user_id)
 
 
@@ -125,5 +123,5 @@ async def authenticate_user(session: AsyncSession, body: LoginIn) -> User:
     # lama responsnya tidak membedakan "email tidak ada" dari "password salah".
     cocok = verify_password(body.password, user.password_hash if user else HASH_UMPAN)
     if user is None or not cocok:
-        raise KredensialSalah("kredensial_salah", "Email atau password salah.")
+        raise InvalidCredentials("kredensial_salah", "Email atau password salah.")
     return user

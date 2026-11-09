@@ -59,13 +59,13 @@ async def test_br76_dua_percobaan_scoring_sungguhan_meninggalkan_dua_baris(
     kedua.
 
     Proposal dipaksa balik ke submitted langsung di sini, bukan lewat
-    minta_rescore (yang hanya mengizinkan rescore dari status failed):
+    request_rescore (yang hanya mengizinkan rescore dari status failed):
     tujuannya murni membuktikan tabel scoring_results append-only, bukan
     mengulang aturan kapan rescore boleh dipicu (sudah diuji R6/BR-75).
     """
-    from app.services.scoring import jalankan_scoring
+    from app.services.scoring import run_scoring
 
-    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+    await run_scoring(db, submitted_proposal.id, engine_mock, clock)
     await db.refresh(submitted_proposal)
     baris_pertama = (
         await db.scalars(
@@ -81,7 +81,7 @@ async def test_br76_dua_percobaan_scoring_sungguhan_meninggalkan_dua_baris(
     # terbukti dibedakan oleh total_score, bukan cuma oleh id.
     submitted_proposal.business_profile += " [[SCORE:80]]"
     await db.flush()
-    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+    await run_scoring(db, submitted_proposal.id, engine_mock, clock)
 
     semua_baris = (
         await db.scalars(
@@ -100,9 +100,9 @@ async def test_br76_dua_percobaan_scoring_sungguhan_meninggalkan_dua_baris(
 async def test_br75_job_terpicu_dua_kali_tidak_menghasilkan_dua_transisi(
     db, listed_proposal, engine_mock, clock
 ):
-    from app.services.scoring import jalankan_scoring
+    from app.services.scoring import run_scoring
 
-    await jalankan_scoring(db, listed_proposal.id, engine_mock, clock)
+    await run_scoring(db, listed_proposal.id, engine_mock, clock)
     await db.refresh(listed_proposal)
     assert listed_proposal.status is ProposalStatus.LISTED  # tidak berubah, tidak error
 
@@ -110,10 +110,10 @@ async def test_br75_job_terpicu_dua_kali_tidak_menghasilkan_dua_transisi(
 async def test_t50_t51_scoring_status_berjalan_pending_processing_done(
     db, submitted_proposal, engine_mock, clock
 ):
-    from app.services.scoring import jalankan_scoring
+    from app.services.scoring import run_scoring
 
     assert submitted_proposal.scoring_status is ScoringStatus.PENDING
-    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+    await run_scoring(db, submitted_proposal.id, engine_mock, clock)
     await db.refresh(submitted_proposal)
     assert submitted_proposal.scoring_status is ScoringStatus.DONE
 
@@ -121,9 +121,9 @@ async def test_t50_t51_scoring_status_berjalan_pending_processing_done(
 async def test_t52_scoring_status_jadi_failed_saat_engine_meledak(
     db, submitted_proposal, engine_meledak, clock
 ):
-    from app.services.scoring import jalankan_scoring
+    from app.services.scoring import run_scoring
 
-    await jalankan_scoring(db, submitted_proposal.id, engine_meledak, clock)
+    await run_scoring(db, submitted_proposal.id, engine_meledak, clock)
     await db.refresh(submitted_proposal)
     assert submitted_proposal.scoring_status is ScoringStatus.FAILED
 

@@ -35,7 +35,7 @@ from app.models.milestone_report import MilestoneReport, ReportStatus
 from app.models.proposal import MilestoneStatus, ProposalMilestone, ProposalStatus
 from app.models.user import User
 from app.schemas.milestone import MilestoneReportIn
-from app.services.ledger import catat_entri
+from app.services.ledger import record_entry
 from app.services.pledge import get_locked_proposal
 from app.services.status import advance_milestone, advance_proposal, advance_report
 
@@ -73,7 +73,7 @@ async def get_latest_report(
     )
 
 
-async def semua_milestone_cair(session: AsyncSession, proposal_id: UUID) -> bool:
+async def all_milestones_disbursed(session: AsyncSession, proposal_id: UUID) -> bool:
     """True bila setiap milestone proposal ini sudah `disbursed` (T-09).
 
     Dipanggil setelah milestone yang baru di-approve di-flush ke sesi ini:
@@ -203,9 +203,9 @@ async def approve_milestone(
     # BR-47, BR-48: satu entri disbursement_out sebesar amount milestone.
     # Kunci idempotensi berasal dari milestone, bukan dari request, sehingga
     # approve ganda (sekuensial lewat BR-48, atau konkuren lewat RF-5) hanya
-    # menghasilkan satu entri: catat_entri mengembalikan None secara diam-diam
+    # menghasilkan satu entri: record_entry mengembalikan None secara diam-diam
     # untuk kunci yang sudah pernah dipakai, bukan melempar error.
-    await catat_entri(
+    await record_entry(
         session,
         proposal.id,
         EntryType.DISBURSEMENT_OUT,
@@ -225,7 +225,7 @@ async def approve_milestone(
     # transisi completed->completed memang tidak ada di PROPOSAL_MAP. Itu
     # bukan kegagalan nyata: pencairannya sendiri sudah aman lewat idempotensi
     # di atas, jadi tidak ada uang yang perlu diselamatkan di sini.
-    if await semua_milestone_cair(session, proposal.id):
+    if await all_milestones_disbursed(session, proposal.id):
         with contextlib.suppress(IllegalTransition):
             advance_proposal(proposal, ProposalEvent.SEMUA_MILESTONE_CAIR)
 

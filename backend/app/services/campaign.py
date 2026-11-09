@@ -18,20 +18,20 @@ from app.models.scoring import ScoringResult
 from app.models.user import User
 from app.models.vote import Vote
 from app.schemas.campaign import CampaignIn, CampaignUpdateIn
-from app.services.expiry import evaluasi_kedaluwarsa_banyak
-from app.services.ledger import jumlah_terkumpul_subquery
+from app.services.expiry import evaluate_expiry_many
+from app.services.ledger import collected_amount_subquery
 from app.services.status import advance_campaign
 
 # Status proposal yang dianggap publik: "listed ke atas" menurut
 # 03-feature-investor.md. submitted (belum dinilai) dan rejected disembunyikan
 # dari siapa pun selain pembuat campaign.
-STATUS_PROPOSAL_PUBLIK = frozenset(ProposalStatus) - {
+PUBLIC_PROPOSAL_STATUSES = frozenset(ProposalStatus) - {
     ProposalStatus.SUBMITTED,
     ProposalStatus.REJECTED,
 }
 
 
-def validasi_deadline(body: CampaignIn, clock: Clock) -> None:
+def validate_deadline(body: CampaignIn, clock: Clock) -> None:
     sekarang = clock.now()
     if body.apply_deadline <= sekarang:
         raise UnprocessableError(
@@ -45,10 +45,10 @@ def validasi_deadline(body: CampaignIn, clock: Clock) -> None:
         )
 
 
-async def buat_campaign(
+async def create_campaign(
     session: AsyncSession, investor: User, body: CampaignIn, clock: Clock
 ) -> Campaign:
-    validasi_deadline(body, clock)
+    validate_deadline(body, clock)
     campaign = Campaign(
         investor_id=investor.id,
         title=body.title,
@@ -65,7 +65,7 @@ async def buat_campaign(
     return campaign
 
 
-async def daftar_campaign(session: AsyncSession) -> list[Campaign]:
+async def list_campaigns(session: AsyncSession) -> list[Campaign]:
     # Urutan diputus created_at lalu id supaya daftar deterministik (BR-05):
     # dua campaign dengan created_at identik tidak boleh bertukar posisi
     # antar-request.
@@ -78,14 +78,14 @@ async def daftar_campaign(session: AsyncSession) -> list[Campaign]:
     return list(hasil)
 
 
-async def ambil_campaign(session: AsyncSession, campaign_id: UUID) -> Campaign | None:
+async def get_campaign(session: AsyncSession, campaign_id: UUID) -> Campaign | None:
     return await session.get(Campaign, campaign_id)
 
 
-async def ambil_campaign_detail(
+async def get_campaign_detail(
     session: AsyncSession, campaign_id: UUID, clock: Clock
 ) -> Campaign | None:
-    campaign = await ambil_campaign(session, campaign_id)
+    campaign = await get_campaign(session, campaign_id)
     if campaign is None:
         return None
     if campaign.status is CampaignStatus.OPEN and clock.now() > campaign.apply_deadline:
@@ -96,7 +96,9 @@ async def ambil_campaign_detail(
     return campaign
 
 
-async def tutup_campaign_manual(session: AsyncSession, campaign: Campaign) -> Campaign:
+async def close_campaign_manually(
+    session: AsyncSession, campaign: Campaign
+) -> Campaign:
     try:
         advance_campaign(campaign, CampaignEvent.TUTUP_MANUAL)
     except IllegalTransition:
@@ -107,7 +109,7 @@ async def tutup_campaign_manual(session: AsyncSession, campaign: Campaign) -> Ca
     return campaign
 
 
-async def ubah_campaign(
+async def update_campaign(
     session: AsyncSession, campaign: Campaign, body: CampaignUpdateIn
 ) -> Campaign:
     if (
@@ -137,9 +139,9 @@ async def ubah_campaign(
 
 
 @dataclass
-class ProposalDenganSinyal:
+class ProposalWithSignals:
     """Proposal dibungkus skor AI terbaru dan jumlah vote, khusus bentuk
-    balik `daftar_proposal_campaign`. `ProposalWithSignalsOut` membacanya
+    balik `list_campaign_proposals`. `ProposalWithSignalsOut` membacanya
     lewat `from_attributes`, yang memanggil getattr apa adanya -- __getattr__
     di sini meneruskan kolom Proposal asli, sama seperti ProposalWithPledge
     di tests/conftest.py. Proposal tidak boleh dititipi atribut bebas secara
@@ -157,9 +159,9 @@ class ProposalDenganSinyal:
         return getattr(self.proposal, name)
 
 
-async def daftar_proposal_campaign(
+async def list_campaign_proposals(
     session: AsyncSession, campaign: Campaign, pemilik: bool, clock: Clock
-) -> list[ProposalDenganSinyal]:
+) -> list[ProposalWithSignals]:
     """Skor lalu vote lalu waktu submit (10-api-contract.md). `created_at`
     lalu `id` di akhir yang membuat urutan ini benar-benar deterministik:
     tanpa itu, dua proposal yang identik di seluruh kolom pengurut bisa
@@ -174,7 +176,7 @@ async def daftar_proposal_campaign(
     # SQLModel diketik sebagai UUID/datetime biasa oleh mypy (tidak ada
     # plugin sqlmodel), sehingga distinct_on/.desc()/group_by di atasnya
     # dianggap tidak ada (sama seperti catatan desc("created_at") di
-    # daftar_campaign).
+    # list_campaigns).
     skor_terbaru = (
         select(ScoringResult.proposal_id, ScoringResult.total_score)
         .ext(distinct_on(col(ScoringResult.proposal_id)))
@@ -185,7 +187,7 @@ async def daftar_proposal_campaign(
             col(Vote.proposal_id)
         )
     ).subquery("jumlah_vote")
-    terkumpul = jumlah_terkumpul_subquery()
+    terkumpul = collected_amount_subquery()
 
     kueri = (
         select(
@@ -202,7 +204,7 @@ async def daftar_proposal_campaign(
     if not pemilik:
         # Publik hanya melihat yang listed ke atas; submitted dan rejected
         # hanya boleh dilihat pembuat campaign (03-feature-investor.md).
-        kueri = kueri.where(col(Proposal.status).in_(STATUS_PROPOSAL_PUBLIK))
+        kueri = kueri.where(col(Proposal.status).in_(PUBLIC_PROPOSAL_STATUSES))
     kueri = kueri.order_by(desc("total_score"), desc("vote_count"), "created_at", "id")
 
     baris = (await session.execute(kueri)).all()
@@ -212,12 +214,12 @@ async def daftar_proposal_campaign(
     # sebelumnya: objek yang dikembalikan adalah instance ORM yang sama, jadi
     # perubahan status dari evaluasi langsung terbaca pemanggil. Lewat fungsi
     # _banyak, bukan loop dalam urutan tampil total_score DESC di atas: lihat
-    # docstring evaluasi_kedaluwarsa_banyak soal kenapa urutan tampil tidak
+    # docstring evaluate_expiry_many soal kenapa urutan tampil tidak
     # aman dipakai mengunci baris lintas endpoint (review keamanan Finding 1).
-    await evaluasi_kedaluwarsa_banyak(session, [p for p, _, _, _ in baris], clock)
+    await evaluate_expiry_many(session, [p for p, _, _, _ in baris], clock)
 
     return [
-        ProposalDenganSinyal(
+        ProposalWithSignals(
             proposal=p, total_score=skor, vote_count=vote, collected_amount=int(jumlah)
         )
         for p, skor, vote, jumlah in baris

@@ -52,7 +52,7 @@ class PledgeListItemOut(BaseModel):
     investor sebelum posisinya settle. `amount` dan `is_lead_investor` tetap
     tampil: keduanya informasi publik yang sah (bilah progres, penanda
     lead), bukan identitas. Redaksinya terjadi di
-    `daftar_pledge_aktif` (services/pledge.py), bukan di sini lewat
+    `list_active_pledges` (services/pledge.py), bukan di sini lewat
     model_validator: fungsi itu sudah memegang `proposal.status` di tangan,
     jadi tidak perlu membawa status proposal ke skema ini hanya untuk
     keputusan yang sama."""

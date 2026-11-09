@@ -96,16 +96,14 @@ DEFAULT_RATE_RULES: tuple[RateRule, ...] = (
 )
 
 
-def _cocokkan_rule(
-    rules: tuple[RateRule, ...], method: str, path: str
-) -> RateRule | None:
+def _match_rule(rules: tuple[RateRule, ...], method: str, path: str) -> RateRule | None:
     for rule in rules:
         if rule.method == method and rule.path.match(path):
             return rule
     return None
 
 
-def _ambil_account_id(request: Request) -> str | None:
+def _get_account_id(request: Request) -> str | None:
     """Mengurai klaim `sub` dari header Authorization tanpa membaca
     database: ini hanya kunci pembatas, bukan autentikasi. Token tidak ada,
     salah format, atau sudah kedaluwarsa semuanya berarti "tidak ada akun
@@ -143,7 +141,7 @@ class InMemoryRateLimiter:
         return hitung <= limit
 
 
-def _gerbang_gerbang(
+def _rate_limit_gates(
     rule: RateRule, request: Request, account_id: str | None
 ) -> list[tuple[str, int]]:
     """Satu request bisa kena dua gerbang independen: IP dan akun, masing-
@@ -171,17 +169,15 @@ def build_rate_limit_middleware(
     async def rate_limit_middleware(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        rule = _cocokkan_rule(rules, request.method, request.url.path)
+        rule = _match_rule(rules, request.method, request.url.path)
         if rule is not None:
             try:
                 account_id = (
-                    _ambil_account_id(request)
-                    if rule.account_limit is not None
-                    else None
+                    _get_account_id(request) if rule.account_limit is not None else None
                 )
                 boleh = all(
                     limiter.hit(kunci, limit, rule.window_s)
-                    for kunci, limit in _gerbang_gerbang(rule, request, account_id)
+                    for kunci, limit in _rate_limit_gates(rule, request, account_id)
                 )
             except Exception:  # noqa: BLE001
                 # Gagal tertutup (lihat docstring modul): exception apa pun

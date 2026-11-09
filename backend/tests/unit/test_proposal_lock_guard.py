@@ -13,7 +13,7 @@ BASIS = pathlib.Path(__file__).parents[2] / "app" / "services"
 # begitu fase 07 membuatnya; difilter lewat exists() di bawah karena file itu
 # belum ada sekarang, dan .read_text() pada file yang tidak ada akan meledak
 # dengan alasan yang salah (FileNotFoundError, bukan pelanggaran pagar).
-# "expiry.py" ditambahkan fase 09: evaluasi_kedaluwarsa juga mengunci baris
+# "expiry.py" ditambahkan fase 09: evaluate_expiry juga mengunci baris
 # proposal sebelum merefund (ledger-invariants.md: "Berlaku untuk: pledge,
 # pembatalan pledge, approve milestone, dan evaluasi kedaluwarsa").
 MONEY_SERVICES = [

@@ -2,7 +2,7 @@
 
 Pencairan milestone (`disbursement_out`) belum punya service sendiri di fase
 ini (fase 07, lihat .claude/plan/README.md baris RF-5); di sini entrinya
-ditulis langsung lewat `catat_entri`, primitif yang sama yang akan dipakai
+ditulis langsung lewat `record_entry`, primitif yang sama yang akan dipakai
 service pencairan nanti. Yang diuji adalah invarian ledger itu sendiri, yang
 berlaku untuk entri apa pun yang pernah masuk, bukan jalur HTTP milestone yang
 belum ada.
@@ -17,7 +17,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.proposal import Proposal
-from app.services.ledger import catat_entri, hitung_saldo, total_terkumpul
+from app.services.ledger import compute_balance, record_entry, total_raised
 from app.services.pledge import cancel_pledge, create_pledge
 
 
@@ -36,9 +36,9 @@ async def check_invariants(db, proposal_id: UUID, requested: int) -> None:
     disbursed = sum(
         e.amount for e in entries if e.entry_type is EntryType.DISBURSEMENT_OUT
     )
-    assert disbursed <= total_terkumpul(entries), "dana cair melebihi dana terkumpul"
-    assert hitung_saldo(entries) >= 0, "saldo escrow negatif"
-    assert total_terkumpul(entries) <= requested, "terkumpul melebihi dana yang diminta"
+    assert disbursed <= total_raised(entries), "dana cair melebihi dana terkumpul"
+    assert compute_balance(entries) >= 0, "saldo escrow negatif"
+    assert total_raised(entries) <= requested, "terkumpul melebihi dana yang diminta"
 
     keys = [e.idempotency_key for e in entries]
     assert len(keys) == len(set(keys)), "idempotency_key duplikat"
@@ -80,7 +80,7 @@ def full_scenario(
         await _periksa()  # total pas 10 juta, proposal funded
         yield listed_proposal
 
-        await catat_entri(
+        await record_entry(
             db,
             listed_proposal.id,
             EntryType.DISBURSEMENT_OUT,
@@ -91,7 +91,7 @@ def full_scenario(
         await _periksa()
         yield listed_proposal
 
-        await catat_entri(
+        await record_entry(
             db,
             listed_proposal.id,
             EntryType.DISBURSEMENT_OUT,
@@ -117,7 +117,7 @@ async def test_r2_calling_the_same_disbursement_twice_does_not_add_a_row(
 ):
     key = f"disburse:{funded_proposal.id}:milestone-1"
 
-    pertama = await catat_entri(
+    pertama = await record_entry(
         db,
         funded_proposal.id,
         EntryType.DISBURSEMENT_OUT,
@@ -125,7 +125,7 @@ async def test_r2_calling_the_same_disbursement_twice_does_not_add_a_row(
         idempotency_key=key,
         clock=clock,
     )
-    kedua = await catat_entri(
+    kedua = await record_entry(
         db,
         funded_proposal.id,
         EntryType.DISBURSEMENT_OUT,
@@ -159,7 +159,7 @@ async def _ledger_fingerprint(db, proposal_id: UUID) -> frozenset[tuple]:
     ref_type, ref_id, actor_id, created_at -- sebuah UPDATE yang menulis ulang
     jejak audit (misal mengganti actor_id atau created_at tanpa menyentuh
     empat kolom itu) akan lolos tanpa terdeteksi fingerprint lama. Catatan
-    ini TIDAK membuat test ini bisa merah sendirian: `catat_entri` memang
+    ini TIDAK membuat test ini bisa merah sendirian: `record_entry` memang
     tidak punya jalur UPDATE sama sekali, jadi assertion ini masih belum
     pernah terbukti bisa gagal karena alasan yang benar. Pagar yang
     sebenarnya menolak UPDATE/DELETE ada di database (lihat migrasi
@@ -190,7 +190,7 @@ async def test_r2_ledger_rows_are_never_altered_after_insert(
     db, funded_proposal, clock
 ):
     before = await _ledger_fingerprint(db, funded_proposal.id)
-    await catat_entri(
+    await record_entry(
         db,
         funded_proposal.id,
         EntryType.DISBURSEMENT_OUT,
@@ -204,7 +204,7 @@ async def test_r2_ledger_rows_are_never_altered_after_insert(
 
 async def test_r2_ledger_entries_update_is_rejected_by_database(db, funded_proposal):
     """Review keamanan Finding 3: pagar sebelumnya (test di atas) tidak
-    pernah bisa merah karena `catat_entri` memang tidak punya jalur UPDATE --
+    pernah bisa merah karena `record_entry` memang tidak punya jalur UPDATE --
     ia tidak membuktikan apa pun tentang database itu sendiri. Test ini
     benar-benar MENCOBA menulis UPDATE yang dilarang (migrasi
     a72b47da4fb7) dan membuktikan database menolaknya, bukan mengandalkan
@@ -215,7 +215,7 @@ async def test_r2_ledger_entries_update_is_rejected_by_database(db, funded_propo
     ("current transaction is aborted"), dan savepoint ini membatasi
     kegagalan itu supaya assertion sesudahnya (baris ledger tidak berubah)
     masih bisa dibaca lewat sesi yang sama, pola yang sama dengan
-    `catat_entri` menangkap IntegrityError idempotensi (services/ledger.py).
+    `record_entry` menangkap IntegrityError idempotensi (services/ledger.py).
     """
     before = await _ledger_fingerprint(db, funded_proposal.id)
     satu_baris = (

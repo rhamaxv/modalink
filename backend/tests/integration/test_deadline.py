@@ -5,7 +5,7 @@ from sqlalchemy import select
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.pledge import Pledge, PledgeStatus
 from app.models.proposal import ProposalStatus
-from app.services.ledger import hitung_saldo
+from app.services.ledger import compute_balance
 
 
 async def ambil_ledger(db, proposal_id):
@@ -54,7 +54,7 @@ async def test_t08_partially_funded_becomes_failed_and_pledge_refunded(
     assert any(
         e.entry_type is EntryType.REFUND_OUT and e.amount == 4_000_000 for e in entri
     )
-    assert hitung_saldo(entri) == 0
+    assert compute_balance(entri) == 0
 
 
 async def test_funded_proposal_unaffected_by_deadline(
@@ -121,7 +121,7 @@ async def test_br62_failed_proposal_with_active_pledge_still_refunded(
 
     Kasus ini nyata: pledge yang diterima tepat setelah funding_deadline lewat
     membuat recompute_funding_status menulis failed sementara pledge-nya tetap
-    aktif. Kalau evaluasi_kedaluwarsa menyaring status saja lewat AKTIF,
+    aktif. Kalau evaluate_expiry menyaring status saja lewat ACTIVE_STATUSES,
     proposal itu dilewati selamanya dan uangnya tidak pernah kembali.
     """
     await client.post(

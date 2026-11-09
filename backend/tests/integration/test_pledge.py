@@ -7,7 +7,7 @@ from app.errors import UnprocessableError
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.pledge import Pledge, PledgeStatus
 from app.models.proposal import ProposalStatus
-from app.services.ledger import hitung_saldo
+from app.services.ledger import compute_balance
 from app.services.pledge import create_pledge
 
 
@@ -104,7 +104,7 @@ async def test_br25_pledge_cannot_be_cancelled_after_completed(
         )
     ).all()
     assert EntryType.REFUND_OUT not in [e.entry_type for e in entries]
-    assert hitung_saldo(entries) == 0
+    assert compute_balance(entries) == 0
 
 
 async def test_br26_cancellation_records_refund_not_delete(
@@ -176,7 +176,7 @@ async def test_br62_pledge_after_deadline_rejected_not_accepted_then_refunded(
     ditolak sebelum satu baris pun ditulis.
 
     Status `failed` yang muncul di GET di bawah bukan akibat pledge yang
-    ditolak -- ia berasal dari evaluasi_kedaluwarsa (BR-61, fase 09) yang
+    ditolak -- ia berasal dari evaluate_expiry (BR-61, fase 09) yang
     berjalan di setiap pembacaan proposal begitu funding_deadline lewat,
     terlepas dari percobaan pledge apa pun. Yang dibuktikan di sini tetap
     sama seperti sebelum fase 09 ada: percobaan pledge yang ditolak itu
@@ -265,7 +265,7 @@ async def test_br62_cancelling_one_pledge_past_deadline_refunds_every_active_ple
     assert refunded_pledge_ids == {p.id for p in pledges}, (
         "setiap pledge aktif pada proposal failed wajib punya refund_out pasangannya"
     )
-    assert hitung_saldo(entries_rows) == 0
+    assert compute_balance(entries_rows) == 0
 
 
 async def test_br27_service_layer_rejects_amount_below_minimum_without_http(

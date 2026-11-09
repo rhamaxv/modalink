@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 
 from app.models.proposal import ProposalStatus, ScoringStatus
 from app.models.scoring import ScoringResult
-from app.services.scoring import jalankan_scoring
+from app.services.scoring import run_scoring
 
 
 class EngineMeledak:
@@ -30,7 +30,7 @@ MODE_GAGAL = [
 async def test_r6_kegagalan_tidak_mengubah_status_proposal(
     db, submitted_proposal, clock, kegagalan
 ):
-    await jalankan_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
+    await run_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
     await db.refresh(submitted_proposal)
 
     assert submitted_proposal.scoring_status is ScoringStatus.FAILED
@@ -41,7 +41,7 @@ async def test_r6_kegagalan_tidak_mengubah_status_proposal(
 async def test_r6_kegagalan_tidak_meninggalkan_baris_scoring(
     db, submitted_proposal, clock, kegagalan
 ):
-    await jalankan_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
+    await run_scoring(db, submitted_proposal.id, EngineMeledak(kegagalan), clock)
     jumlah = await db.scalar(
         select(func.count())
         .select_from(ScoringResult)
@@ -76,8 +76,8 @@ async def test_r6_rescore_ditolak_saat_scoring_sudah_selesai(
 async def test_r6_job_dua_kali_hanya_satu_transisi(
     db, submitted_proposal, engine_mock, clock
 ):
-    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+    await run_scoring(db, submitted_proposal.id, engine_mock, clock)
     status_pertama = submitted_proposal.status
-    await jalankan_scoring(db, submitted_proposal.id, engine_mock, clock)
+    await run_scoring(db, submitted_proposal.id, engine_mock, clock)
     await db.refresh(submitted_proposal)
     assert submitted_proposal.status is status_pertama

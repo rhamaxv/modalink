@@ -1,4 +1,4 @@
-"""Test buang_evidence_halusinasi (RF-3): kutipan karangan tidak boleh
+"""Test drop_hallucinated_evidence (RF-3): kutipan karangan tidak boleh
 sampai ke pemilik usaha sebagai alasan penolakan."""
 
 from dataclasses import dataclass
@@ -7,11 +7,11 @@ from datetime import UTC, date, datetime
 import pytest
 
 from app.ai.gemini_engine import (
+    DailyQuotaExceeded,
     GeminiEngine,
-    KuotaHarianTerlampaui,
-    PromptTerlaluBesar,
+    PromptTooLarge,
     _DailyBudget,
-    buang_evidence_halusinasi,
+    drop_hallucinated_evidence,
 )
 from app.ai.models import Brief, ProposalScore, RedFlag
 from app.config import Settings, settings
@@ -38,14 +38,14 @@ ISI_PROPOSAL = "Omzet rata-rata Rp12 juta per bulan dengan dua pekerja."
 
 
 def test_rf3_evidence_yang_ada_di_proposal_dipertahankan():
-    hasil = buang_evidence_halusinasi(
+    hasil = drop_hallucinated_evidence(
         skor_dengan("Omzet rata-rata Rp12 juta"), ISI_PROPOSAL
     )
     assert len(hasil.red_flags) == 1
 
 
 def test_rf3_evidence_yang_tidak_ada_di_proposal_dibuang():
-    hasil = buang_evidence_halusinasi(
+    hasil = drop_hallucinated_evidence(
         skor_dengan("Omzet Rp900 juta per hari"), ISI_PROPOSAL
     )
     assert hasil.red_flags == []
@@ -58,12 +58,12 @@ def test_rf3_membuang_red_flag_kritis_halusinasi_mengubah_verdict():
 
     kotor = skor_dengan("Omzet Rp900 juta per hari")
     assert decide_verdict(kotor, 60) is Verdict.REJECTED
-    bersih = buang_evidence_halusinasi(kotor, ISI_PROPOSAL)
+    bersih = drop_hallucinated_evidence(kotor, ISI_PROPOSAL)
     assert decide_verdict(bersih, 60) is Verdict.LISTED
 
 
 def test_rf3_pembandingan_mengabaikan_beda_spasi_dan_huruf_besar():
-    hasil = buang_evidence_halusinasi(
+    hasil = drop_hallucinated_evidence(
         skor_dengan("OMZET   RATA-RATA  rp12 JUTA"), ISI_PROPOSAL
     )
     assert len(hasil.red_flags) == 1
@@ -72,7 +72,7 @@ def test_rf3_pembandingan_mengabaikan_beda_spasi_dan_huruf_besar():
 def test_rf3_pembandingan_menolak_parafrase():
     """Beda spasi dan huruf besar diabaikan, tapi parafrase tetap dibuang:
     'omzet bulanan dua belas juta' bukan kutipan persis dari isi proposal."""
-    hasil = buang_evidence_halusinasi(
+    hasil = drop_hallucinated_evidence(
         skor_dengan("omzet bulanan dua belas juta"), ISI_PROPOSAL
     )
     assert hasil.red_flags == []
@@ -90,7 +90,7 @@ def test_gemini_engine_menolak_dibuat_tanpa_kunci_api():
 class _StubCompletions:
     """Pengganti instructor.AsyncInstructor.chat.completions, tanpa jaringan
     (C-28). Mencatat messages yang dikirim supaya test bisa memeriksa prompt
-    yang sungguh dirakit _rakit_isi(), bukan cuma bahwa score() mengembalikan
+    yang sungguh dirakit _assemble_content(), bukan cuma bahwa score() mengembalikan
     sesuatu."""
 
     def __init__(self, hasil: ProposalScore) -> None:
@@ -115,7 +115,7 @@ class _StubClient:
 @dataclass
 class _CampaignLengkap:
     """campaign_draft di unit/conftest.py sengaja cuma punya target_amount
-    (C-25: hanya field yang dibaca MockScoringEngine). GeminiEngine._rakit_isi
+    (C-25: hanya field yang dibaca MockScoringEngine). GeminiEngine._assemble_content
     juga membaca title/sector/description, jadi test ini butuh draft sendiri
     yang lebih lengkap."""
 
@@ -141,7 +141,7 @@ def _bangun_engine_dengan_stub(
     # __new__, bukan GeminiEngine(client, model, timeout_s): __init__
     # membungkus client lewat instructor.from_genai(client, use_async=True),
     # yang menolak objek selain genai.Client sungguhan. Stub ini menggantikan
-    # _client secara langsung, menjaga score() dan _rakit_isi() tetap
+    # _client secara langsung, menjaga score() dan _assemble_content() tetap
     # kode sungguhan yang diuji, tanpa menyentuh jaringan maupun instructor.
     engine = GeminiEngine.__new__(GeminiEngine)
     engine._client = stub
@@ -202,7 +202,7 @@ async def test_rf2_score_rejects_a_prompt_larger_than_the_configured_cap(
     stub = _StubClient(skor_dengan("evidence apa pun"))
     engine = _bangun_engine_dengan_stub(stub, max_prompt_chars=10)
 
-    with pytest.raises(PromptTerlaluBesar):
+    with pytest.raises(PromptTooLarge):
         await engine.score(proposal_draft, campaign_gemini_draft)
 
     assert stub.chat.completions.messages_terkirim is None, (
@@ -220,15 +220,15 @@ async def test_rf2_score_is_rejected_once_the_daily_budget_is_exhausted(
 
     await engine.score(proposal_draft, campaign_gemini_draft)
     await engine.score(proposal_draft, campaign_gemini_draft)
-    with pytest.raises(KuotaHarianTerlampaui):
+    with pytest.raises(DailyQuotaExceeded):
         await engine.score(proposal_draft, campaign_gemini_draft)
 
 
 def test_rf2_daily_budget_resets_on_a_new_day():
     hari_1 = [date(2026, 11, 9)]
     anggaran = _DailyBudget(limit=1)
-    anggaran._tanggal = hari_1[0]
-    anggaran._terpakai = 1
+    anggaran._date = hari_1[0]
+    anggaran._used = 1
 
     class _JamBesok:
         def now(self):
@@ -239,6 +239,6 @@ def test_rf2_daily_budget_resets_on_a_new_day():
     asli = modul_gemini._clock
     modul_gemini._clock = _JamBesok()
     try:
-        anggaran.pakai()  # tidak melempar: hari baru, hitungan direset
+        anggaran.use()  # tidak melempar: hari baru, hitungan direset
     finally:
         modul_gemini._clock = asli

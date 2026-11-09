@@ -31,7 +31,7 @@ from app.schemas.milestone import MilestoneReportIn
 from app.services.auth import hash_password
 from app.services.milestone import approve_milestone, submit_report
 from app.services.pledge import create_pledge, get_locked_proposal
-from app.services.scoring import jalankan_scoring
+from app.services.scoring import run_scoring
 
 
 async def _create_committed_user(role: Role, label: str) -> User:
@@ -108,7 +108,7 @@ async def funded_proposal_tercommit(lead, clock):
         )
         session.add(proposal)
         await session.flush()
-        await jalankan_scoring(session, proposal.id, MockScoringEngine(), clock)
+        await run_scoring(session, proposal.id, MockScoringEngine(), clock)
 
         for seq, judul in ((1, "Beli mesin"), (2, "Bahan baku")):
             session.add(

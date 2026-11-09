@@ -51,11 +51,11 @@ from app.schemas.auth import RegisterIn
 from app.schemas.campaign import CampaignIn
 from app.schemas.proposal import MilestoneIn, ProposalIn
 from app.services.auth import register_user
-from app.services.campaign import buat_campaign
+from app.services.campaign import create_campaign
 from app.services.milestone import approve_milestone
 from app.services.pledge import create_pledge, get_locked_proposal
 from app.services.proposal import submit_proposal
-from app.services.scoring import jalankan_scoring
+from app.services.scoring import run_scoring
 
 # Satu password untuk seluruh akun demo: lihat docstring modul ini soal
 # alasannya sengaja identik dan mencolok, bukan disamarkan jadi kuat tapi acak.
@@ -95,7 +95,7 @@ _DISCLAIMER = (
 
 
 @dataclass(frozen=True, slots=True)
-class HasilSeed:
+class SeedResult:
     """Ringkasan hasil `seed_demo_data`, dipakai endpoint dan CLI untuk melapor."""
 
     sudah_pernah_disemai: bool
@@ -106,22 +106,24 @@ class HasilSeed:
     jumlah_ledger_entry: int
 
 
-async def _hitung(session: AsyncSession, model: type) -> int:
+async def _count(session: AsyncSession, model: type) -> int:
     return int(await session.scalar(select(func.count()).select_from(model)) or 0)
 
 
-async def _ringkas(session: AsyncSession, *, sudah_pernah: bool) -> HasilSeed:
-    return HasilSeed(
+async def _summarize(session: AsyncSession, *, sudah_pernah: bool) -> SeedResult:
+    return SeedResult(
         sudah_pernah_disemai=sudah_pernah,
-        jumlah_user=await _hitung(session, User),
-        jumlah_campaign=await _hitung(session, Campaign),
-        jumlah_proposal=await _hitung(session, Proposal),
-        jumlah_pledge=await _hitung(session, Pledge),
-        jumlah_ledger_entry=await _hitung(session, LedgerEntry),
+        jumlah_user=await _count(session, User),
+        jumlah_campaign=await _count(session, Campaign),
+        jumlah_proposal=await _count(session, Proposal),
+        jumlah_pledge=await _count(session, Pledge),
+        jumlah_ledger_entry=await _count(session, LedgerEntry),
     )
 
 
-async def _buat_user(session: AsyncSession, email: str, name: str, role: Role) -> User:
+async def _create_user(
+    session: AsyncSession, email: str, name: str, role: Role
+) -> User:
     return await register_user(
         session, RegisterIn(email=email, password=DEMO_PASSWORD, name=name, role=role)
     )
@@ -140,7 +142,7 @@ class _ProposalSpec:
     engine (lihat docstring modul) supaya skornya persis dan tidak berubah
     antar-pemutaran demo."""
 
-    pemilik: User
+    owner: User
     business_name: str
     business_profile: str
     fund_usage_plan: str
@@ -149,7 +151,7 @@ class _ProposalSpec:
     milestones: Sequence[_MilestoneSpec]
 
 
-async def _submit_dan_nilai(
+async def _submit_and_score(
     session: AsyncSession, campaign: Campaign, spec: _ProposalSpec, clock: Clock
 ) -> Proposal:
     body = ProposalIn(
@@ -165,16 +167,16 @@ async def _submit_dan_nilai(
             for i, m in enumerate(spec.milestones)
         ],
     )
-    proposal = await submit_proposal(session, spec.pemilik, campaign, body, clock)
-    # Lewat orkestrasi sungguhan (jalankan_scoring), bukan status yang
+    proposal = await submit_proposal(session, spec.owner, campaign, body, clock)
+    # Lewat orkestrasi sungguhan (run_scoring), bukan status yang
     # ditulis langsung: data demo harus tunduk pada aturan yang sama dengan
     # data produksi (BR-73), termasuk ScoringResult yang tercatat di baliknya.
-    await jalankan_scoring(session, proposal.id, _ENGINE, clock)
+    await run_scoring(session, proposal.id, _ENGINE, clock)
     await session.refresh(proposal)
     return proposal
 
 
-def _spesifikasi_proposal(
+def _proposal_specs(
     umkm1: User, umkm2: User, umkm3: User, umkm4: User
 ) -> tuple[list[_ProposalSpec], list[_ProposalSpec]]:
     """Enam proposal, dipisah per campaign tujuannya. Dua UMKM (umkm1, umkm2)
@@ -183,7 +185,7 @@ def _spesifikasi_proposal(
     ada di campaign yang berbeda, bukan campaign yang sama."""
     campaign1 = [
         _ProposalSpec(
-            pemilik=umkm1,
+            owner=umkm1,
             business_name="Warung Kopi Mbak Sri",
             business_profile=(
                 "Warung Kopi Mbak Sri adalah kedai kopi rumahan di kawasan "
@@ -219,7 +221,7 @@ def _spesifikasi_proposal(
             ],
         ),
         _ProposalSpec(
-            pemilik=umkm2,
+            owner=umkm2,
             business_name="Kerajinan Rotan Pak Dedi",
             business_profile=(
                 "Kerajinan Rotan Pak Dedi memproduksi kursi dan keranjang "
@@ -257,7 +259,7 @@ def _spesifikasi_proposal(
             ],
         ),
         _ProposalSpec(
-            pemilik=umkm3,
+            owner=umkm3,
             business_name="Katering Bu Yanti",
             business_profile=(
                 "Katering Bu Yanti melayani pesanan nasi kotak dan tumpeng "
@@ -298,7 +300,7 @@ def _spesifikasi_proposal(
             ],
         ),
         _ProposalSpec(
-            pemilik=umkm4,
+            owner=umkm4,
             business_name="Bengkel Las Mas Tono",
             business_profile=(
                 "Bengkel Las Mas Tono mengerjakan pagar, teralis, dan pesanan "
@@ -335,7 +337,7 @@ def _spesifikasi_proposal(
     ]
     campaign2 = [
         _ProposalSpec(
-            pemilik=umkm1,
+            owner=umkm1,
             business_name="Toko Kelontong Bu Imah",
             business_profile=(
                 "Toko Kelontong Bu Imah menjual sembako dan kebutuhan harian "
@@ -366,7 +368,7 @@ def _spesifikasi_proposal(
             ],
         ),
         _ProposalSpec(
-            pemilik=umkm2,
+            owner=umkm2,
             business_name="Peternakan Lele Instan",
             business_profile=(
                 "Peternakan Lele Instan mengelola delapan kolam terpal di "
@@ -417,7 +419,7 @@ def _spesifikasi_proposal(
 
 async def seed_demo_data(
     session: AsyncSession, clock: Clock | None = None
-) -> HasilSeed:
+) -> SeedResult:
     """Mengisi database dengan 3 investor, 4 UMKM, 2 campaign, dan 6 proposal
     dengan kualitas berbeda (10-api-contract.md:97).
 
@@ -428,35 +430,35 @@ async def seed_demo_data(
     clock = clock or SystemClock()
 
     if await session.scalar(select(User).where(User.email == SEED_SENTINEL_EMAIL)):
-        return await _ringkas(session, sudah_pernah=True)
+        return await _summarize(session, sudah_pernah=True)
 
-    investor1 = await _buat_user(
+    investor1 = await _create_user(
         session, SEED_SENTINEL_EMAIL, "Hendra Wijaya (Demo)", Role.INVESTOR
     )
-    investor2 = await _buat_user(
+    investor2 = await _create_user(
         session,
         f"investor2@{DEMO_EMAIL_DOMAIN}",
         "Maria Angelina (Demo)",
         Role.INVESTOR,
     )
-    investor3 = await _buat_user(
+    investor3 = await _create_user(
         session, f"investor3@{DEMO_EMAIL_DOMAIN}", "Fajar Nugroho (Demo)", Role.INVESTOR
     )
-    umkm1 = await _buat_user(
+    umkm1 = await _create_user(
         session, f"umkm1@{DEMO_EMAIL_DOMAIN}", "Dian Permata (Demo)", Role.UMKM
     )
-    umkm2 = await _buat_user(
+    umkm2 = await _create_user(
         session, f"umkm2@{DEMO_EMAIL_DOMAIN}", "Agus Setiawan (Demo)", Role.UMKM
     )
-    umkm3 = await _buat_user(
+    umkm3 = await _create_user(
         session, f"umkm3@{DEMO_EMAIL_DOMAIN}", "Eka Nurhayati (Demo)", Role.UMKM
     )
-    umkm4 = await _buat_user(
+    umkm4 = await _create_user(
         session, f"umkm4@{DEMO_EMAIL_DOMAIN}", "Bambang Prasetyo (Demo)", Role.UMKM
     )
 
     sekarang = clock.now()
-    campaign1 = await buat_campaign(
+    campaign1 = await create_campaign(
         session,
         investor1,
         CampaignIn(
@@ -476,7 +478,7 @@ async def seed_demo_data(
         ),
         clock,
     )
-    campaign2 = await buat_campaign(
+    campaign2 = await create_campaign(
         session,
         investor2,
         CampaignIn(
@@ -496,15 +498,15 @@ async def seed_demo_data(
         clock,
     )
 
-    # Urutan sama dengan daftar di _spesifikasi_proposal: warung kopi,
+    # Urutan sama dengan daftar di _proposal_specs: warung kopi,
     # kerajinan rotan, katering, bengkel las.
-    spesifikasi_c1, spesifikasi_c2 = _spesifikasi_proposal(umkm1, umkm2, umkm3, umkm4)
+    spesifikasi_c1, spesifikasi_c2 = _proposal_specs(umkm1, umkm2, umkm3, umkm4)
     _, proposal_rotan, proposal_katering, _ = [
-        await _submit_dan_nilai(session, campaign1, spec, clock)
+        await _submit_and_score(session, campaign1, spec, clock)
         for spec in spesifikasi_c1
     ]
     for spec in spesifikasi_c2:
-        await _submit_dan_nilai(session, campaign2, spec, clock)
+        await _submit_and_score(session, campaign2, spec, clock)
 
     # P2 "Kerajinan Rotan Pak Dedi": satu pledge yang sengaja tidak menutup
     # seluruh dana (BR-20..BR-24), supaya proposal ini tetap partially_funded
@@ -530,4 +532,4 @@ async def seed_demo_data(
     assert milestone_pertama is not None  # dijamin submit_proposal di atas
     await approve_milestone(session, milestone_pertama, investor2, clock)
 
-    return await _ringkas(session, sudah_pernah=False)
+    return await _summarize(session, sudah_pernah=False)

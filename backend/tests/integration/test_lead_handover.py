@@ -10,7 +10,7 @@ berpindah bisa dibedakan dari lead yang kebetulan sama.
 """
 
 from app.models.proposal import ProposalStatus as S
-from app.services.ledger import total_terkumpul_proposal
+from app.services.ledger import collected_amount_for_proposal
 
 
 async def test_rf4_cancelling_largest_pledge_after_funded_is_rejected(
@@ -89,7 +89,7 @@ async def test_rf4_funded_never_occurs_with_total_below_requested(
     )
     await db.refresh(listed_proposal)
 
-    total = await total_terkumpul_proposal(db, listed_proposal.id)
+    total = await collected_amount_for_proposal(db, listed_proposal.id)
     if listed_proposal.status is S.FUNDED:
         assert total == listed_proposal.requested_amount
     else:

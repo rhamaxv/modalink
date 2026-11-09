@@ -10,13 +10,13 @@ from app.domain.money import Rupiah
 
 
 @dataclass(frozen=True, slots=True)
-class PledgeRingkas:
+class PledgeSummary:
     investor_id: UUID
     amount: Rupiah
     created_at: datetime
 
 
-def pick_lead_investor(pledges: Sequence[PledgeRingkas]) -> UUID | None:
+def pick_lead_investor(pledges: Sequence[PledgeSummary]) -> UUID | None:
     if not pledges:
         return None
 

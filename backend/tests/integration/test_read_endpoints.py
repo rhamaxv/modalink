@@ -154,7 +154,7 @@ async def test_br67_pledges_list_reveals_investor_identity_once_funded(
 async def test_milestones_visible_for_public_proposal_and_404_for_private_non_owner(
     client, db, listed_proposal, submitted_proposal, umkm, umkm_lain
 ):
-    """`listed_proposal` publik (boleh_melihat selalu True untuk status itu),
+    """`listed_proposal` publik (can_view selalu True untuk status itu),
     `submitted_proposal` tidak publik dan dimiliki `umkm` (bukan `umkm_lain`):
     GET milestones mewarisi persis aturan akses GET /proposals/{id}."""
     # listed_proposal sudah membawa dua milestone dari fixture-nya (BR-14,
@@ -347,7 +347,7 @@ async def test_t1_public_proposal_detail_includes_collected_amount(
 ):
     """Task 1: pengunjung tanpa akun tidak punya cara lain melihat progres
     funding -- GET /proposals/{id}/pledges mewajibkan investor atau pemilik
-    (api/deps.py `ambil_proposal_untuk_daftar_pledge`). collected_amount
+    (api/deps.py `get_proposal_for_pledge_listing`). collected_amount
     harus muncul tanpa header Authorization apa pun."""
     proposal = await get_locked_proposal(db, listed_proposal.id)
     await create_pledge(db, investor.user, proposal, 3_000_000, clock)
@@ -390,13 +390,13 @@ async def test_t1_proposal_list_collected_amount_has_no_n_plus_1(
     satu query ledger per baris di atas itu. Dibuktikan lewat jumlah SELECT
     sungguhan yang dieksekusi connection ini, dibandingkan antara satu
     proposal publik dan enam: kalau collected_amount dihitung satu-satu
-    lewat `total_terkumpul_proposal` di dalam loop (N+1), selisihnya akan
+    lewat `collected_amount_for_proposal` di dalam loop (N+1), selisihnya akan
     bertambah mengikuti jumlah proposal baru, bukan tetap."""
     from sqlalchemy import event
 
     from app.models.proposal import Proposal
     from app.models.user import Role
-    from app.services.proposal import daftar_proposal_publik
+    from app.services.proposal import list_public_proposals
 
     def _proposal(i: int, umkm_id) -> Proposal:
         return Proposal(
@@ -424,7 +424,7 @@ async def test_t1_proposal_list_collected_amount_has_no_n_plus_1(
 
         event.listen(conn.sync_connection, "before_cursor_execute", _tambah)
         try:
-            await daftar_proposal_publik(db, clock, page=1, page_size=20)
+            await list_public_proposals(db, clock, page=1, page_size=20)
         finally:
             event.remove(conn.sync_connection, "before_cursor_execute", _tambah)
         return jumlah

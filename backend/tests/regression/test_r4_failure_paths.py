@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.proposal import Proposal, ProposalMilestone, ProposalStatus
 from app.models.user import Role
-from app.services.ledger import hitung_saldo, total_pledge_aktif
+from app.services.ledger import compute_balance, total_pledge_aktif
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ async def test_r4_deadline_past_refunds_all_pledges(
     entri = await ambil_ledger(db, listed_proposal.id)
     refund = sum(e.amount for e in entri if e.entry_type is EntryType.REFUND_OUT)
     assert refund == 7_000_000
-    assert hitung_saldo(entri) == 0
+    assert compute_balance(entri) == 0
     await db.refresh(listed_proposal)
     assert listed_proposal.status is ProposalStatus.FAILED
 
@@ -133,9 +133,9 @@ async def test_r4_deadline_past_refunds_all_pledges(
 async def test_br60_lazy_expiry_refund_uses_injected_clock_not_wall_clock(
     client, db, listed_proposal, investor_a, majukan
 ):
-    """Finding 4: catat_entri dulu punya jam sendiri (SystemClock module-level)
+    """Finding 4: record_entry dulu punya jam sendiri (SystemClock module-level)
     lepas dari clock yang disuntikkan permintaan. Refund yang ditulis lazy
-    expiry (evaluasi_kedaluwarsa) tetap tertanggal mendekati jam dinding,
+    expiry (evaluate_expiry) tetap tertanggal mendekati jam dinding,
     bukan tanggal virtual yang memicunya -- padahal pledge_in yang sama
     sudah tercatat jauh lebih awal. GET /internal/ledger/{id}, yang
     diurutkan created_at supaya juri bisa mengaudit uang, bisa menampilkan

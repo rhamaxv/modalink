@@ -27,7 +27,7 @@ from app.schemas.milestone import MilestoneReportIn
 from app.services.auth import hash_password, issue_token
 from app.services.milestone import approve_milestone, submit_report
 from app.services.pledge import create_pledge
-from app.services.scoring import jalankan_scoring
+from app.services.scoring import run_scoring
 
 
 @pytest.fixture
@@ -149,7 +149,7 @@ async def community_lain(db):
 @pytest.fixture
 async def umkm_ketiga(db):
     """UMKM ketiga: dipakai rejected_proposal supaya transisi sementaranya
-    lewat submitted (sebelum jalankan_scoring menolaknya) tidak bertabrakan
+    lewat submitted (sebelum run_scoring menolaknya) tidak bertabrakan
     dengan submitted_proposal atau listed_proposal pada campaign yang sama,
     yang keduanya juga aktif menurut partial unique index (BR-13)."""
     return await _buat_akun(db, "umkm-ketiga-teruji@contoh.id", Role.UMKM)
@@ -293,7 +293,7 @@ async def listed_proposal(db, campaign, umkm_lain, clock):
     )
     db.add(p)
     await db.flush()
-    await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+    await run_scoring(db, p.id, MockScoringEngine(), clock)
     await db.refresh(p)
     # Dua milestone yang jumlahnya persis sama dengan requested_amount
     # (BR-14), dipakai fixture milestone (funded_proposal.milestones) di
@@ -378,7 +378,7 @@ async def submitted_proposal(db, campaign, umkm):
 async def rejected_proposal(db, campaign, umkm_ketiga, clock):
     """Proposal yang ditolak scoring sungguhan lewat red flag kritis (BR-72),
     dicapai lewat orkestrasi, bukan status yang diset langsung. Statusnya
-    melewati submitted dulu (aktif menurut BR-13) sebelum jalankan_scoring
+    melewati submitted dulu (aktif menurut BR-13) sebelum run_scoring
     menolaknya, jadi pemiliknya harus berbeda dari submitted_proposal dan
     listed_proposal yang berbagi campaign yang sama dan tetap aktif di sana
     (lihat umkm_ketiga)."""
@@ -389,7 +389,7 @@ async def rejected_proposal(db, campaign, umkm_ketiga, clock):
     )
     db.add(p)
     await db.flush()
-    await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+    await run_scoring(db, p.id, MockScoringEngine(), clock)
     await db.refresh(p)
     return p
 
@@ -405,7 +405,7 @@ async def proposal_scoring_gagal(db, campaign, umkm, clock, engine_meledak):
     )
     db.add(p)
     await db.flush()
-    await jalankan_scoring(db, p.id, engine_meledak, clock)
+    await run_scoring(db, p.id, engine_meledak, clock)
     await db.refresh(p)
     return p
 
@@ -464,7 +464,7 @@ def proposal_dengan(db, campaign, clock):
         )
         db.add(p)
         await db.flush()
-        await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+        await run_scoring(db, p.id, MockScoringEngine(), clock)
         for i in range(vote):
             akun = await _akun_komunitas(i)
             db.add(Vote(proposal_id=p.id, user_id=akun.user.id))
@@ -497,7 +497,7 @@ async def proposal_discore_ulang(db, campaign, clock):
     )
     db.add(p)
     await db.flush()
-    await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+    await run_scoring(db, p.id, MockScoringEngine(), clock)
 
     await db.refresh(p)
     p.scoring_status = ScoringStatus.PENDING
@@ -508,7 +508,7 @@ async def proposal_discore_ulang(db, campaign, clock):
     # menghasilkan 50 lagi, bukan membuktikan apa pun soal baris terbaru.
     p.business_profile = "x" * 110 + " [[SCORE:95]]"
     await db.flush()
-    await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
+    await run_scoring(db, p.id, MockScoringEngine(), clock)
     await db.refresh(p)
     return ProposalWithSkorTerbaru(proposal=p, skor_terbaru=95)
 

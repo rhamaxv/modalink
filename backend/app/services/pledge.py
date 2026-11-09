@@ -15,7 +15,7 @@ from sqlmodel import select
 
 from app.domain.clock import Clock
 from app.domain.funding import compute_funding_status, remaining_amount
-from app.domain.lead_investor import PledgeRingkas, pick_lead_investor
+from app.domain.lead_investor import PledgeSummary, pick_lead_investor
 from app.domain.money import format_rupiah
 from app.domain.transitions import PLEDGE_LOCKED_PROPOSAL_STATUSES
 from app.domain.transitions import ProposalEvent as DomainProposalEvent
@@ -27,7 +27,7 @@ from app.models.pledge import Pledge, PledgeStatus
 from app.models.proposal import Proposal, ProposalStatus
 from app.models.user import User
 from app.schemas.pledge import MIN_PLEDGE_AMOUNT
-from app.services.ledger import catat_entri, total_terkumpul_proposal
+from app.services.ledger import collected_amount_for_proposal, record_entry
 from app.services.status import advance_proposal
 
 # BR-20: hanya proposal pada status ini yang boleh menerima pledge baru.
@@ -102,7 +102,7 @@ async def create_pledge(
         # langsung melompat ke partially_funded lewat recompute_funding_status
         # di bawah, melanggar BR-20.
         remaining = remaining_amount(
-            await total_terkumpul_proposal(session, proposal.id),
+            await collected_amount_for_proposal(session, proposal.id),
             proposal.requested_amount,
         )
         raise ConflictError(
@@ -138,7 +138,8 @@ async def create_pledge(
         )
 
     remaining = remaining_amount(
-        await total_terkumpul_proposal(session, proposal.id), proposal.requested_amount
+        await collected_amount_for_proposal(session, proposal.id),
+        proposal.requested_amount,
     )
     if amount > remaining:
         raise ConflictError(
@@ -157,7 +158,7 @@ async def create_pledge(
     session.add(pledge)
     await session.flush()
 
-    await catat_entri(
+    await record_entry(
         session,
         proposal.id,
         EntryType.PLEDGE_IN,
@@ -185,7 +186,7 @@ async def cancel_pledge(
     dua pembatalan hampir bersamaan pada pledge yang sama bisa-bisa keduanya
     lolos pengecekan itu. Yang sebenarnya menutup balapan itu bukan lock
     baris proposal -- pledge memang tidak pernah dikunci sendiri -- melainkan
-    idempotency_key `refund:{pledge.id}` di `catat_entri`: kalau keduanya
+    idempotency_key `refund:{pledge.id}` di `record_entry`: kalau keduanya
     lolos, keduanya sama-sama mencoba INSERT ledger dengan kunci yang sama,
     dan yang kedua kalah lewat unique constraint, bukan lewat baris Python
     ini. Window ini sudah dicoba dipaksa lewat forced interleaving 0.4 detik
@@ -216,7 +217,7 @@ async def cancel_pledge(
     session.add(pledge)
     await session.flush()
 
-    await catat_entri(
+    await record_entry(
         session,
         proposal.id,
         EntryType.REFUND_OUT,
@@ -314,7 +315,7 @@ async def recompute_funding_status(
         for p in aktif:
             p.status = PledgeStatus.CANCELLED
             session.add(p)
-            await catat_entri(
+            await record_entry(
                 session,
                 proposal.id,
                 EntryType.REFUND_OUT,
@@ -328,7 +329,7 @@ async def recompute_funding_status(
         aktif = []  # sudah seluruhnya direfund; lead investor jadi None di bawah
 
     proposal.lead_investor_id = pick_lead_investor(
-        [PledgeRingkas(p.investor_id, p.amount, p.created_at) for p in aktif]
+        [PledgeSummary(p.investor_id, p.amount, p.created_at) for p in aktif]
     )
     if proposal.status is ProposalStatus.FUNDED and proposal.funded_at is None:
         proposal.funded_at = clock.now()
@@ -336,7 +337,7 @@ async def recompute_funding_status(
 
 
 @dataclass(frozen=True, slots=True)
-class PledgeAktifDenganLeadMarker:
+class ActivePledgeWithLeadMarker:
     """Bentuk siap-serialisasi untuk GET /proposals/{id}/pledges
     (10-api-contract.md:67). Bukan Pledge langsung: SQLModel menolak atribut
     bebas (lihat ProposalWithPledge di tests/conftest.py untuk alasan yang
@@ -362,9 +363,9 @@ class PledgeAktifDenganLeadMarker:
     is_lead_investor: bool
 
 
-async def daftar_pledge_aktif(
+async def list_active_pledges(
     session: AsyncSession, proposal: Proposal
-) -> list[PledgeAktifDenganLeadMarker]:
+) -> list[ActivePledgeWithLeadMarker]:
     """Hanya pledge aktif (BR-20 sampai BR-26, 10-api-contract.md:67): yang
     sudah dibatalkan tidak pernah muncul di sini, beda dari riwayat penuh."""
     aktif = (
@@ -385,7 +386,7 @@ async def daftar_pledge_aktif(
         DomainProposalStatus(proposal.status.value) in PLEDGE_LOCKED_PROPOSAL_STATUSES
     )
     return [
-        PledgeAktifDenganLeadMarker(
+        ActivePledgeWithLeadMarker(
             id=p.id,
             proposal_id=p.proposal_id,
             investor_id=p.investor_id if identitas_boleh_tampil else None,

@@ -31,9 +31,9 @@ from app.errors import NotFoundError
 from app.schemas.internal import ClockOut, SeedOut, TickIn
 from app.schemas.ledger import LedgerOut
 from app.seed.demo import seed_demo_data
-from app.services.clock_service import ambil_clock, majukan_jam
-from app.services.ledger import ambil_ledger_proposal
-from app.services.proposal import ambil_proposal
+from app.services.clock_service import advance_clock, fetch_clock
+from app.services.ledger import get_proposal_ledger
+from app.services.proposal import get_proposal
 
 # Tanpa prefix, dengan path penuh di tiap dekorator: dua kelompok endpoint di
 # bawah ini tidak berbagi awalan yang sama (/internal/clock/... dan
@@ -46,8 +46,8 @@ async def tick_endpoint(
     body: TickIn,
     session: AsyncSession = Depends(get_session),
 ) -> ClockOut:
-    await majukan_jam(session, body.advance_days)
-    clock = await ambil_clock(session)
+    await advance_clock(session, body.advance_days)
+    clock = await fetch_clock(session)
     return ClockOut(virtual_now=clock.now())
 
 
@@ -65,12 +65,12 @@ async def seed_endpoint(session: AsyncSession = Depends(get_session)) -> SeedOut
 
 
 @router.get("/api/v1/internal/ledger/{proposal_id}", response_model=LedgerOut)
-async def ambil_ledger_endpoint(
+async def get_ledger_endpoint(
     proposal_id: UUID,
     session: AsyncSession = Depends(get_session),
 ) -> LedgerOut:
-    proposal = await ambil_proposal(session, proposal_id)
+    proposal = await get_proposal(session, proposal_id)
     if proposal is None:
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
-    entries, balance = await ambil_ledger_proposal(session, proposal_id)
+    entries, balance = await get_proposal_ledger(session, proposal_id)
     return LedgerOut(entries=entries, balance=balance)

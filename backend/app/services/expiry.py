@@ -2,7 +2,7 @@
 
 Tidak ada scheduler: transisi ke `failed` dihitung saat proposal (atau daftar
 proposal milik sebuah campaign) dibaca, bukan oleh job terjadwal. Pola yang
-sama dipakai `ambil_campaign_detail` di services/campaign.py untuk
+sama dipakai `get_campaign_detail` di services/campaign.py untuk
 `apply_deadline` (T-41); modul ini melakukan hal yang sama untuk
 `funding_deadline`, ditambah refund yang BR-62 wajibkan begitu transisi ke
 `failed` terjadi.
@@ -20,23 +20,23 @@ from app.models.campaign import Campaign
 from app.models.ledger import EntryType
 from app.models.pledge import Pledge, PledgeStatus
 from app.models.proposal import Proposal, ProposalStatus
-from app.services.ledger import catat_entri
+from app.services.ledger import record_entry
 from app.services.pledge import get_locked_proposal
 from app.services.status import advance_proposal
 
-AKTIF = {ProposalStatus.LISTED, ProposalStatus.PARTIALLY_FUNDED}
+ACTIVE_STATUSES = {ProposalStatus.LISTED, ProposalStatus.PARTIALLY_FUNDED}
 
 # FAILED ikut diperiksa, dan ini bukan kehati-hatian berlebihan. Pledge bisa
 # masuk atau dibatalkan tepat setelah funding_deadline lewat; recompute_funding_status
 # langsung menulis failed, dan pledge aktifnya tertinggal tanpa refund_out kalau
 # jalur itu sendiri gagal menuntaskannya (lihat juga catatan di
 # services/pledge.py:recompute_funding_status). Kalau fungsi ini menyaring
-# status saja lewat AKTIF, proposal yang sudah failed semacam itu dilewati
+# status saja lewat ACTIVE_STATUSES, proposal yang sudah failed semacam itu dilewati
 # selamanya dan uang investor lain tidak pernah kembali (BR-62).
-PERLU_REKONSILIASI = AKTIF | {ProposalStatus.FAILED}
+NEEDS_RECONCILIATION = ACTIVE_STATUSES | {ProposalStatus.FAILED}
 
 
-async def evaluasi_kedaluwarsa(
+async def evaluate_expiry(
     session: AsyncSession, proposal: Proposal, clock: Clock
 ) -> None:
     """Dipanggil di awal setiap pembacaan proposal, baik satu proposal maupun
@@ -48,7 +48,7 @@ async def evaluasi_kedaluwarsa(
     seluruh pledge aktifnya sudah `cancelled`, baris `aktif` di bawah kosong
     dan badan loop tidak pernah berjalan lagi.
     """
-    if proposal.status not in PERLU_REKONSILIASI:
+    if proposal.status not in NEEDS_RECONCILIATION:
         return
 
     campaign = await session.get(Campaign, proposal.campaign_id)
@@ -77,14 +77,14 @@ async def evaluasi_kedaluwarsa(
             return
 
     # Pemeriksaan pertama di atas memakai `proposal` yang bisa saja belum
-    # terkunci (pemanggil di router hanya membacanya lewat ambil_proposal()).
+    # terkunci (pemanggil di router hanya membacanya lewat get_proposal()).
     # Baris di bawah ini mengunci baris yang sama lalu membaca ulang
     # statusnya: kalau transaksi lain (request pledge/cancel yang hampir
     # bersamaan) sudah mengubahnya di antara pemeriksaan pertama dan baris
     # ini, keputusan harus dibuat dari keadaan terbaru, bukan dari snapshot
     # yang sudah basi.
     terkunci = await get_locked_proposal(session, proposal.id)
-    if terkunci.status not in PERLU_REKONSILIASI:
+    if terkunci.status not in NEEDS_RECONCILIATION:
         return  # transaksi lain sudah mengurusnya sebelum baris ini terkunci
 
     aktif = (
@@ -97,7 +97,7 @@ async def evaluasi_kedaluwarsa(
     ).all()
     for p in aktif:
         p.status = PledgeStatus.CANCELLED
-        await catat_entri(
+        await record_entry(
             session,
             terkunci.id,
             EntryType.REFUND_OUT,
@@ -109,7 +109,7 @@ async def evaluasi_kedaluwarsa(
             actor_id=p.investor_id,
         )
 
-    if terkunci.status in AKTIF:
+    if terkunci.status in ACTIVE_STATUSES:
         # Belum pernah ditulis failed lewat jalur mana pun (kasus normal:
         # listed/partially_funded yang baru sekarang melewati deadline).
         # Proposal yang sudah failed sebelum baris ini (kasus BR-62 di atas)
@@ -118,17 +118,17 @@ async def evaluasi_kedaluwarsa(
     await session.flush()
 
 
-async def evaluasi_kedaluwarsa_banyak(
+async def evaluate_expiry_many(
     session: AsyncSession, proposals: Sequence[Proposal], clock: Clock
 ) -> None:
     """Merekonsiliasi kedaluwarsa untuk satu HALAMAN daftar publik anonim
-    (`daftar_proposal_publik`, `daftar_proposal_campaign`) -- review
+    (`list_public_proposals`, `list_campaign_proposals`) -- review
     keamanan Finding 1.
 
-    Locking per proposal lewat `evaluasi_kedaluwarsa` di atas sudah benar
+    Locking per proposal lewat `evaluate_expiry` di atas sudah benar
     dan perlu (BR-62 wajib mengunci baris sebelum menulis refund). Yang
-    salah bukan locking itu sendiri, melainkan URUTANNYA: daftar_proposal_publik
-    menampilkan proposal created_at DESC lalu id DESC, daftar_proposal_campaign
+    salah bukan locking itu sendiri, melainkan URUTANNYA: list_public_proposals
+    menampilkan proposal created_at DESC lalu id DESC, list_campaign_proposals
     menampilkan total_score DESC lalu vote_count DESC lalu created_at lalu id.
     Dua proposal kedaluwarsa yang sama bisa muncul berurutan terbalik di dua
     daftar itu, dan dua request anonim bersamaan yang masing-masing mengunci
@@ -152,7 +152,7 @@ async def evaluasi_kedaluwarsa_banyak(
     pertama, lalu lanjut, persis seperti dua request berurutan.
     """
     kandidat = sorted(
-        (p for p in proposals if p.status in PERLU_REKONSILIASI), key=lambda p: p.id
+        (p for p in proposals if p.status in NEEDS_RECONCILIATION), key=lambda p: p.id
     )
     for p in kandidat:
-        await evaluasi_kedaluwarsa(session, p, clock)
+        await evaluate_expiry(session, p, clock)

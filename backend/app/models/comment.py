@@ -1,7 +1,7 @@
 """Model komentar komunitas pada proposal (BR-33, BR-34).
 
 `deleted_at` adalah soft delete (10-api-contract.md): baris tidak pernah
-benar-benar hilang, hanya disembunyikan dari `daftar_komentar`.
+benar-benar hilang, hanya disembunyikan dari `list_comments`.
 """
 
 from datetime import datetime

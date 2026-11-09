@@ -31,7 +31,7 @@ from app.services.status import advance_proposal, advance_scoring
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
 
-async def jalankan_scoring(
+async def run_scoring(
     session: AsyncSession, proposal_id: UUID, engine: ScoringEngine, clock: Clock
 ) -> None:
     proposal = await session.get(Proposal, proposal_id)
@@ -93,7 +93,7 @@ async def jalankan_scoring(
     await session.flush()
 
 
-async def jalankan_scoring_job(
+async def run_scoring_job(
     session_factory: SessionFactory,
     proposal_id: UUID,
     engine: ScoringEngine,
@@ -103,11 +103,11 @@ async def jalankan_scoring_job(
     lewat session_factory, bukan session request yang sudah selesai saat
     BackgroundTasks benar-benar berjalan."""
     async with session_factory() as session:
-        await jalankan_scoring(session, proposal_id, engine, clock)
+        await run_scoring(session, proposal_id, engine, clock)
 
 
 @asynccontextmanager
-async def sesi_job_produksi() -> AsyncIterator[AsyncSession]:
+async def production_job_session() -> AsyncIterator[AsyncSession]:
     """Implementasi SessionFactory sungguhan untuk app/api/deps.py: session
     baru per job, dikomit kalau tidak ada exception. Diletakkan di sini,
     bukan di deps.py, karena pagar AST menolak router/deps menyentuh
@@ -117,7 +117,7 @@ async def sesi_job_produksi() -> AsyncIterator[AsyncSession]:
         await session.commit()
 
 
-async def ambil_proposal_untuk_rescore(
+async def get_proposal_for_rescore(
     session: AsyncSession, proposal_id: UUID
 ) -> Proposal:
     proposal = await session.get(Proposal, proposal_id)
@@ -126,7 +126,7 @@ async def ambil_proposal_untuk_rescore(
     return proposal
 
 
-async def minta_rescore(session: AsyncSession, proposal: Proposal) -> None:
+async def request_rescore(session: AsyncSession, proposal: Proposal) -> None:
     if proposal.scoring_status is not ScoringStatus.FAILED:
         raise ConflictError(
             "scoring_belum_gagal",
@@ -144,9 +144,7 @@ async def minta_rescore(session: AsyncSession, proposal: Proposal) -> None:
     await session.flush()
 
 
-async def ambil_scoring_terbaru(
-    session: AsyncSession, proposal_id: UUID
-) -> ScoringResult:
+async def get_latest_scoring(session: AsyncSession, proposal_id: UUID) -> ScoringResult:
     proposal = await session.get(Proposal, proposal_id)
     if proposal is None:
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")

@@ -17,7 +17,7 @@ from app.models.pledge import Pledge, PledgeStatus
 # (lihat services/pledge.py). Perbandingan `is` di bawah akan selalu gagal
 # kalau S diimpor dari domain, meski nilainya sama persis.
 from app.models.proposal import ProposalStatus as S
-from app.services.ledger import catat_entri
+from app.services.ledger import record_entry
 from app.services.pledge import recompute_funding_status
 
 
@@ -33,7 +33,7 @@ def pledge(db, clock):
         )
         db.add(p)
         await db.flush()
-        await catat_entri(
+        await record_entry(
             db, proposal.id, EntryType.PLEDGE_IN, amount, f"pledge:{p.id}", clock=clock
         )
         return p
@@ -45,7 +45,7 @@ def pledge(db, clock):
 def batalkan(db, clock):
     async def _batalkan(p: Pledge) -> None:
         p.status = PledgeStatus.CANCELLED
-        await catat_entri(
+        await record_entry(
             db,
             p.proposal_id,
             EntryType.REFUND_OUT,

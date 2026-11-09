@@ -28,7 +28,7 @@ class LedgerEntryOut(BaseModel):
 
 
 class LedgerOut(BaseModel):
-    # balance dihitung di services/ledger.py lewat hitung_saldo atas entries
+    # balance dihitung di services/ledger.py lewat compute_balance atas entries
     # yang sama ini, tidak pernah dibaca dari kolom manapun (BR-52): kolom
     # saldo tidak ada dan tidak boleh ada.
     entries: list[LedgerEntryOut]

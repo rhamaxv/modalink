@@ -11,12 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.engine import ScoringEngine
 from app.api.deps import (
-    ambil_proposal_untuk_rescore_milik_sendiri,
     get_clock,
+    get_own_proposal_for_rescore,
     get_scoring_engine,
     get_session_factory,
-    jaga_akses_scoring_milik_sendiri,
-    pengguna_opsional,
+    guard_own_scoring_access,
+    optional_user,
     require_role,
 )
 from app.db.session import get_session
@@ -33,25 +33,25 @@ from app.schemas.proposal import (
     ProposalOut,
 )
 from app.schemas.scoring import ScoringResultOut
-from app.services.campaign import ambil_campaign
-from app.services.expiry import evaluasi_kedaluwarsa
-from app.services.ledger import total_terkumpul_proposal
+from app.services.campaign import get_campaign
+from app.services.expiry import evaluate_expiry
+from app.services.ledger import collected_amount_for_proposal
 from app.services.proposal import (
     PROPOSAL_PAGE_SIZE_DEFAULT,
     PROPOSAL_PAGE_SIZE_MAX,
-    ProposalDenganTerkumpul,
-    ambil_proposal,
-    boleh_melihat,
-    daftar_milestone_proposal,
-    daftar_proposal_milik,
-    daftar_proposal_publik,
+    ProposalWithCollectedAmount,
+    can_view,
+    get_proposal,
+    list_own_proposals,
+    list_proposal_milestones,
+    list_public_proposals,
     submit_proposal,
 )
 from app.services.scoring import (
     SessionFactory,
-    ambil_scoring_terbaru,
-    jalankan_scoring_job,
-    minta_rescore,
+    get_latest_scoring,
+    request_rescore,
+    run_scoring_job,
 )
 
 router = APIRouter(tags=["proposals"])
@@ -71,70 +71,72 @@ async def submit_proposal_endpoint(
     clock: Clock = Depends(get_clock),
     engine: ScoringEngine = Depends(get_scoring_engine),
     session_factory: SessionFactory = Depends(get_session_factory),
-) -> ProposalDenganTerkumpul:
-    campaign = await ambil_campaign(session, campaign_id)
+) -> ProposalWithCollectedAmount:
+    campaign = await get_campaign(session, campaign_id)
     if campaign is None:
         raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")
     proposal = await submit_proposal(session, umkm, campaign, body, clock)
     # Proposal masuk langsung dinilai, tanpa menunggu AI sebelum 201 dikirim
     # (10-api-contract.md): job jalan di latar belakang lewat JobRunner.
     InlineRunner(background_tasks, session).submit(
-        lambda: jalankan_scoring_job(session_factory, proposal.id, engine, clock)
+        lambda: run_scoring_job(session_factory, proposal.id, engine, clock)
     )
     # collected_amount=0 langsung, tanpa query: proposal yang baru disubmit
     # berstatus submitted, dan status itu tidak pernah menerima pledge
     # (FUNDABLE_PROPOSAL_STATUSES di services/pledge.py), jadi angkanya pasti
     # nol tanpa perlu dihitung.
-    return ProposalDenganTerkumpul(proposal=proposal, collected_amount=0)
+    return ProposalWithCollectedAmount(proposal=proposal, collected_amount=0)
 
 
 @router.get("/api/v1/proposals", response_model=ProposalListOut)
-async def daftar_proposal_endpoint(
+async def list_proposals_endpoint(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     page: int = Query(1, ge=1),
     page_size: int = Query(PROPOSAL_PAGE_SIZE_DEFAULT, ge=1, le=PROPOSAL_PAGE_SIZE_MAX),
 ) -> ProposalListOut:
-    items, total = await daftar_proposal_publik(session, clock, page, page_size)
+    items, total = await list_public_proposals(session, clock, page, page_size)
     return ProposalListOut(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/api/v1/proposals/mine", response_model=list[ProposalOut])
-async def daftar_proposal_mine_endpoint(
+async def list_my_proposals_endpoint(
     umkm: User = Depends(require_role(Role.UMKM)),
     session: AsyncSession = Depends(get_session),
-) -> list[ProposalDenganTerkumpul]:
+) -> list[ProposalWithCollectedAmount]:
     # Didaftarkan sebelum GET /proposals/{proposal_id} di bawah: keduanya
     # satu segmen setelah /proposals, dan FastAPI mencocokkan route sesuai
     # urutan pendaftaran, jadi "mine" harus menang lebih dulu atau akan
     # ditelan oleh {proposal_id} sebagai literal string yang gagal UUID.
-    return await daftar_proposal_milik(session, umkm.id)
+    return await list_own_proposals(session, umkm.id)
 
 
 @router.get("/api/v1/proposals/{proposal_id}", response_model=ProposalOut)
-async def ambil_proposal_endpoint(
+async def get_proposal_endpoint(
     proposal_id: UUID,
-    user: User | None = Depends(pengguna_opsional),
+    user: User | None = Depends(optional_user),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
-) -> ProposalDenganTerkumpul:
-    proposal = await ambil_proposal(session, proposal_id)
+) -> ProposalWithCollectedAmount:
+    proposal = await get_proposal(session, proposal_id)
     if proposal is None:
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
     # D-06/BR-61: evaluasi lazy berjalan di sini, sebelum pengecekan akses di
-    # bawah, supaya status yang dilihat pemanggil (termasuk boleh_melihat())
+    # bawah, supaya status yang dilihat pemanggil (termasuk can_view())
     # selalu yang terbaru, bukan status yang sudah basi karena deadline lewat.
-    await evaluasi_kedaluwarsa(session, proposal, clock)
-    campaign = await ambil_campaign(session, proposal.campaign_id)
+    await evaluate_expiry(session, proposal, clock)
+    campaign = await get_campaign(session, proposal.campaign_id)
     # campaign is None di sini praktis mustahil (FK menjamin keberadaannya),
     # tapi tetap dianggap "tidak boleh dilihat" alih-alih mengandalkan None
-    # menyebabkan AttributeError di boleh_melihat.
-    if campaign is None or not boleh_melihat(proposal, campaign, user):
+    # menyebabkan AttributeError di can_view.
+    if campaign is None or not can_view(proposal, campaign, user):
         # 404, bukan 403: mengonfirmasi keberadaan proposal yang tidak boleh
         # dilihat sudah jadi kebocoran tersendiri.
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
-    collected_amount = await total_terkumpul_proposal(session, proposal.id)
-    return ProposalDenganTerkumpul(proposal=proposal, collected_amount=collected_amount)
+    collected_amount = await collected_amount_for_proposal(session, proposal.id)
+    return ProposalWithCollectedAmount(
+        proposal=proposal, collected_amount=collected_amount
+    )
 
 
 @router.post(
@@ -143,15 +145,15 @@ async def ambil_proposal_endpoint(
 )
 async def rescore_proposal_endpoint(
     background_tasks: BackgroundTasks,
-    proposal: Proposal = Depends(ambil_proposal_untuk_rescore_milik_sendiri),
+    proposal: Proposal = Depends(get_own_proposal_for_rescore),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     engine: ScoringEngine = Depends(get_scoring_engine),
     session_factory: SessionFactory = Depends(get_session_factory),
 ) -> dict[str, str]:
-    await minta_rescore(session, proposal)
+    await request_rescore(session, proposal)
     InlineRunner(background_tasks, session).submit(
-        lambda: jalankan_scoring_job(session_factory, proposal.id, engine, clock)
+        lambda: run_scoring_job(session_factory, proposal.id, engine, clock)
     )
     return {"scoring_status": proposal.scoring_status.value}
 
@@ -159,31 +161,31 @@ async def rescore_proposal_endpoint(
 @router.get(
     "/api/v1/proposals/{proposal_id}/scoring",
     response_model=ScoringResultOut,
-    dependencies=[Depends(jaga_akses_scoring_milik_sendiri)],
+    dependencies=[Depends(guard_own_scoring_access)],
 )
-async def ambil_scoring_endpoint(
+async def get_scoring_endpoint(
     proposal_id: UUID,
     session: AsyncSession = Depends(get_session),
 ) -> ScoringResult:
-    return await ambil_scoring_terbaru(session, proposal_id)
+    return await get_latest_scoring(session, proposal_id)
 
 
 @router.get(
     "/api/v1/proposals/{proposal_id}/milestones", response_model=MilestoneListOut
 )
-async def daftar_milestone_endpoint(
+async def list_milestones_endpoint(
     proposal_id: UUID,
-    user: User | None = Depends(pengguna_opsional),
+    user: User | None = Depends(optional_user),
     session: AsyncSession = Depends(get_session),
 ) -> MilestoneListOut:
-    # Aturan akses baca sama persis dengan ambil_proposal_endpoint di atas
+    # Aturan akses baca sama persis dengan get_proposal_endpoint di atas
     # (publik bila proposal publik, 10-api-contract.md:73): milestone bukan
     # sumber daya yang punya aturan visibilitas sendiri, ia mewarisi
     # visibilitas proposal induknya.
-    proposal = await ambil_proposal(session, proposal_id)
+    proposal = await get_proposal(session, proposal_id)
     if proposal is None:
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
-    campaign = await ambil_campaign(session, proposal.campaign_id)
-    if campaign is None or not boleh_melihat(proposal, campaign, user):
+    campaign = await get_campaign(session, proposal.campaign_id)
+    if campaign is None or not can_view(proposal, campaign, user):
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
-    return MilestoneListOut(items=await daftar_milestone_proposal(session, proposal_id))
+    return MilestoneListOut(items=await list_proposal_milestones(session, proposal_id))

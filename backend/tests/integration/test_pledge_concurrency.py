@@ -23,9 +23,9 @@ from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
 from app.models.user import Role, User
 from app.services import pledge as pledge_service
 from app.services.auth import hash_password
-from app.services.ledger import total_terkumpul_proposal
+from app.services.ledger import collected_amount_for_proposal
 from app.services.pledge import create_pledge, get_locked_proposal
-from app.services.scoring import jalankan_scoring
+from app.services.scoring import run_scoring
 
 # Review menemukan RF-1 lolos byte-identik setelah with_for_update() dihapus
 # dari get_locked_proposal: asyncio.gather(attempt(a), attempt(b)) terlihat
@@ -50,16 +50,16 @@ _RF1_READ_DELAY_S = 0.05
 @pytest.fixture
 def paksa_interleaving_baca_remaining(monkeypatch):
     """Lihat komentar modul di atas: menyisipkan jeda tepat setelah
-    total_terkumpul_proposal (baca "sisa dana") dikembalikan ke create_pledge,
+    collected_amount_for_proposal (baca "sisa dana") dikembalikan ke create_pledge,
     sebelum create_pledge memutuskan menulis pledge atau menolak."""
-    asli = pledge_service.total_terkumpul_proposal
+    asli = pledge_service.collected_amount_for_proposal
 
     async def _dengan_delay(session, proposal_id):
         hasil = await asli(session, proposal_id)
         await asyncio.sleep(_RF1_READ_DELAY_S)
         return hasil
 
-    monkeypatch.setattr(pledge_service, "total_terkumpul_proposal", _dengan_delay)
+    monkeypatch.setattr(pledge_service, "collected_amount_for_proposal", _dengan_delay)
 
 
 async def _create_committed_user(role: Role, label: str) -> User:
@@ -149,7 +149,7 @@ async def listed_proposal_committed(investor_a, investor_b, clock):
         )
         session.add(proposal)
         await session.flush()
-        await jalankan_scoring(session, proposal.id, MockScoringEngine(), clock)
+        await run_scoring(session, proposal.id, MockScoringEngine(), clock)
         await session.commit()
         await session.refresh(proposal)
 
@@ -205,7 +205,9 @@ async def test_rf1_concurrent_pledges_do_not_exceed_target(
     assert sorted(outcomes) == ["rejected", "succeeded"]
 
     async with SessionLocal() as session:
-        total = await total_terkumpul_proposal(session, listed_proposal_committed.id)
+        total = await collected_amount_for_proposal(
+            session, listed_proposal_committed.id
+        )
     assert total == remaining  # R2: dana terkumpul tidak pernah melebihi yang diminta
 
 
@@ -228,5 +230,7 @@ async def test_rf1_total_pledged_never_exceeds_requested_amount(
     await asyncio.gather(attempt(investor_a), attempt(investor_b))
 
     async with SessionLocal() as session:
-        total = await total_terkumpul_proposal(session, listed_proposal_committed.id)
+        total = await collected_amount_for_proposal(
+            session, listed_proposal_committed.id
+        )
     assert total <= listed_proposal_committed.requested_amount

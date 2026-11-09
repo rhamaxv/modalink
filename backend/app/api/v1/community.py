@@ -13,12 +13,12 @@ from app.models.comment import Comment
 from app.models.user import Role, User
 from app.schemas.community import CommentIn, CommentListOut, CommentOut, VoteOut
 from app.services.community import (
-    buat_komentar,
-    daftar_komentar,
-    hapus_komentar,
+    create_comment,
+    delete_comment,
+    list_comments,
     toggle_vote,
 )
-from app.services.proposal import ambil_proposal
+from app.services.proposal import get_proposal
 
 router = APIRouter(tags=["community"])
 
@@ -29,7 +29,7 @@ async def toggle_vote_endpoint(
     community: User = Depends(require_role(Role.COMMUNITY)),
     session: AsyncSession = Depends(get_session),
 ) -> VoteOut:
-    proposal = await ambil_proposal(session, proposal_id)
+    proposal = await get_proposal(session, proposal_id)
     if proposal is None:
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
     voted, jumlah = await toggle_vote(session, community, proposal)
@@ -37,11 +37,11 @@ async def toggle_vote_endpoint(
 
 
 @router.get("/api/v1/proposals/{proposal_id}/comments", response_model=CommentListOut)
-async def daftar_komentar_endpoint(
+async def list_comments_endpoint(
     proposal_id: UUID,
     session: AsyncSession = Depends(get_session),
 ) -> CommentListOut:
-    return CommentListOut(items=await daftar_komentar(session, proposal_id))
+    return CommentListOut(items=await list_comments(session, proposal_id))
 
 
 @router.post(
@@ -49,23 +49,23 @@ async def daftar_komentar_endpoint(
     status_code=status.HTTP_201_CREATED,
     response_model=CommentOut,
 )
-async def buat_komentar_endpoint(
+async def create_comment_endpoint(
     proposal_id: UUID,
     body: CommentIn,
     community: User = Depends(require_role(Role.COMMUNITY)),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
 ) -> Comment:
-    proposal = await ambil_proposal(session, proposal_id)
+    proposal = await get_proposal(session, proposal_id)
     if proposal is None:
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
-    return await buat_komentar(session, community, proposal, body.body, clock)
+    return await create_comment(session, community, proposal, body.body, clock)
 
 
 @router.delete("/api/v1/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def hapus_komentar_endpoint(
+async def delete_comment_endpoint(
     komentar: Comment = Depends(get_own_comment),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
 ) -> None:
-    await hapus_komentar(session, komentar, clock)
+    await delete_comment(session, komentar, clock)

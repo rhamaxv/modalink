@@ -5,8 +5,8 @@ from uuid import uuid4
 import pytest
 
 from app.services.auth import (
-    TokenKedaluwarsa,
-    TokenTidakSah,
+    TokenExpired,
+    TokenInvalid,
     decode_token,
     hash_password,
     issue_token,
@@ -40,7 +40,7 @@ def test_token_membawa_sub_dan_role():
 def test_token_kedaluwarsa_ditolak():
     uid = uuid4()
     kedaluwarsa = issue_token(uid, "investor", ttl_hours=-1)
-    with pytest.raises(TokenKedaluwarsa):
+    with pytest.raises(TokenExpired):
         decode_token(kedaluwarsa)
 
 
@@ -52,5 +52,5 @@ def test_token_dengan_tanda_tangan_lain_ditolak():
         "kunci-lain-yang-sama-sekali-berbeda-32-byte",
         algorithm="HS256",
     )
-    with pytest.raises(TokenTidakSah):
+    with pytest.raises(TokenInvalid):
         decode_token(palsu)

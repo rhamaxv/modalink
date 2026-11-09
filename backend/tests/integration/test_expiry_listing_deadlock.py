@@ -1,9 +1,9 @@
 """Review keamanan Finding 1: GET anonim yang mengunci baris proposal dalam
 urutan berlawanan.
 
-`daftar_proposal_publik` mengurutkan tampilannya created_at DESC, id DESC;
-`daftar_proposal_campaign` mengurutkan total_score DESC, vote_count DESC,
-created_at, id. Keduanya memanggil `evaluasi_kedaluwarsa` per baris dalam
+`list_public_proposals` mengurutkan tampilannya created_at DESC, id DESC;
+`list_campaign_proposals` mengurutkan total_score DESC, vote_count DESC,
+created_at, id. Keduanya memanggil `evaluate_expiry` per baris dalam
 urutan TAMPIL itu, dan fungsi itu mengambil `SELECT ... FOR UPDATE` atas
 proposal yang kedaluwarsa. Dua proposal kedaluwarsa pada campaign yang sama
 bisa muncul dalam urutan tampil yang berlawanan di dua endpoint ini, dan dua
@@ -38,11 +38,11 @@ from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
 from app.models.user import Role, User
 from app.services.auth import hash_password
 from app.services.pledge import create_pledge, get_locked_proposal
-from app.services.scoring import jalankan_scoring
+from app.services.scoring import run_scoring
 
 # Jeda kecil setelah lock pertama diambil, sama alasannya dengan
 # _RF1_READ_DELAY_S di test_pledge_concurrency.py: tanpanya, Postgres lokal
-# yang cepat sering menyelesaikan seluruh loop evaluasi_kedaluwarsa satu
+# yang cepat sering menyelesaikan seluruh loop evaluate_expiry satu
 # request sebelum request kedua benar-benar mendapat giliran event loop,
 # sehingga jendela balapan yang sebenarnya diuji di sini tidak pernah
 # benar-benar tumpang tindih. Ini bukan sleep waktu bisnis (dikendalikan
@@ -118,7 +118,7 @@ async def dua_proposal_kedaluwarsa_overlap(investor, investor_pledge, umkm, umkm
     """Dua proposal `listed`/`partially_funded` pada campaign yang sama,
     masing-masing dengan satu pledge aktif, yang `total_score`-nya dibalik
     relatif terhadap `created_at`-nya (lihat docstring modul): urutan tampil
-    daftar_proposal_publik dan daftar_proposal_campaign jadi berlawanan untuk
+    list_public_proposals dan list_campaign_proposals jadi berlawanan untuk
     pasangan ini secara spesifik.
 
     `funding_deadline` campaign dibuat di masa depan dulu supaya create_pledge
@@ -147,8 +147,8 @@ async def dua_proposal_kedaluwarsa_overlap(investor, investor_pledge, umkm, umkm
         await session.flush()
 
         # p1 dibuat lebih dulu dengan skor TINGGI, p2 belakangan dengan skor
-        # RENDAH: daftar_proposal_publik (created_at DESC) menampilkan
-        # [p2, p1], daftar_proposal_campaign (total_score DESC) menampilkan
+        # RENDAH: list_public_proposals (created_at DESC) menampilkan
+        # [p2, p1], list_campaign_proposals (total_score DESC) menampilkan
         # [p1, p2] -- urutan lock yang persis berlawanan kalau diambil dalam
         # urutan tampil.
         p1 = Proposal(
@@ -181,8 +181,8 @@ async def dua_proposal_kedaluwarsa_overlap(investor, investor_pledge, umkm, umkm
         session.add(p2)
         await session.flush()
 
-        await jalankan_scoring(session, p1.id, MockScoringEngine(), clock)
-        await jalankan_scoring(session, p2.id, MockScoringEngine(), clock)
+        await run_scoring(session, p1.id, MockScoringEngine(), clock)
+        await run_scoring(session, p2.id, MockScoringEngine(), clock)
         await session.flush()
 
         proposal1 = await get_locked_proposal(session, p1.id)
