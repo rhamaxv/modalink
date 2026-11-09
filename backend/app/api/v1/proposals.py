@@ -66,7 +66,7 @@ async def submit_proposal_endpoint(
     proposal = await submit_proposal(session, umkm, campaign, body, clock)
     # Proposal masuk langsung dinilai, tanpa menunggu AI sebelum 201 dikirim
     # (10-api-contract.md): job jalan di latar belakang lewat JobRunner.
-    InlineRunner(background_tasks).submit(
+    InlineRunner(background_tasks, session).submit(
         lambda: jalankan_scoring_job(session_factory, proposal.id, engine, clock)
     )
     return proposal
@@ -112,7 +112,7 @@ async def rescore_proposal_endpoint(
     session_factory: SessionFactory = Depends(get_session_factory),
 ) -> dict[str, str]:
     await minta_rescore(session, proposal)
-    InlineRunner(background_tasks).submit(
+    InlineRunner(background_tasks, session).submit(
         lambda: jalankan_scoring_job(session_factory, proposal.id, engine, clock)
     )
     return {"scoring_status": proposal.scoring_status.value}
