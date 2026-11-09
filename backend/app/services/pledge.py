@@ -67,9 +67,40 @@ async def create_pledge(
         # pagar ini, proposal submitted yang belum lolos scoring bisa
         # langsung melompat ke partially_funded lewat recompute_funding_status
         # di bawah, melanggar BR-20.
+        remaining = remaining_amount(
+            await total_terkumpul_proposal(session, proposal.id),
+            proposal.requested_amount,
+        )
         raise ConflictError(
             "proposal_belum_bisa_didanai",
             "Proposal ini belum bisa menerima pledge.",
+            detail={
+                "current_status": proposal.status.value,
+                "remaining_amount": remaining,
+            },
+        )
+
+    # BR-61/BR-62: funding_deadline campaign bisa saja sudah lewat padahal
+    # proposal.status masih LISTED/PARTIALLY_FUNDED di baris ini -- evaluasi
+    # lazy penuh belum ada (Fase 09), dan satu-satunya tempat yang pernah
+    # menghitung ulang status terhadap deadline adalah recompute_funding_status
+    # di bawah, SETELAH pledge baru ditulis. Menerima pledge dulu lalu
+    # memaksa-refund-nya balik lewat recompute bukan "menolak": itu membuat
+    # entri pledge_in yang hidup sepersekian detik sebelum ikut direfund, dan
+    # investor tetap menerima 201 untuk pledge yang sebenarnya gagal (review
+    # f06-b Finding 1). Dicek eksplisit di sini supaya tidak ada satu baris
+    # pun ditulis untuk pledge yang pasti akan dibatalkan sendiri.
+    campaign = await session.get(Campaign, proposal.campaign_id)
+    if campaign is None:
+        raise RuntimeError(
+            f"Proposal {proposal.id} merujuk campaign yang tidak ada: "
+            f"{proposal.campaign_id}."
+        )
+    if clock.now() >= campaign.funding_deadline:
+        raise ConflictError(
+            "pendanaan_sudah_ditutup",
+            "Periode pendanaan proposal ini sudah berakhir sebelum pledge ini masuk.",
+            detail={"current_status": ProposalStatus.FAILED.value},
         )
 
     remaining = remaining_amount(

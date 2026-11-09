@@ -118,3 +118,28 @@ async def test_br28_umkm_and_community_have_no_pledge_access(
             json={"amount": 1_000_000},
         )
         assert res.status_code == 403
+
+
+async def test_br62_pledge_after_deadline_rejected_not_accepted_then_refunded(
+    client, investor, listed_proposal, majukan
+):
+    """Review f06-b Finding 1: sebelum fix, pledge yang masuk setelah
+    funding_deadline lewat tetap diterima (201 Created, baris pledge_in
+    tercatat) dan baru dipaksa-refund balik oleh recompute_funding_status di
+    akhir create_pledge. Investor sempat "berhasil" pledge pada proposal yang
+    pada request yang sama juga ditulis `failed`. Sekarang pledge-nya
+    ditolak sebelum satu baris pun ditulis."""
+    await majukan(hari=30)  # funding_deadline campaign fixture jatuh di hari ke-21
+
+    res = await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges",
+        headers=investor.headers,
+        json={"amount": 4_000_000},
+    )
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "pendanaan_sudah_ditutup"
+
+    entries = (await client.get(f"/api/v1/proposals/{listed_proposal.id}")).json()
+    assert entries["status"] == "listed", (
+        "pledge yang ditolak tidak boleh ikut mengubah status proposal"
+    )
