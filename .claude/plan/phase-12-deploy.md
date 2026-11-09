@@ -306,7 +306,7 @@ bentuk pelanggaran yang disebut eksplisit di guidebook.
 ## Gerbang keluar fase 12
 
 - [ ] `https://<domain>` terbuka dari jaringan lain, bukan hanya dari VPS
-- [ ] `https://<domain>/api/v1/health` mengembalikan status database `ok`
+- [ ] `https://<domain>/health` mengembalikan status database `ok` (backend memasangnya di akar, bukan di bawah `/api/v1`; Caddy juga menyediakan alias `/api/v1/health`)
 - [ ] Sertifikat HTTPS valid, tidak ada peringatan browser
 - [ ] `ENV=prod` membuat router internal tidak terdaftar, diuji dengan `curl` ke `/api/v1/internal/clock/tick` yang harus `404`
 - [ ] Ketiga akun demonstrasi bisa login dari browser
