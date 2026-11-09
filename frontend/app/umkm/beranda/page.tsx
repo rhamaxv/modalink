@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { EmptyState, ErrorState, LoadingState, Nominal } from "@/components/ui";
+import { Amount, EmptyState, ErrorState, LoadingState } from "@/components/ui";
 // StatusBadge belum ada di barrel components/ui/index.ts (fase 10), jadi
 // diimpor langsung dari filenya tanpa mengubah barrel itu sendiri.
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -153,7 +153,7 @@ function ProposalCard({ proposal }: { proposal: ProposalMine }) {
         <StatusBadge status={proposal.status} />
       </div>
       <div className="mt-space-2">
-        <Nominal label="Dana yang diminta" nominal={proposal.requested_amount} ukuran="sedang" />
+        <Amount label="Dana yang diminta" amount={proposal.requested_amount} size="medium" />
       </div>
       {proposal.scoring_status === "done" && <ScoreSummary proposalId={proposal.id} />}
       {/* Tanpa tautan ini, dashboard UMKM tidak punya jalan sama sekali ke

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { EmptyState, ErrorState, LoadingState, Nominal } from "@/components/ui";
+import { Amount, EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ApiError, api } from "@/lib/api";
 
@@ -101,7 +101,7 @@ export function CampaignList() {
                 </h3>
                 <StatusBadge status={campaign.status} />
               </div>
-              <Nominal label="Dana target" nominal={campaign.target_amount} ukuran={featured ? "besar" : "sedang"} />
+              <Amount label="Dana target" amount={campaign.target_amount} size={featured ? "large" : "medium"} />
               <p className="mt-space-2 text-[0.8125rem] text-muted">
                 Tenggat pengajuan {formatDate(campaign.apply_deadline)}, tenggat funding{" "}
                 {formatDate(campaign.funding_deadline)}

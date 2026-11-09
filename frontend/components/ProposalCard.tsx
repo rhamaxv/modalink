@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { EmptyState, ErrorState, LoadingState, Nominal } from "@/components/ui";
+import { Amount, EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ApiError, api } from "@/lib/api";
 
@@ -55,10 +55,10 @@ export function ProposalCard({ proposal, featured = false, index }: ProposalCard
         </div>
         <StatusBadge status={proposal.status} />
       </div>
-      <Nominal
+      <Amount
         label="Dana diminta"
-        nominal={proposal.requested_amount}
-        ukuran={featured ? "besar" : "sedang"}
+        amount={proposal.requested_amount}
+        size={featured ? "large" : "medium"}
       />
       {featured && (
         <p className="max-w-measure text-base leading-[1.6] text-muted">

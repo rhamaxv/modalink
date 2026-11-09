@@ -1,10 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Nominal } from "@/components/ui/Nominal";
+import { Amount } from "@/components/ui/Amount";
 
-describe("Nominal", () => {
+describe("Amount", () => {
   it("menampilkan label di atas nominal rupiah yang tabular", () => {
-    render(<Nominal label="Terkumpul" nominal={4_000_000} />);
+    render(<Amount label="Terkumpul" amount={4_000_000} />);
     expect(screen.getByText("Terkumpul")).toBeInTheDocument();
     const nilai = screen.getByText("Rp4.000.000");
     expect(nilai).toBeInTheDocument();

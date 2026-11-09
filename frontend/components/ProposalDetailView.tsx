@@ -9,7 +9,7 @@ import { PledgeForm } from "@/components/PledgeForm";
 import { ScorePanel, type ProposalScore, type ScoringStatus } from "@/components/ScorePanel";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingState } from "@/components/ui/LoadingState";
-import { Nominal } from "@/components/ui/Nominal";
+import { Amount } from "@/components/ui/Amount";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ApiError, api, daftarDariRespons } from "@/lib/api";
 import { getToken } from "@/lib/auth";
@@ -258,7 +258,7 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
           satu kolom, tanpa rule. Ini yang dibaca lebih dulu: produk ini
           tentang uang yang berpindah. */}
       <section data-pola="sorotan-nominal" className="flex flex-col gap-space-1">
-        <Nominal label="Dana yang diminta" nominal={data.requested_amount} ukuran="besar" />
+        <Amount label="Dana yang diminta" amount={data.requested_amount} size="large" />
       </section>
 
       {/* 2. Bilah funding dan daftar pemberi dana. Lebar penuh, rata kiri,
@@ -287,7 +287,7 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
                         <span className="ml-space-2 text-[0.8125rem] font-medium text-muted">(investor utama)</span>
                       )}
                     </span>
-                    <Nominal label="" nominal={pledge.amount} ukuran="sedang" />
+                    <Amount label="" amount={pledge.amount} size="medium" />
                   </li>
                 ))}
               </ul>
@@ -380,7 +380,7 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
                     )}
                   </div>
                   <div className="flex items-center gap-space-3">
-                    <Nominal label="" nominal={milestone.amount} ukuran="sedang" />
+                    <Amount label="" amount={milestone.amount} size="medium" />
                     <StatusBadge status={milestone.status} />
                     {/* Satu-satunya jalan masuk di produk ini ke
                         /umkm/milestone/[id]/lapor: halaman itu tidak punya

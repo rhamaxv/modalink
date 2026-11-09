@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Nominal } from "@/components/ui/Nominal";
+import { Amount } from "@/components/ui/Amount";
 import { ApiError, api, daftarDariRespons } from "@/lib/api";
 
 // Panjang minimum narasi laporan sesuai .claude/prd/04-feature-umkm.md.
@@ -120,7 +120,7 @@ export default function MilestoneLapor() {
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold text-ink">{milestone.title}</h1>
         <div className="mt-space-3 flex flex-wrap items-center gap-space-3">
           <StatusBadge status={milestone.status} />
-          <Nominal label="Nominal tahap ini" nominal={milestone.amount} ukuran="sedang" />
+          <Amount label="Nominal tahap ini" amount={milestone.amount} size="medium" />
         </div>
       </div>
 

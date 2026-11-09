@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { EmptyState, ErrorState, LoadingState, Nominal } from "@/components/ui";
+import { Amount, EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ApiError, api } from "@/lib/api";
 import { CampaignForm, type CampaignOut } from "@/components/CampaignForm";
@@ -85,7 +85,7 @@ export function CampaignManagePanel({ campaignId }: { campaignId: string }) {
           <StatusBadge status={campaign.status} />
         </div>
         <p className="max-w-measure text-base leading-[1.6] text-muted">{campaign.description}</p>
-        <Nominal label="Dana target" nominal={campaign.target_amount} />
+        <Amount label="Dana target" amount={campaign.target_amount} />
 
         {/* D-16: dua tenggat, label berbeda, tidak pernah hanya satu. */}
         <dl className="mt-space-2 grid grid-cols-1 gap-space-2 text-[0.8125rem] text-muted sm:grid-cols-2">

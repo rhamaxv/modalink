@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { EmptyState, Field, Nominal } from "@/components/ui";
+import { Amount, EmptyState, Field } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
 const CATATAN_MINIMAL = 10;
@@ -118,7 +118,7 @@ function StageActions({ milestone, onApprove, onReject }: StageActionsProps) {
 
 // Lini milestone satu proposal, disusun vertikal dengan nominal besar di
 // tiap tahap (motif identitas DESIGN.md). Tahap aktif (tahap pertama yang
-// belum cair, berjalan dari urutan seq) mendapat Nominal berukuran besar
+// belum cair, berjalan dari urutan seq) mendapat Amount berukuran besar
 // dan satu lencana aksen "Tahap berjalan"; tahap lain memakai ukuran sedang
 // dan tanpa aksen, supaya aksen tetap bermakna satu per layar (DESIGN.md).
 export function MilestoneTimeline({
@@ -161,10 +161,10 @@ export function MilestoneTimeline({
             className="flex flex-col gap-space-2 border-t border-line py-space-4 first:border-t-0 first:pt-0"
           >
             <div className="flex flex-wrap items-start justify-between gap-space-2">
-              <Nominal
+              <Amount
                 label={`Tahap ${milestone.seq}`}
-                nominal={milestone.amount}
-                ukuran={aktif ? "besar" : "sedang"}
+                amount={milestone.amount}
+                size={aktif ? "large" : "medium"}
               />
               <StatusBadge status={milestone.status} />
             </div>
