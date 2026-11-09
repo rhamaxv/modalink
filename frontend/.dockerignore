@@ -1,0 +1,12 @@
+# Context build Docker adalah frontend/ (lihat docker-compose.prod.yml: build: ./frontend),
+# jadi .dockerignore di root saja tidak berpengaruh di sini; file ini yang dibaca.
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.vercel
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/
