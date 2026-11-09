@@ -13,23 +13,31 @@ aksesnya lewat baris yang terkunci -- menulis session.get(Proposal, ...)
 atau select(Proposal) tanpa with_for_update() di sini akan membuatnya merah.
 """
 
+import contextlib
 from uuid import UUID
 
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.domain.clock import Clock
-from app.domain.milestone_rules import can_be_reported
-from app.domain.transitions import IllegalTransition, MilestoneEvent, ReportEvent
+from app.domain.milestone_rules import can_be_reported, disbursement_precondition
+from app.domain.transitions import (
+    IllegalTransition,
+    MilestoneEvent,
+    ProposalEvent,
+    ReportEvent,
+)
 from app.domain.transitions import MilestoneStatus as DomainMilestoneStatus
 from app.errors import ConflictError, NotFoundError
+from app.models.ledger import EntryType
 from app.models.milestone_report import MilestoneReport, ReportStatus
-from app.models.proposal import ProposalMilestone
+from app.models.proposal import MilestoneStatus, ProposalMilestone, ProposalStatus
 from app.models.user import User
 from app.schemas.milestone import MilestoneReportIn
+from app.services.ledger import catat_entri
 from app.services.pledge import get_locked_proposal
-from app.services.status import advance_milestone, advance_report
+from app.services.status import advance_milestone, advance_proposal, advance_report
 
 
 async def get_milestone(
@@ -63,6 +71,23 @@ async def get_latest_report(
         .order_by(desc("submitted_at"))
         .limit(1)
     )
+
+
+async def semua_milestone_cair(session: AsyncSession, proposal_id: UUID) -> bool:
+    """True bila setiap milestone proposal ini sudah `disbursed` (T-09).
+
+    Dipanggil setelah milestone yang baru di-approve di-flush ke sesi ini:
+    autoflush AsyncSession membuat SELECT di sini melihat statusnya yang
+    terbaru, bukan nilai sebelum approve."""
+    belum_cair = await session.scalar(
+        select(func.count())
+        .select_from(ProposalMilestone)
+        .where(
+            ProposalMilestone.proposal_id == proposal_id,
+            ProposalMilestone.status != MilestoneStatus.DISBURSED,
+        )
+    )
+    return belum_cair == 0
 
 
 async def submit_report(
@@ -126,6 +151,21 @@ async def approve_milestone(
     if proposal.lead_investor_id != aktor.id:
         raise NotFoundError("milestone_tidak_ada", "Milestone tidak ditemukan.")
 
+    # BR-40, BR-43: prasyarat pencairan, dipisah dari pemeriksaan transisi
+    # milestone itu sendiri di bawah supaya pesan errornya menunjuk ke
+    # alasan bisnisnya (proposal belum funded, atau milestone sebelumnya
+    # belum cair), bukan sekadar "transisi tidak sah".
+    previous = await get_previous_milestone(session, milestone)
+    previous_status = (
+        DomainMilestoneStatus(previous.status.value) if previous is not None else None
+    )
+    try:
+        disbursement_precondition(
+            milestone.seq, previous_status, proposal.status is ProposalStatus.FUNDED
+        )
+    except ValueError as exc:
+        raise ConflictError("prasyarat_pencairan_belum_terpenuhi", str(exc)) from None
+
     # D-13: seq=1 cair tanpa laporan (T-21); seq lainnya wajib lewat laporan
     # yang disetujui (T-22). MILESTONE_MAP sendiri tidak tahu soal seq, jadi
     # pemilihan event ini yang menegakkan pembatasan "hanya seq=1" dari D-13.
@@ -152,6 +192,34 @@ async def approve_milestone(
         advance_report(report, ReportEvent.APPROVE)  # T-30
         report.reviewed_by = aktor.id
         report.reviewed_at = clock.now()
+
+    # BR-47, BR-48: satu entri disbursement_out sebesar amount milestone.
+    # Kunci idempotensi berasal dari milestone, bukan dari request, sehingga
+    # approve ganda (sekuensial lewat BR-48, atau konkuren lewat RF-5) hanya
+    # menghasilkan satu entri: catat_entri mengembalikan None secara diam-diam
+    # untuk kunci yang sudah pernah dipakai, bukan melempar error.
+    await catat_entri(
+        session,
+        proposal.id,
+        EntryType.DISBURSEMENT_OUT,
+        milestone.amount,
+        idempotency_key=f"disburse:{milestone.id}",
+        ref_type="milestone",
+        ref_id=milestone.id,
+        actor_id=aktor.id,
+    )
+
+    # T-09: milestone terakhir cair -> proposal completed. IllegalTransition
+    # diredam di sini, bukan di pemanggil: satu-satunya jalan ia muncul adalah
+    # jendela balapan RF-5 di mana `proposal` di memori sesi ini sudah
+    # terbaca ulang sebagai completed (lewat get_locked_proposal setelah
+    # menunggu lock milik approve lain yang lebih dulu selesai), sehingga
+    # transisi completed->completed memang tidak ada di PROPOSAL_MAP. Itu
+    # bukan kegagalan nyata: pencairannya sendiri sudah aman lewat idempotensi
+    # di atas, jadi tidak ada uang yang perlu diselamatkan di sini.
+    if await semua_milestone_cair(session, proposal.id):
+        with contextlib.suppress(IllegalTransition):
+            advance_proposal(proposal, ProposalEvent.SEMUA_MILESTONE_CAIR)
 
     await session.flush()
     return milestone
