@@ -152,3 +152,30 @@ async def test_other_umkm_cannot_report(client, umkm, funded_proposal):
         json=body_laporan(),
     )
     assert res.status_code in {403, 404}
+
+
+async def test_br44_unrelated_investor_cannot_approve_milestone(
+    client, investor_lain, funded_proposal
+):
+    """investor_lain tidak pernah mendanai funded_proposal sama sekali, jadi ia
+    bukan lead investor. 404, bukan 403, sama seperti get_own_milestone_for_report:
+    investor yang bukan lead tidak boleh sekaligus mengonfirmasi bahwa milestone
+    ini ada."""
+    m1 = funded_proposal.milestones[0]
+    res = await client.post(
+        f"/api/v1/milestones/{m1.id}/approve", headers=investor_lain.headers
+    )
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "milestone_tidak_ada"
+
+
+async def test_br44_unrelated_investor_cannot_reject_milestone(
+    client, investor_lain, milestone_reported
+):
+    res = await client.post(
+        f"/api/v1/milestones/{milestone_reported.id}/reject",
+        headers=investor_lain.headers,
+        json={"note": "Catatan penolakan oleh investor yang bukan lead."},
+    )
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "milestone_tidak_ada"

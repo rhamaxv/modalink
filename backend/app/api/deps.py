@@ -200,11 +200,14 @@ async def get_milestone_for_review(
     investor: User = Depends(require_role(Role.INVESTOR)),
     session: AsyncSession = Depends(get_session),
 ) -> ProposalMilestone:
-    """BR-44 membatasi approve/reject ke lead investor; pemeriksaan identitas
-    lead investor yang sesungguhnya ditambahkan task berikutnya fase ini
-    bersama penguncian baris proposal (lihat docstring services/milestone.py).
-    Dependency ini untuk sekarang hanya menjaga perannya investor dan
-    memastikan milestone-nya ada.
+    """Dependency ini hanya menjaga perannya investor dan memastikan
+    milestone-nya ada. BR-44 (hanya lead investor yang boleh approve/reject)
+    sengaja tidak diperiksa di sini: pemeriksaan identitas lead investor
+    butuh baris proposal yang terkunci (RF-5, approve mencairkan uang), dan
+    dependency FastAPI bukan tempat yang tepat untuk mengunci baris sebelum
+    router memutuskan apakah akan melakukan apa pun dengannya. Pemeriksaan
+    itu hidup di approve_milestone dan reject_milestone (services/milestone.py),
+    lewat get_locked_proposal yang sama dengan RF-1.
     """
     milestone = await get_milestone(session, milestone_id)
     if milestone is None:

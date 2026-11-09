@@ -1,15 +1,16 @@
 """Orkestrasi laporan progres milestone dan review lead investor
 (BR-41 sampai BR-46, T-20 sampai T-23, T-30, T-31).
 
-Pencairan sungguhan -- entri ledger `disbursement_out` (BR-47, BR-48),
-penguncian baris proposal (RF-5), dan pemeriksaan lead investor (BR-44) --
-belum ada di sini. Approve di modul ini hanya memajukan status milestone dan
-menandai laporannya; task berikutnya fase ini memperluas `approve_milestone`
-untuk juga mencatat ledger dan mengunci baris proposal, persis seperti
-`.claude/plan/phase-07-milestone.md` Task 3. Karena itu, service ini sengaja
-tidak pernah menyentuh `Proposal` sama sekali: begitu ia melakukannya,
-tests/unit/test_proposal_lock_guard.py mewajibkan aksesnya lewat baris yang
-terkunci.
+approve_milestone dan reject_milestone menyentuh `Proposal` lewat
+`get_locked_proposal` (dipinjam dari services/pledge.py, bukan diduplikasi:
+docstringnya sendiri sudah menyebut RF-5 sebagai pemakai yang dituju) untuk
+dua alasan sekaligus: BR-44 (hanya lead investor yang boleh approve/reject,
+dan identitasnya dibaca dari kolom `lead_investor_id` milik baris proposal
+itu) dan RF-5 (approve mencairkan uang, jadi baris proposal harus terkunci
+sebelum pemeriksaan apa pun dibaca, bukan sesudahnya). Karena modul ini kini
+menyentuh Proposal, tests/unit/test_proposal_lock_guard.py mewajibkan semua
+aksesnya lewat baris yang terkunci -- menulis session.get(Proposal, ...)
+atau select(Proposal) tanpa with_for_update() di sini akan membuatnya merah.
 """
 
 from uuid import UUID
@@ -22,11 +23,12 @@ from app.domain.clock import Clock
 from app.domain.milestone_rules import can_be_reported
 from app.domain.transitions import IllegalTransition, MilestoneEvent, ReportEvent
 from app.domain.transitions import MilestoneStatus as DomainMilestoneStatus
-from app.errors import ConflictError
+from app.errors import ConflictError, NotFoundError
 from app.models.milestone_report import MilestoneReport, ReportStatus
 from app.models.proposal import ProposalMilestone
 from app.models.user import User
 from app.schemas.milestone import MilestoneReportIn
+from app.services.pledge import get_locked_proposal
 from app.services.status import advance_milestone, advance_report
 
 
@@ -115,6 +117,15 @@ async def submit_report(
 async def approve_milestone(
     session: AsyncSession, milestone: ProposalMilestone, aktor: User, clock: Clock
 ) -> ProposalMilestone:
+    # BR-44: kunci baris proposal dulu, baca identitas lead investor sesudahnya
+    # (RF-5 -- approve mencairkan uang, jadi urutannya tidak boleh dibalik).
+    # 404, bukan 403, sama seperti get_own_milestone_for_report di api/deps.py:
+    # investor yang bukan lead tidak boleh sekaligus mengonfirmasi keberadaan
+    # milestone ini.
+    proposal = await get_locked_proposal(session, milestone.proposal_id)
+    if proposal.lead_investor_id != aktor.id:
+        raise NotFoundError("milestone_tidak_ada", "Milestone tidak ditemukan.")
+
     # D-13: seq=1 cair tanpa laporan (T-21); seq lainnya wajib lewat laporan
     # yang disetujui (T-22). MILESTONE_MAP sendiri tidak tahu soal seq, jadi
     # pemilihan event ini yang menegakkan pembatasan "hanya seq=1" dari D-13.
@@ -153,6 +164,12 @@ async def reject_milestone(
     note: str,
     clock: Clock,
 ) -> ProposalMilestone:
+    # BR-44: sama seperti approve_milestone di atas -- identitas lead investor
+    # dibaca lewat baris proposal yang terkunci, bukan session.get biasa.
+    proposal = await get_locked_proposal(session, milestone.proposal_id)
+    if proposal.lead_investor_id != aktor.id:
+        raise NotFoundError("milestone_tidak_ada", "Milestone tidak ditemukan.")
+
     try:
         advance_milestone(milestone, MilestoneEvent.REJECT)  # T-23
     except IllegalTransition:
