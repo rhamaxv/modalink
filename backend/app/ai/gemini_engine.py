@@ -87,9 +87,9 @@ class GeminiEngine:
         hasil = await self._client.chat.completions.create(
             model=self.model,
             response_model=ProposalScore,
-            # max_retries=2 digabung timeout di level client berarti worst
-            # case satu pemanggilan score() bisa menggantung sampai hampir
-            # 3x gemini_timeout_s sebelum menyerah.
+            # Instructor mengirim ulang saat validasi gagal; digabung timeout
+            # di level client, worst case satu pemanggilan score() bisa
+            # menggantung sampai hampir 3x gemini_timeout_s sebelum menyerah.
             max_retries=2,
             messages=[{"role": "user", "content": PROMPT.format(**isi)}],
         )

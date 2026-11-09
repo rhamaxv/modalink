@@ -47,7 +47,10 @@ class ScoringResult(SQLModel, table=True):
     )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    proposal_id: UUID = Field(foreign_key="proposals.id", index=True)
+    # Tanpa index=True: query pada proposal_id saja sudah terlayani oleh
+    # kolom pertama index komposit (proposal_id, created_at) di atas, jadi
+    # index tunggal di sini cuma duplikat yang menambah beban setiap write.
+    proposal_id: UUID = Field(foreign_key="proposals.id")
     engine_name: str
     model_name: str
     fit_score: int = Field(sa_column=Column(SmallInteger, nullable=False))
