@@ -30,6 +30,14 @@ describe("loading state", () => {
     const container = screen.getByTestId("loading-state");
     expect(container.style.minHeight).toBe("240px");
   });
+
+  it("reserves a non-zero default height when the caller does not specify one", () => {
+    // Pemanggil yang lupa mengisi minHeight tidak boleh jatuh ke 0 lalu
+    // membuat layout melompat begitu data datang.
+    render(<LoadingState label="Memuat daftar proposal" />);
+    const container = screen.getByTestId("loading-state");
+    expect(Number.parseInt(container.style.minHeight, 10)).toBeGreaterThan(0);
+  });
 });
 
 describe("error state", () => {

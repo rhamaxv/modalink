@@ -44,3 +44,12 @@ body { background: var(--paper); color: var(--ink); }
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
+
+/* MOTION 2 di DESIGN.md bukan alasan mengabaikan preferensi pengguna yang
+   meminta gerak dikurangi. Ini jaring pengaman tingkat situs; LoadingState
+   sendiri juga memakai varian Tailwind motion-reduce: pada elemennya. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: none;
+  }
+}
