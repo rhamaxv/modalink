@@ -11,10 +11,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
 
 from app.domain.clock import Clock
 from app.models.ledger import EntryType, LedgerEntry
@@ -104,6 +104,37 @@ async def catat_entri(
             raise
         return None
     return entri
+
+
+def jumlah_terkumpul_subquery():
+    """Subquery total_terkumpul per proposal (pledge_in dikurangi refund_out),
+    dipakai JOIN pada query daftar proposal publik (Task 1, BR-51).
+
+    Satu query untuk SELURUH baris proposal yang sedang dibaca, bukan satu
+    query `total_terkumpul_proposal` per baris: GET /proposals menampilkan
+    banyak proposal sekaligus, dan memanggil fungsi tunggal di bawah di
+    dalam loop mengubahnya jadi N+1 query (N proposal, satu SELECT ledger
+    masing-masing). CASE di sini sengaja meniru persis ekspresi di
+    `total_terkumpul()` Python di atas (PLEDGE_IN dikurangi REFUND_OUT, DI
+    LUAR DISBURSEMENT_OUT) supaya kedua definisinya tidak bisa diam-diam
+    menyimpang: tanpa itu bilah progres publik dan "sisa dana" yang dipakai
+    create_pledge bisa menghitung dua angka berbeda untuk proposal yang sama.
+    """
+    kolom = case(
+        (LedgerEntry.entry_type == EntryType.PLEDGE_IN, LedgerEntry.amount),
+        (LedgerEntry.entry_type == EntryType.REFUND_OUT, -LedgerEntry.amount),
+        else_=0,
+    )
+    return (
+        select(
+            LedgerEntry.proposal_id.label("proposal_id"),
+            func.sum(kolom).label("collected_amount"),
+        )
+        .where(
+            col(LedgerEntry.entry_type).in_({EntryType.PLEDGE_IN, EntryType.REFUND_OUT})
+        )
+        .group_by(LedgerEntry.proposal_id)
+    ).subquery("jumlah_terkumpul")
 
 
 async def total_terkumpul_proposal(session: AsyncSession, proposal_id: UUID) -> int:

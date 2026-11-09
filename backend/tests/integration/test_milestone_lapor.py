@@ -144,6 +144,65 @@ async def test_br45_reject_without_note_returns_422(
     assert res.status_code == 422
 
 
+async def test_t3_narrative_over_5000_characters_rejected(
+    client, umkm_lain, investor, funded_proposal
+):
+    """Review keamanan: narrative lolos sampai 5 MB tanpa batas atas sebelum
+    ini. 5.000 karakter longgar untuk laporan progres mana pun yang wajar."""
+    m1, m2 = funded_proposal.milestones
+    await cairkan_lewat_api(client, investor, m1)
+    res = await client.post(
+        f"/api/v1/milestones/{m2.id}/reports",
+        headers=umkm_lain.headers,
+        json=body_laporan(narrative="x" * 60 + "y" * 4_941),
+    )
+    assert res.status_code == 422
+
+
+async def test_t3_metrics_float_value_rejected_rupiah_must_stay_integer(
+    client, umkm_lain, investor, funded_proposal
+):
+    """BR-50: rupiah BIGINT utuh di setiap tempat lain. Sebelum ini metrics
+    bertipe dict[str, int | float], jadi float rupiah lolos diam-diam di
+    satu-satunya tempat angka progres dibaca juri (review keamanan)."""
+    m1, m2 = funded_proposal.milestones
+    await cairkan_lewat_api(client, investor, m1)
+    res = await client.post(
+        f"/api/v1/milestones/{m2.id}/reports",
+        headers=umkm_lain.headers,
+        json=body_laporan(metrics={"omzet_minggu_1": 3_200_000.5}),
+    )
+    assert res.status_code == 422
+
+
+async def test_t3_metrics_over_50_keys_rejected(
+    client, umkm_lain, investor, funded_proposal
+):
+    """Review keamanan: 200.000 key metrics lolos tanpa batas atas sebelum
+    ini."""
+    m1, m2 = funded_proposal.milestones
+    await cairkan_lewat_api(client, investor, m1)
+    res = await client.post(
+        f"/api/v1/milestones/{m2.id}/reports",
+        headers=umkm_lain.headers,
+        json=body_laporan(metrics={f"metrik_{i}": i for i in range(51)}),
+    )
+    assert res.status_code == 422
+
+
+async def test_t3_reject_note_over_2000_characters_rejected(
+    client, investor, milestone_reported
+):
+    """Review keamanan: note lolos sampai 5 MB tanpa batas atas sebelum
+    ini."""
+    res = await client.post(
+        f"/api/v1/milestones/{milestone_reported.id}/reject",
+        headers=investor.headers,
+        json={"note": "x" * 2_001},
+    )
+    assert res.status_code == 422
+
+
 async def test_other_umkm_cannot_report(client, umkm, funded_proposal):
     m2 = funded_proposal.milestones[1]
     res = await client.post(

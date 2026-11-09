@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,8 +25,32 @@ from app.models.user import User
 from app.schemas.proposal import ProposalIn
 from app.services.campaign import STATUS_PROPOSAL_PUBLIK
 from app.services.expiry import evaluasi_kedaluwarsa
+from app.services.ledger import jumlah_terkumpul_subquery
 
 MINIMAL_REQUESTED_AMOUNT = 500_000  # BR-12: di bawah ini biaya screening tidak sepadan.
+
+# Server-enforced, bukan sekadar default klien (Task 4 review keamanan):
+# GET /proposals mengembalikan 7.2 MB untuk dua belas proposal seeded karena
+# tidak ada batas atas sama sekali. 50 cukup untuk satu halaman penuh
+# landing page publik tanpa membuka jalan request page_size=100000 yang
+# sama parahnya dengan tidak ada paginasi sama sekali.
+PROPOSAL_PAGE_SIZE_DEFAULT = 20
+PROPOSAL_PAGE_SIZE_MAX = 50
+
+
+@dataclass
+class ProposalDenganTerkumpul:
+    """Proposal dibungkus total dana terkumpul (BR-51, Task 1), khusus
+    bentuk balik `daftar_proposal_publik`/`daftar_proposal_milik`/endpoint
+    detail dan submit. Pola yang sama dengan `ProposalDenganSinyal` di
+    services/campaign.py: Proposal sengaja tidak boleh dititipi atribut
+    bebas langsung (SQLModel/Pydantic v2 menolaknya)."""
+
+    proposal: Proposal
+    collected_amount: int
+
+    def __getattr__(self, name: str):
+        return getattr(self.proposal, name)
 
 
 async def submit_proposal(
@@ -112,36 +136,82 @@ def boleh_melihat(proposal: Proposal, campaign: Campaign, user: User | None) -> 
     return user.id in {proposal.umkm_id, campaign.investor_id}
 
 
-async def daftar_proposal_publik(session: AsyncSession, clock: Clock) -> list[Proposal]:
+async def daftar_proposal_publik(
+    session: AsyncSession,
+    clock: Clock,
+    page: int = 1,
+    page_size: int = PROPOSAL_PAGE_SIZE_DEFAULT,
+) -> tuple[list[ProposalDenganTerkumpul], int]:
+    """GET /proposals (Task 4, perluasan kontrak): paginasi server-enforced,
+    bukan sekadar klien yang sopan -- `page_size` sudah diklem di
+    api/v1/proposals.py lewat Query(le=PROPOSAL_PAGE_SIZE_MAX) sebelum sampai
+    sini, jadi baris ini tidak lagi memanggil satu query SELECT COUNT per
+    baris maupun mengambil seluruh tabel ke memori.
+
+    `collected_amount` ikut di-JOIN lewat `jumlah_terkumpul_subquery()`
+    (Task 1), bukan dipanggil satu-satu per baris proposal: dengan dua belas
+    proposal publik, memanggil `total_terkumpul_proposal` di dalam loop
+    berarti tiga belas query (satu daftar + dua belas ledger), dan jumlah itu
+    bertambah linear seiring proposal baru (N+1 klasik).
+    """
+    terkumpul = jumlah_terkumpul_subquery()
+    kueri_dasar = select(Proposal).where(
+        col(Proposal.status).in_(STATUS_PROPOSAL_PUBLIK)
+    )
+    total = await session.scalar(
+        select(func.count()).select_from(kueri_dasar.subquery())
+    )
+
     # Urutan diputus created_at lalu id, sama seperti daftar_campaign (BR-05):
     # dua proposal dengan created_at identik tidak boleh bertukar posisi
-    # antar-request.
-    hasil = list(
-        await session.scalars(
-            select(Proposal)
+    # antar-request/antar-halaman.
+    baris = (
+        await session.execute(
+            select(Proposal, func.coalesce(terkumpul.c.collected_amount, 0))
+            .outerjoin(terkumpul, terkumpul.c.proposal_id == Proposal.id)
             .where(col(Proposal.status).in_(STATUS_PROPOSAL_PUBLIK))
             .order_by(desc("created_at"), desc("id"))
+            .limit(page_size)
+            .offset((page - 1) * page_size)
         )
-    )
+    ).all()
+
     # D-06/BR-61: daftar ini juga "pembacaan proposal", jadi proposal yang
     # funding_deadline-nya lewat harus ikut direkonsiliasi di sini, bukan
-    # hanya saat dibaca satu-satu lewat GET /proposals/{id}.
-    for p in hasil:
+    # hanya saat dibaca satu-satu lewat GET /proposals/{id}. Hanya baris di
+    # halaman ini, bukan seluruh tabel -- konsisten dengan tujuan paginasi.
+    for p, _ in baris:
         await evaluasi_kedaluwarsa(session, p, clock)
-    return hasil
+
+    return [
+        ProposalDenganTerkumpul(proposal=p, collected_amount=int(jumlah))
+        for p, jumlah in baris
+    ], int(total or 0)
 
 
-async def daftar_proposal_milik(session: AsyncSession, umkm_id: UUID) -> list[Proposal]:
+async def daftar_proposal_milik(
+    session: AsyncSession, umkm_id: UUID
+) -> list[ProposalDenganTerkumpul]:
     """GET /proposals/mine (10-api-contract.md:57). Tidak menyaring status:
     pemiliknya boleh melihat seluruh proposalnya sendiri termasuk rejected
     dan failed, beda dari daftar_proposal_publik yang menyaring
-    STATUS_PROPOSAL_PUBLIK untuk pengunjung yang bukan pemilik."""
-    hasil = await session.scalars(
-        select(Proposal)
-        .where(Proposal.umkm_id == umkm_id)
-        .order_by(desc("created_at"), desc("id"))
-    )
-    return list(hasil)
+    STATUS_PROPOSAL_PUBLIK untuk pengunjung yang bukan pemilik.
+
+    `collected_amount` di-JOIN sama seperti daftar_proposal_publik, dengan
+    alasan N+1 yang sama persis."""
+    terkumpul = jumlah_terkumpul_subquery()
+    baris = (
+        await session.execute(
+            select(Proposal, func.coalesce(terkumpul.c.collected_amount, 0))
+            .outerjoin(terkumpul, terkumpul.c.proposal_id == Proposal.id)
+            .where(Proposal.umkm_id == umkm_id)
+            .order_by(desc("created_at"), desc("id"))
+        )
+    ).all()
+    return [
+        ProposalDenganTerkumpul(proposal=p, collected_amount=int(jumlah))
+        for p, jumlah in baris
+    ]
 
 
 @dataclass

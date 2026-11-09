@@ -38,12 +38,33 @@ class PledgeOut(BaseModel):
     created_at: datetime
 
 
-class PledgeListItemOut(PledgeOut):
-    """GET /proposals/{id}/pledges (10-api-contract.md:67) menambah satu
-    kolom di atas PledgeOut: penanda lead investor. Bukan kolom tabel, jadi
-    tidak bisa divalidasi lewat from_attributes atas baris Pledge mentah;
-    lihat PledgeAktifDenganLeadMarker di services/pledge.py yang merakitnya."""
+class PledgeListItemOut(BaseModel):
+    """GET /proposals/{id}/pledges (10-api-contract.md:67). Bukan subclass
+    PledgeOut meski field-nya hampir sama: `investor_id` di sini opsional
+    (None sebelum proposal `funded`), sementara PledgeOut dipakai apa
+    adanya untuk respons POST/DELETE pledge sendiri, yang selalu tahu
+    identitasnya sendiri dan tidak pernah butuh disembunyikan.
 
+    10-api-contract.md:106-107 melarang identitas investor terlihat sebelum
+    `funded`; review keamanan menemukan endpoint ini membiarkan investor
+    manapun membaca UUID dan nominal pasti investor lain pada proposal yang
+    masih `partially_funded` -- cukup untuk sengaja menyaingi pledge lead
+    investor sebelum posisinya settle. `amount` dan `is_lead_investor` tetap
+    tampil: keduanya informasi publik yang sah (bilah progres, penanda
+    lead), bukan identitas. Redaksinya terjadi di
+    `daftar_pledge_aktif` (services/pledge.py), bukan di sini lewat
+    model_validator: fungsi itu sudah memegang `proposal.status` di tangan,
+    jadi tidak perlu membawa status proposal ke skema ini hanya untuk
+    keputusan yang sama."""
+
+    model_config = {"from_attributes": True}
+
+    id: UUID
+    proposal_id: UUID
+    investor_id: UUID | None
+    amount: int
+    status: PledgeStatus
+    created_at: datetime
     is_lead_investor: bool
 
 

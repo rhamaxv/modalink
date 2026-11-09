@@ -124,6 +124,61 @@ async def test_br17_campaign_yang_apply_deadline_nya_lewat_menolak(
     assert res.json()["error"]["code"] == "pengajuan_ditutup"
 
 
+async def test_t3_business_profile_over_5000_characters_rejected(
+    client, umkm, campaign, body_proposal
+):
+    """Review keamanan: business_profile lolos sampai 5 MB tanpa batas atas
+    sebelum ini. 5.000 karakter dipilih longgar -- kira-kira satu-dua
+    halaman, jauh di atas rencana bisnis UMKM mana pun yang wajar -- supaya
+    batas ini menolak payload raksasa tanpa pernah menolak isian sungguhan."""
+    res = await client.post(
+        f"/api/v1/campaigns/{campaign.id}/proposals",
+        headers=umkm.headers,
+        json=body_proposal(business_profile="x" * 5_001),
+    )
+    assert res.status_code == 422
+
+
+async def test_t3_fund_usage_plan_over_5000_characters_rejected(
+    client, umkm, campaign, body_proposal
+):
+    res = await client.post(
+        f"/api/v1/campaigns/{campaign.id}/proposals",
+        headers=umkm.headers,
+        json=body_proposal(fund_usage_plan="x" * 5_001),
+    )
+    assert res.status_code == 422
+
+
+async def test_t3_business_projection_over_3000_characters_rejected(
+    client, umkm, campaign, body_proposal
+):
+    res = await client.post(
+        f"/api/v1/campaigns/{campaign.id}/proposals",
+        headers=umkm.headers,
+        json=body_proposal(business_projection="x" * 3_001),
+    )
+    assert res.status_code == 422
+
+
+async def test_t3_more_than_30_milestones_rejected(
+    client, umkm, campaign, body_proposal
+):
+    """Review keamanan: 50.000 item milestone lolos tanpa batas atas sebelum
+    ini. 30 tahap jauh di atas rencana pendanaan bertahap mana pun yang
+    wajar (seed data terpanjang hanya dua tahap)."""
+    banyak = [
+        {"seq": i, "title": f"Tahap {i}", "description": "x" * 20, "amount": 100_000}
+        for i in range(1, 32)
+    ]
+    res = await client.post(
+        f"/api/v1/campaigns/{campaign.id}/proposals",
+        headers=umkm.headers,
+        json=body_proposal(requested_amount=31 * 100_000, milestones=banyak),
+    )
+    assert res.status_code == 422
+
+
 async def test_br18_tidak_ada_endpoint_ubah_proposal(app):
     rute = {
         (m, r.path)

@@ -16,7 +16,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, Index
+from sqlalchemy import CheckConstraint, Column, Index
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
@@ -38,6 +38,18 @@ class MilestoneReport(SQLModel, table=True):
             "ix_milestone_reports_milestone_id_submitted_at",
             "milestone_id",
             "submitted_at",
+        ),
+        # Lapisan kedua di belakang Field(max_length=...) di
+        # MilestoneReportIn/MilestoneRejectIn (Task 3 review keamanan,
+        # migrasi a061fd4c5ee6). reviewer_note harus tetap meloloskan NULL:
+        # ia hanya wajib diisi saat rejected (BR-45), bukan setiap baris.
+        CheckConstraint(
+            "length(narrative) BETWEEN 50 AND 5000",
+            name="ck_milestone_reports_narrative_length",
+        ),
+        CheckConstraint(
+            "reviewer_note IS NULL OR length(reviewer_note) BETWEEN 10 AND 2000",
+            name="ck_milestone_reports_reviewer_note_length",
         ),
     )
 

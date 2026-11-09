@@ -210,13 +210,19 @@ async def campaign_kedaluwarsa(db, investor):
 
 def _isi_proposal_minimal(campaign_id, umkm_id, status: ProposalStatus) -> Proposal:
     """Baris proposal lengkap secara kolom, dipakai fixture yang statusnya
-    sudah final secara artifisial (BR-13, bukan lewat mesin skoring)."""
+    sudah final secara artifisial (BR-13, bukan lewat mesin skoring).
+
+    business_profile dan fund_usage_plan 100 karakter, bukan 50: fixture ini
+    menyusun Proposal langsung, melompati ProposalIn (BR-10 min_length=100)
+    sama sekali, dan sejak migrasi a061fd4c5ee6 (Task 3) database menolak
+    baris di bawah itu lewat CHECK ck_proposals_business_profile_length /
+    ck_proposals_fund_usage_plan_length."""
     return Proposal(
         campaign_id=campaign_id,
         umkm_id=umkm_id,
         business_name="Warung Kopi Mbak Sri",
-        business_profile="x" * 50,
-        fund_usage_plan="x" * 50,
+        business_profile="x" * 100,
+        fund_usage_plan="x" * 100,
         business_projection="x" * 50,
         requested_amount=10_000_000,
         status=status,

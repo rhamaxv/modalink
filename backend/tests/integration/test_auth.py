@@ -106,6 +106,66 @@ async def test_br02_email_duplikat_ditolak_400_bukan_500(client):
     assert kedua.json()["error"]["code"] == "email_terpakai"
 
 
+async def test_t3_register_rejects_malformed_email(client):
+    """Review keamanan: "not-an-email" lolos registrasi sebelum ini karena
+    RegisterIn.email bertipe str polos."""
+    res = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "not-an-email",
+            "password": "rahasia123",
+            "name": "Siapa Saja",
+            "role": "umkm",
+        },
+    )
+    assert res.status_code == 422
+
+
+async def test_t3_register_accepts_reserved_test_tld_used_by_seed_demo_data(client):
+    """Bukan kelonggaran yang terlewat: app/seed/demo.py sengaja memakai
+    domain `*.demo.modalink.test` untuk akun demo juri, dan EmailStr bawaan
+    Pydantic menolak TLD reserved RFC 2606 itu tanpa opsi pengecualian.
+    Test ini membuktikan `test_environment=True` di schemas/auth.py tidak
+    diam-diam melonggarkan validasi format lain (lihat test di atas)."""
+    res = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "juri@demo.modalink.test",
+            "password": "rahasia123",
+            "name": "Juri",
+            "role": "investor",
+        },
+    )
+    assert res.status_code == 201
+
+
+async def test_t3_register_rejects_name_over_120_characters(client):
+    res = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "nama-panjang@contoh.id",
+            "password": "rahasia123",
+            "name": "x" * 121,
+            "role": "umkm",
+        },
+    )
+    assert res.status_code == 422
+
+
+async def test_t3_register_rejects_password_over_128_characters(client):
+    """Review keamanan: password 5 MB lolos tanpa batas atas sebelum ini."""
+    res = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "password-panjang@contoh.id",
+            "password": "x" * 129,
+            "name": "Siapa Saja",
+            "role": "umkm",
+        },
+    )
+    assert res.status_code == 422
+
+
 async def test_login_argon2_tetap_jalan_untuk_email_tak_dikenal(db, monkeypatch):
     """Oracle waktu: tanpa HASH_UMPAN, email tak dikenal melewati argon2 lewat
     short-circuit `user is None`, sehingga responsnya terukur lebih cepat
