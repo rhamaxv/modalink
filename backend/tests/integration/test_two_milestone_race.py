@@ -175,6 +175,14 @@ async def _buat_proposal_siap_race(
 
 async def _bersihkan_proposal(proposal_id, lead_id) -> None:
     async with SessionLocal() as session:
+        # ledger_entries sekarang punya trigger append-only (review keamanan
+        # Finding 3): DELETE biasa ditolak database. SET LOCAL ini adalah
+        # escape hatch yang hanya dipakai infrastruktur test, tidak pernah
+        # oleh kode aplikasi, supaya teardown data uji tetap bisa membersihkan
+        # baris yang dibuat test ini sendiri lewat commit sungguhan.
+        await session.execute(
+            text("SET LOCAL modalink.ledger_cleanup_override = 'on'")
+        )
         await session.execute(
             text(
                 "DELETE FROM milestone_reports WHERE milestone_id IN "
