@@ -31,17 +31,20 @@ test-regression:
 test-live:
 	cd backend && $(VENV_BIN)pytest tests/contract -m live -v
 
-# The frontend is scaffolded in phase 10; until then these targets are no-ops
-# so `make check` keeps passing on a backend-only tree.
+# Keberadaan folder frontend bukan penanda yang benar: npx jatuh ke tsc milik sistem
+# kalau node_modules belum ada, dan pesan errornya tidak menyebut dependency sama sekali.
+# Lewatnya diumumkan, tidak didiamkan, supaya skip tidak terbaca sebagai lolos.
+SKIP_FE = echo "frontend dilewati: jalankan 'cd frontend && npm install' lebih dulu"
+
 test-fe:
-	@if [ -d frontend ]; then cd frontend && npm run test; else echo "frontend not yet scaffolded, skipping until phase 10"; fi
+	@if [ -d frontend/node_modules ]; then cd frontend && npm run test; else $(SKIP_FE); fi
 
 test-e2e:
-	@if [ -d frontend ]; then cd frontend && npx playwright test; else echo "frontend not yet scaffolded, skipping until phase 10"; fi
+	@if [ -d frontend/node_modules ]; then cd frontend && npx playwright test; else $(SKIP_FE); fi
 
 check:
 	cd backend && $(VENV_BIN)ruff check . && $(VENV_BIN)ruff format --check . && $(VENV_BIN)mypy app
-	@if [ -d frontend ]; then cd frontend && npx tsc --noEmit && npm run lint; fi
+	@if [ -d frontend/node_modules ]; then cd frontend && npx tsc --noEmit && npm run lint; else $(SKIP_FE); fi
 	$(MAKE) test
 	$(MAKE) test-fe
 
