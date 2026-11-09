@@ -1,9 +1,12 @@
 """Endpoint pledge dan pembatalan (BR-20 sampai BR-28)."""
 
+import pytest
 from sqlalchemy import select
 
+from app.errors import UnprocessableError
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.proposal import ProposalStatus
+from app.services.pledge import create_pledge
 
 
 async def test_br22_any_investor_may_fund(client, investor_lain, listed_proposal):
@@ -143,3 +146,16 @@ async def test_br62_pledge_after_deadline_rejected_not_accepted_then_refunded(
     assert entries["status"] == "listed", (
         "pledge yang ditolak tidak boleh ikut mengubah status proposal"
     )
+
+
+async def test_br27_service_layer_rejects_amount_below_minimum_without_http(
+    db, investor, listed_proposal, clock
+):
+    """BR-27 sebelumnya hanya ditegakkan di PledgeIn (schemas/pledge.py), satu
+    pintu HTTP saja. Pemanggil yang menyusun pledge lewat create_pledge()
+    langsung -- test lain, job batch, service lain -- melewati pintu itu
+    sama sekali dan bisa mencatat pledge Rp1 (CLAUDE.md aturan 1: aturan
+    uang tidak boleh cuma benar di satu lapisan)."""
+    with pytest.raises(UnprocessableError) as exc_info:
+        await create_pledge(db, investor.user, listed_proposal, 1, clock)
+    assert exc_info.value.code == "pledge_di_bawah_minimum"

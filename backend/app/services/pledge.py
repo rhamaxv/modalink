@@ -14,12 +14,13 @@ from app.domain.clock import Clock
 from app.domain.funding import compute_funding_status, remaining_amount
 from app.domain.lead_investor import PledgeRingkas, pick_lead_investor
 from app.domain.money import format_rupiah
-from app.errors import ConflictError, NotFoundError
+from app.errors import ConflictError, NotFoundError, UnprocessableError
 from app.models.campaign import Campaign
 from app.models.ledger import EntryType
 from app.models.pledge import Pledge, PledgeStatus
 from app.models.proposal import Proposal, ProposalStatus
 from app.models.user import User
+from app.schemas.pledge import MIN_PLEDGE_AMOUNT
 from app.services.ledger import catat_entri, total_terkumpul_proposal
 
 # BR-20: hanya proposal pada status ini yang boleh menerima pledge baru.
@@ -62,6 +63,18 @@ async def create_pledge(
 ) -> Pledge:
     """Mencatat pledge baru dan menghitung ulang status funding (BR-20 sampai
     BR-24, BR-27, D-11, D-12). `proposal` wajib hasil `get_locked_proposal`."""
+    if amount < MIN_PLEDGE_AMOUNT:
+        # BR-27: schemas/pledge.py sudah menolak ini di 422 lewat PledgeIn,
+        # tapi itu hanya menjaga pintu HTTP. Pemanggil lain (test, job batch,
+        # service lain yang menyusun Pledge tanpa lewat router) bisa
+        # melewatinya sama sekali. CLAUDE.md aturan 1 melarang aturan uang
+        # hanya benar di satu pintu, jadi diulang di sini.
+        raise UnprocessableError(
+            "pledge_di_bawah_minimum",
+            f"Pledge minimal {format_rupiah(MIN_PLEDGE_AMOUNT)}.",
+            detail={"minimal_amount": MIN_PLEDGE_AMOUNT},
+        )
+
     if proposal.status not in FUNDABLE_PROPOSAL_STATUSES:
         # Brief task ini hanya menyebut pemeriksaan sisa dana (D-11); tanpa
         # pagar ini, proposal submitted yang belum lolos scoring bisa
