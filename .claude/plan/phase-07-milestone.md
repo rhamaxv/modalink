@@ -10,13 +10,183 @@
 backend/app/
   models/milestone_report.py
   domain/milestone_rules.py    # prasyarat pelaporan dan pencairan, murni
+  services/status.py           # jembatan enum domain <-> enum kolom, satu tempat
   services/milestone.py
   api/v1/milestones.py
 backend/tests/
   unit/test_milestone_rules.py
+  unit/test_transition_guard.py
   integration/test_milestone_lapor.py
   integration/test_milestone_cair.py
   regression/test_r3_happy_path.py
+```
+
+---
+
+### Task 0: Satu tempat untuk jembatan enum transisi
+
+Dikerjakan lebih dulu, karena Task 3 dan Task 4 fase ini akan menambah dua pemanggil
+`apply_*` lagi dan pola yang mereka contoh sekarang adalah pola yang salah.
+
+**Kenapa task ini ada.** Mesin transisi di `app/domain/transitions.py` memakai enum domain.
+Kolom database memakai enum di `app/models/`. Nilai stringnya sama, kelasnya tidak. Hasil
+`apply_*` karena itu tidak boleh langsung ditulis ke kolom: mypy menolaknya, dan perbandingan
+`is` di test akan selalu `False` tanpa satu pun pesan error muncul. Project ini sudah kena
+sekali, di `test_recompute.py` fase 06.
+
+Konversinya sudah ditulis tiga kali di tempat berbeda (`services/scoring.py` dua helper,
+`services/campaign.py` satu). Docstring `services/scoring.py` bahkan mencatat sendiri bahwa
+pola ini berulang. Fase ini akan menjadikannya lima. Konversi yang wajib, mudah lupa, dan
+tidak bersuara saat dilupakan adalah kandidat yang tepat untuk dipusatkan dan dipagari,
+alasan yang sama dengan [D-04](../docs/decisions.md) memusatkan peta transisinya.
+
+**Files:**
+- Create: `backend/app/services/status.py`
+- Create: `backend/tests/unit/test_transition_guard.py`
+- Modify: `backend/app/services/scoring.py` (buang `_advance_proposal`, `_advance_scoring`)
+- Modify: `backend/app/services/campaign.py` (buang konversi inline di `_tutup`)
+
+**Interfaces:**
+- Produces: `advance_proposal(proposal, event) -> None`,
+  `advance_scoring(proposal, event) -> None`,
+  `advance_campaign(campaign, event) -> None`. Task 3 dan 4 fase ini menambahkan
+  `advance_milestone` dan `advance_report` ke modul yang sama.
+
+- [ ] **Step 1: Tulis pagarnya lebih dulu, dan pastikan ia merah**
+
+Pagar ditulis sebelum modulnya, karena pagar inilah deliverable yang sebenarnya. Tanpa dia
+task ini hanya memindahkan tiga salinan menjadi satu, dan salinan keempat akan muncul lagi
+di fase berikutnya.
+
+```python
+# backend/tests/unit/test_transition_guard.py
+"""Hanya app/services/status.py yang boleh memanggil apply_* dari luar domain.
+
+Pagar ini ada karena hasil apply_* adalah enum domain, bukan enum kolom, dan
+menulisnya langsung ke kolom gagal tanpa bersuara."""
+import ast
+from pathlib import Path
+
+APP = Path(__file__).resolve().parents[2] / "app"
+TRANSITIONS = {"apply_proposal", "apply_scoring", "apply_campaign",
+            "apply_milestone", "apply_report"}
+ALLOWED = {"services/status.py"}
+
+
+def _callers(tree: ast.AST) -> set[str]:
+    names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id in TRANSITIONS:
+                names.add(node.func.id)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr in TRANSITIONS:
+                names.add(node.func.attr)
+    return names
+
+
+def test_apply_transisi_hanya_dipanggil_dari_services_status():
+    violations = {}
+    for f in APP.rglob("*.py"):
+        rel = f.relative_to(APP).as_posix()
+        if rel.startswith("domain/") or rel in ALLOWED:
+            continue
+        used = _callers(ast.parse(f.read_text()))
+        if used:
+            violations[rel] = sorted(used)
+    assert not violations, (
+        "apply_* dipanggil di luar app/services/status.py: "
+        f"{violations}. Pakai advance_* dari modul itu, karena hasil apply_* "
+        "adalah enum domain dan kolom database memakai enum lain."
+    )
+
+
+def test_pagar_ini_benar_benar_mendeteksi_pelanggaran():
+    """Tanpa test ini, pagar di atas bisa hijau karena detektornya rusak."""
+    synthetic = ast.parse("def f(p, e):\n    p.status = apply_proposal(p.status, e)\n")
+    assert _callers(synthetic) == {"apply_proposal"}
+```
+
+- [ ] **Step 2: Jalankan pagarnya, pastikan merah di dua file yang sudah ada**
+
+Run: `cd backend && .venv/bin/pytest tests/unit/test_transition_guard.py -v`
+
+Expected: `test_apply_transisi_hanya_dipanggil_dari_services_status` FAIL, dan pesannya
+menyebut `services/scoring.py` dan `services/campaign.py`. Kalau ia langsung hijau,
+detektornya rusak, bukan kodenya bersih. Yang kedua harus PASS.
+
+Catat output merahnya di laporan. Pagar yang tidak pernah terlihat merah belum terbukti.
+
+- [ ] **Step 3: Tulis modulnya**
+
+```python
+# backend/app/services/status.py
+"""Jembatan nilai antara enum transisi domain dan enum kolom database.
+
+Nilai stringnya sama, kelasnya beda, dan menulis hasil apply_* langsung ke kolom
+gagal tanpa bersuara: mypy menolaknya dan perbandingan `is` di test selalu salah.
+Konversinya dipusatkan di sini supaya tests/unit/test_transition_guard.py bisa
+menegakkannya, bukan supaya lebih singkat."""
+
+from app.domain.transitions import (
+    CampaignEvent,
+    ProposalEvent,
+    ScoringEvent,
+    apply_campaign,
+    apply_proposal,
+    apply_scoring,
+)
+from app.domain.transitions import CampaignStatus as DomainCampaignStatus
+from app.domain.transitions import ProposalStatus as DomainProposalStatus
+from app.domain.transitions import ScoringStatus as DomainScoringStatus
+from app.models.campaign import Campaign, CampaignStatus
+from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
+
+
+def advance_proposal(proposal: Proposal, event: ProposalEvent) -> None:
+    baru = apply_proposal(DomainProposalStatus(proposal.status.value), event)
+    proposal.status = ProposalStatus(baru.value)
+
+
+def advance_scoring(proposal: Proposal, event: ScoringEvent) -> None:
+    baru = apply_scoring(DomainScoringStatus(proposal.scoring_status.value), event)
+    proposal.scoring_status = ScoringStatus(baru.value)
+
+
+def advance_campaign(campaign: Campaign, event: CampaignEvent) -> None:
+    baru = apply_campaign(DomainCampaignStatus(campaign.status.value), event)
+    campaign.status = CampaignStatus(baru.value)
+```
+
+`IllegalTransition` tetap dilempar oleh `apply_*` dan menembus fungsi-fungsi ini tanpa
+ditangkap. Pemanggil yang perlu mengubahnya menjadi `409` tetap menangkapnya sendiri,
+seperti sekarang.
+
+- [ ] **Step 4: Pindahkan tiga pemanggil yang sudah ada**
+
+Di `services/scoring.py`: hapus `_advance_proposal` dan `_advance_scoring`, impor
+`advance_proposal` dan `advance_scoring` dari `app.services.status`, ganti pemanggilannya.
+Buang impor `apply_proposal`, `apply_scoring`, `DomainProposalStatus`, `DomainScoringStatus`
+yang jadi tidak terpakai. Perbarui docstring modulnya: paragraf yang menjelaskan jembatan
+enum sekarang tinggal menunjuk ke `services/status.py`.
+
+Di `services/campaign.py`: hal yang sama untuk `_tutup` dan `advance_campaign`.
+
+Jangan ubah perilaku apa pun. Tidak ada test yang boleh berubah di step ini, dan itulah
+buktinya pemindahan ini benar.
+
+- [ ] **Step 5: Jalankan semuanya**
+
+Run: `make check && make test-regression`
+
+Expected: pagar hijau, dan jumlah test yang lolos **sama** dengan sebelum task ini
+dimulai. Catat kedua angkanya di laporan. Angka yang turun berarti ada test yang hilang,
+bukan ada test yang membaik.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git commit -am "refactor: centralize the domain to column enum bridge"
 ```
 
 ---
