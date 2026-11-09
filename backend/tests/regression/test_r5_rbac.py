@@ -83,6 +83,10 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # divalidasi sebagai UUID. Kasus peran benar tapi bukan pemilik (403) dan
     # pembatalan sungguhan ada di tests/integration/test_pledge.py.
     ("DELETE", "/api/v1/pledges/{pledge_id}", "investor", 422),
+    # Endpoint internal (BR-63): tidak ada pagar role, siapa pun yang bisa
+    # mencapainya di ENV=dev boleh memajukan jam. 422 di sini karena body
+    # kosong kehilangan `hari`, bukan karena ditolak perannya.
+    ("POST", "/api/v1/internal/clock/tick", None, 422),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 
