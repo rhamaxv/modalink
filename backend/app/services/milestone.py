@@ -182,6 +182,13 @@ async def approve_milestone(
             "Milestone ini tidak bisa disetujui pada status sekarang.",
         ) from None
 
+    # Finding 3: dideklarasikan di models/proposal.py dan dikembalikan
+    # schemas/milestone.py, tapi tidak pernah ditulis di sini
+    # (.claude/plan/phase-07-milestone.md baris ini sempat hilang). Lewat
+    # clock yang disuntikkan, bukan jam sistem langsung, supaya tetap benar
+    # di bawah VirtualClock demo (BR-60).
+    milestone.disbursed_at = clock.now()
+
     if event is MilestoneEvent.APPROVE:
         report = await get_latest_report(session, milestone.id)
         if report is None or report.review_status is not ReportStatus.PENDING:

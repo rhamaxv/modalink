@@ -2,9 +2,13 @@
 `completed` saat milestone terakhir cair (BR-47, BR-48, T-09, T-21, D-13).
 """
 
+from datetime import UTC, datetime
+
 from sqlalchemy import func
 from sqlmodel import select
 
+from app.api.deps import get_clock
+from app.domain.clock import FrozenClock
 from app.models.ledger import EntryType, LedgerEntry
 
 # Enum kolom database (app.models.proposal), bukan enum mesin transisi
@@ -27,6 +31,29 @@ async def test_d13_first_milestone_disburses_without_report_after_approve(
     assert res.status_code == 200
     await db.refresh(m1)
     assert m1.status is M.DISBURSED
+
+
+async def test_br47_approve_sets_disbursed_at_from_injected_clock(
+    client, app, db, investor, funded_proposal
+):
+    """Finding 3: disbursed_at dideklarasikan di model dan dikembalikan
+    skema, tapi tidak pernah diisi -- approve_milestone harus mengisinya
+    dari clock yang disuntikkan, bukan datetime.now() (BR-60).
+
+    Jam virtual dipasang ke tanggal yang mustahil dicapai jam dinding
+    (2031), supaya kecocokannya hanya bisa dijelaskan oleh injeksi clock,
+    bukan kebetulan dua pembacaan jam sungguhan yang berdekatan."""
+    tanggal_virtual = datetime(2031, 1, 1, tzinfo=UTC)
+    app.dependency_overrides[get_clock] = lambda: FrozenClock(tanggal_virtual)
+
+    m1 = funded_proposal.milestones[0]
+    res = await client.post(
+        f"/api/v1/milestones/{m1.id}/approve", headers=investor.headers
+    )
+    assert res.status_code == 200
+    assert datetime.fromisoformat(res.json()["disbursed_at"]) == tanggal_virtual
+    await db.refresh(m1)
+    assert m1.disbursed_at == tanggal_virtual
 
 
 async def test_br47_approve_records_disbursement_of_milestone_amount(
