@@ -94,3 +94,20 @@ async def test_tick_endpoint_advances_clock_seen_by_real_proposal_read(
 
     detail = (await client.get(f"/api/v1/proposals/{listed_proposal.id}")).json()
     assert detail["status"] == "failed"
+
+
+async def test_ck_system_clock_tunggal_rejects_second_row(db):
+    """Constraint database, bukan sekadar kolomnya ada: CHECK id = 1 wajib
+    benar-benar menolak baris kedua, bukan hanya dipercaya karena tertulis
+    di model."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.system_clock import SystemClockRow
+
+    db.add(SystemClockRow(id=2, virtual_now=None))
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+    else:
+        raise AssertionError("CHECK id = 1 seharusnya menolak baris dengan id selain 1")
