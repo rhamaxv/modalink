@@ -21,13 +21,13 @@ export default function Beranda() {
       <div className="flex flex-wrap gap-ruang-3">
         <Link
           href="/daftar"
-          className="inline-flex min-h-[44px] items-center rounded-kecil bg-accent px-ruang-4 py-ruang-2 text-sm font-semibold text-ink"
+          className="inline-flex min-h-[44px] items-center rounded-kecil bg-accent px-ruang-4 py-ruang-2 text-base leading-[1.6] font-semibold text-ink"
         >
           Daftar
         </Link>
         <Link
           href="/masuk"
-          className="inline-flex min-h-[44px] items-center rounded-kecil border border-ink px-ruang-4 py-ruang-2 text-sm font-semibold text-ink"
+          className="inline-flex min-h-[44px] items-center rounded-kecil border border-ink px-ruang-4 py-ruang-2 text-base leading-[1.6] font-semibold text-ink"
         >
           Masuk
         </Link>

@@ -15,12 +15,12 @@ type EmptyStateProps = {
 export function EmptyState({ reason, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-start gap-ruang-3 rounded-kartu border border-line bg-surface px-ruang-4 py-ruang-5 text-left">
-      <p className="max-w-baca text-sm text-muted">{reason}</p>
+      <p className="max-w-baca text-base leading-[1.6] text-muted">{reason}</p>
       {action && (
         <button
           type="button"
           onClick={action.onClick}
-          className="min-h-[44px] rounded-kecil bg-accent px-ruang-3 py-ruang-2 text-sm font-semibold text-ink"
+          className="min-h-[44px] rounded-kecil bg-accent px-ruang-3 py-ruang-2 text-base leading-[1.6] font-semibold text-ink"
         >
           {action.label}
         </button>

@@ -19,7 +19,7 @@ export function LoadingState({ label, minHeight }: LoadingStateProps) {
       role="status"
       aria-live="polite"
       style={minHeight ? { minHeight: `${minHeight}px` } : undefined}
-      className="flex items-center gap-ruang-2 rounded-kartu border border-line bg-surface px-ruang-4 py-ruang-3 text-sm text-muted"
+      className="flex items-center gap-ruang-2 rounded-kartu border border-line bg-surface px-ruang-4 py-ruang-3 text-base leading-[1.6] text-muted"
     >
       <span
         aria-hidden="true"

@@ -49,7 +49,7 @@ export function Field({
           onChange={(event) => onChange(event.target.value)}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className="min-h-[44px] rounded-kecil border border-ink bg-paper px-ruang-3 py-ruang-2 text-sm text-ink"
+          className="min-h-[44px] rounded-kecil border border-ink bg-paper px-ruang-3 py-ruang-2 text-base leading-[1.6] text-ink"
         >
           {options.map((item) => (
             <option key={item.value} value={item.value}>
@@ -66,7 +66,7 @@ export function Field({
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           autoComplete={autoComplete}
-          className="min-h-[44px] rounded-kecil border border-ink bg-paper px-ruang-3 py-ruang-2 text-sm text-ink"
+          className="min-h-[44px] rounded-kecil border border-ink bg-paper px-ruang-3 py-ruang-2 text-base leading-[1.6] text-ink"
         />
       )}
       {error && (

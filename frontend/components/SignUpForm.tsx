@@ -73,7 +73,7 @@ export function SignUpForm() {
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-ruang-4">
       {formError && (
-        <p role="alert" className="rounded-kecil border border-danger bg-surface px-ruang-3 py-ruang-2 text-sm text-danger">
+        <p role="alert" className="rounded-kecil border border-danger bg-surface px-ruang-3 py-ruang-2 text-base leading-[1.6] text-danger">
           {formError}
         </p>
       )}
@@ -101,7 +101,7 @@ export function SignUpForm() {
         type="submit"
         disabled={submitting}
         aria-busy={submitting}
-        className="min-h-[44px] rounded-kecil bg-accent px-ruang-4 py-ruang-2 text-sm font-semibold text-ink disabled:opacity-60"
+        className="min-h-[44px] rounded-kecil bg-accent px-ruang-4 py-ruang-2 text-base leading-[1.6] font-semibold text-ink disabled:opacity-60"
       >
         Daftar
       </button>
