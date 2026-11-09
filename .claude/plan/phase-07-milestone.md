@@ -85,7 +85,7 @@ def _callers(tree: ast.AST) -> set[str]:
     return names
 
 
-def test_apply_transisi_hanya_dipanggil_dari_services_status():
+def test_apply_transitions_only_called_from_services_status():
     violations = {}
     for f in APP.rglob("*.py"):
         rel = f.relative_to(APP).as_posix()
@@ -101,7 +101,7 @@ def test_apply_transisi_hanya_dipanggil_dari_services_status():
     )
 
 
-def test_pagar_ini_benar_benar_mendeteksi_pelanggaran():
+def test_this_guard_actually_detects_a_violation():
     """Tanpa test ini, pagar di atas bisa hijau karena detektornya rusak."""
     synthetic = ast.parse("def f(p, e):\n    p.status = apply_proposal(p.status, e)\n")
     assert _callers(synthetic) == {"apply_proposal"}
@@ -111,7 +111,7 @@ def test_pagar_ini_benar_benar_mendeteksi_pelanggaran():
 
 Run: `cd backend && .venv/bin/pytest tests/unit/test_transition_guard.py -v`
 
-Expected: `test_apply_transisi_hanya_dipanggil_dari_services_status` FAIL, dan pesannya
+Expected: `test_apply_transitions_only_called_from_services_status` FAIL, dan pesannya
 menyebut `services/scoring.py` dan `services/campaign.py`. Kalau ia langsung hijau,
 detektornya rusak, bukan kodenya bersih. Yang kedua harus PASS.
 
