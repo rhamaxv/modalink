@@ -125,6 +125,34 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # divalidasi sebagai UUID sekaligus body kosong kehilangan `note`. Reject
     # sungguhan (BR-45, T-23, T-31) ada di tests/integration/test_milestone_lapor.py.
     ("POST", "/api/v1/milestones/{milestone_id}/reject", "investor", 422),
+    # Fase 07 Task 6: empat endpoint baca yang sebelumnya dideklarasikan
+    # kontrak tapi tidak dimiliki task mana pun (10-api-contract.md baris
+    # 57, 67, 73, 96). GET /proposals/mine ditolak karena PERAN (investor
+    # bukan umkm), beda dari pola 404-karena-kepemilikan di endpoint lain:
+    # itulah satu-satunya endpoint di seluruh matriks ini yang memang
+    # dirancang begitu (lihat docstring daftar_proposal_mine_endpoint).
+    ("GET", "/api/v1/proposals/mine", None, 401),
+    ("GET", "/api/v1/proposals/mine", "investor", 403),
+    ("GET", "/api/v1/proposals/mine", "community", 403),
+    ("GET", "/api/v1/proposals/mine", "umkm", 200),
+    ("GET", "/api/v1/proposals/{proposal_id}/pledges", None, 401),
+    ("GET", "/api/v1/proposals/{proposal_id}/pledges", "community", 403),
+    # Investor dan umkm lolos pagar peran (kontrak: "investor, pemilik
+    # proposal"); 422 di sini membuktikan itu, karena literal
+    # "{proposal_id}" gagal UUID sebelum dependency sempat memeriksa
+    # kepemilikan. Kasus umkm bukan pemilik (404) dan penanda lead investor
+    # yang berpindah ada di tests/integration/test_read_endpoints.py.
+    ("GET", "/api/v1/proposals/{proposal_id}/pledges", "umkm", 422),
+    ("GET", "/api/v1/proposals/{proposal_id}/pledges", "investor", 422),
+    # Publik bila proposal publik (kontrak), jadi tidak ada baris per peran:
+    # sama seperti GET /proposals/{proposal_id} di atas, satu baris anonim
+    # sudah cukup karena literal "{proposal_id}" gagal UUID untuk siapa pun.
+    # Kasus visibilitas sungguhan ada di test_read_endpoints.py.
+    ("GET", "/api/v1/proposals/{proposal_id}/milestones", None, 422),
+    # Tidak ada pemeriksaan peran sama sekali (lihat docstring
+    # app/api/v1/internal.py): literal "{proposal_id}" tetap gagal UUID
+    # untuk siapa pun, jadi satu baris anonim ini sudah cukup representatif.
+    ("GET", "/api/v1/internal/ledger/{proposal_id}", None, 422),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

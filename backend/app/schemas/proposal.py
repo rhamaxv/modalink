@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.proposal import ProposalStatus, ScoringStatus
+from app.models.proposal import MilestoneStatus, ProposalStatus, ScoringStatus
 
 
 class MilestoneIn(BaseModel):
@@ -49,3 +49,26 @@ class ProposalOut(BaseModel):
 
 class ProposalListOut(BaseModel):
     items: list[ProposalOut]
+
+
+class MilestoneOut(BaseModel):
+    """GET /proposals/{id}/milestones (10-api-contract.md:73).
+
+    Tidak ada kolom laporan terakhir di sini: milestone_reports belum punya
+    model di backend ini (dibangun task lain yang berjalan bersamaan), dan
+    frontend yang sudah merge (components/ProposalDetailView.tsx) juga tidak
+    membaca kolom itu. Lihat laporan task ini untuk detail penyimpangan dari
+    10-api-contract.md baris 73."""
+
+    model_config = {"from_attributes": True}
+
+    id: UUID
+    seq: int
+    title: str
+    description: str
+    amount: int
+    status: MilestoneStatus
+
+
+class MilestoneListOut(BaseModel):
+    items: list[MilestoneOut]

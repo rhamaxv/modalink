@@ -36,3 +36,16 @@ class PledgeOut(BaseModel):
     amount: int
     status: PledgeStatus
     created_at: datetime
+
+
+class PledgeListItemOut(PledgeOut):
+    """GET /proposals/{id}/pledges (10-api-contract.md:67) menambah satu
+    kolom di atas PledgeOut: penanda lead investor. Bukan kolom tabel, jadi
+    tidak bisa divalidasi lewat from_attributes atas baris Pledge mentah;
+    lihat PledgeAktifDenganLeadMarker di services/pledge.py yang merakitnya."""
+
+    is_lead_investor: bool
+
+
+class PledgeListOut(BaseModel):
+    items: list[PledgeListItemOut]

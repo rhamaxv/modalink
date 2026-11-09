@@ -158,6 +158,26 @@ async def ambil_proposal_untuk_rescore_milik_sendiri(
     return proposal
 
 
+async def ambil_proposal_untuk_daftar_pledge(
+    proposal_id: UUID,
+    user: User = Depends(require_role(Role.UMKM, Role.INVESTOR)),
+    session: AsyncSession = Depends(get_session),
+) -> Proposal:
+    """GET /proposals/{id}/pledges (10-api-contract.md:67). Pola yang sama
+    dengan jaga_akses_scoring_milik_sendiri di bawah: investor manapun boleh
+    melihat (kontrak menyebut peran itu blanket, bukan hanya pemilik
+    campaign), tapi UMKM hanya pemilik proposal ini sendiri. UMKM lain yang
+    lolos require_role di atas tetap ditolak 404, bukan 403, supaya
+    keberadaan proposal tidak terbuka untuk UMKM yang bukan pemiliknya.
+    """
+    proposal = await ambil_proposal(session, proposal_id)
+    if proposal is None:
+        raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
+    if user.role is Role.UMKM and proposal.umkm_id != user.id:
+        raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
+    return proposal
+
+
 async def jaga_akses_scoring_milik_sendiri(
     proposal_id: UUID,
     user: User = Depends(require_role(Role.UMKM, Role.INVESTOR)),

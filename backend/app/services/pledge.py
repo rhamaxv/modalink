@@ -5,8 +5,11 @@ dikunci lewat `get_locked_proposal` (RF-1): tanpa itu dua pledge nyaris
 bersamaan sama-sama membaca sisa dana yang sama dan sama-sama lolos.
 """
 
+from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
+from sqlalchemy import desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -283,3 +286,50 @@ async def recompute_funding_status(
     if proposal.status is ProposalStatus.FUNDED and proposal.funded_at is None:
         proposal.funded_at = clock.now()
     await session.flush()
+
+
+@dataclass(frozen=True, slots=True)
+class PledgeAktifDenganLeadMarker:
+    """Bentuk siap-serialisasi untuk GET /proposals/{id}/pledges
+    (10-api-contract.md:67). Bukan Pledge langsung: SQLModel menolak atribut
+    bebas (lihat ProposalWithPledge di tests/conftest.py untuk alasan yang
+    sama), dan is_lead_investor bukan kolom tabel sama sekali, hanya
+    perbandingan terhadap proposal.lead_investor_id yang satu-satunya
+    penulisnya recompute_funding_status di atas."""
+
+    id: UUID
+    proposal_id: UUID
+    investor_id: UUID
+    amount: int
+    status: PledgeStatus
+    created_at: datetime
+    is_lead_investor: bool
+
+
+async def daftar_pledge_aktif(
+    session: AsyncSession, proposal: Proposal
+) -> list[PledgeAktifDenganLeadMarker]:
+    """Hanya pledge aktif (BR-20 sampai BR-26, 10-api-contract.md:67): yang
+    sudah dibatalkan tidak pernah muncul di sini, beda dari riwayat penuh."""
+    aktif = (
+        await session.scalars(
+            select(Pledge)
+            .where(
+                Pledge.proposal_id == proposal.id,
+                Pledge.status == PledgeStatus.ACTIVE,
+            )
+            .order_by(desc("created_at"), desc("id"))
+        )
+    ).all()
+    return [
+        PledgeAktifDenganLeadMarker(
+            id=p.id,
+            proposal_id=p.proposal_id,
+            investor_id=p.investor_id,
+            amount=p.amount,
+            status=p.status,
+            created_at=p.created_at,
+            is_lead_investor=p.investor_id == proposal.lead_investor_id,
+        )
+        for p in aktif
+    ]
