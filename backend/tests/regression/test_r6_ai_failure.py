@@ -60,10 +60,15 @@ async def test_r6_rescore_mengembalikan_ke_pending(
 
 
 async def test_r6_rescore_ditolak_saat_scoring_sudah_selesai(
-    client, umkm, listed_proposal
+    client, umkm_lain, listed_proposal
 ):
+    # listed_proposal milik umkm_lain (lihat conftest.py), bukan umkm: dengan
+    # peran saja (sebelum H-2) test ini lolos lewat akun yang bukan pemilik
+    # sama sekali, menyembunyikan kebocoran kepemilikan di balik 409 yang
+    # sama persis. Memakai pemilik sungguhan di sini supaya 409 di bawah
+    # benar-benar menguji BR-74, bukan sekadar lolos lewat peran.
     res = await client.post(
-        f"/api/v1/proposals/{listed_proposal.id}/rescore", headers=umkm.headers
+        f"/api/v1/proposals/{listed_proposal.id}/rescore", headers=umkm_lain.headers
     )
     assert res.status_code == 409
 

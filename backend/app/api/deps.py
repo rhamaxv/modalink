@@ -13,10 +13,16 @@ from app.db.session import get_session
 from app.domain.clock import Clock, SystemClock
 from app.errors import DomainError, ForbiddenError, NotFoundError
 from app.models.campaign import Campaign
+from app.models.proposal import Proposal
 from app.models.user import Role, User
 from app.services.auth import ambil_user, decode_token
 from app.services.campaign import ambil_campaign
-from app.services.scoring import SessionFactory, sesi_job_produksi
+from app.services.proposal import ambil_proposal
+from app.services.scoring import (
+    SessionFactory,
+    ambil_proposal_untuk_rescore,
+    sesi_job_produksi,
+)
 
 # Instance tunggal dibangun sekali saat modul ini diimpor, bukan satu engine
 # baru per request: GeminiEngine.from_settings membangun genai.Client sendiri,
@@ -110,3 +116,37 @@ async def ambil_campaign_milik_sendiri(
     if campaign.investor_id != user.id:
         raise ForbiddenError("bukan_pemilik", "Campaign ini bukan milik Anda.")
     return campaign
+
+
+async def ambil_proposal_untuk_rescore_milik_sendiri(
+    proposal_id: UUID,
+    user: User = Depends(require_role(Role.UMKM, Role.INVESTOR)),
+    session: AsyncSession = Depends(get_session),
+) -> Proposal:
+    """H-2: 10-api-contract.md membatasi POST rescore ke pemilik proposal
+    (UMKM) atau pemilik campaign (investor), bukan peran manapun. 404, bukan
+    403: investor atau UMKM lain yang lolos require_role di atas tidak boleh
+    sekalian mengonfirmasi bahwa proposal ini ada.
+    """
+    proposal = await ambil_proposal_untuk_rescore(session, proposal_id)
+    campaign = await ambil_campaign(session, proposal.campaign_id)
+    if campaign is None or user.id not in {proposal.umkm_id, campaign.investor_id}:
+        raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
+    return proposal
+
+
+async def jaga_akses_scoring_milik_sendiri(
+    proposal_id: UUID,
+    user: User = Depends(require_role(Role.UMKM, Role.INVESTOR)),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """H-2: GET scoring mengizinkan investor manapun (10-api-contract.md
+    menyebut "investor" secara blanket, beda dari rescore yang membatasi ke
+    pemilik campaign), tapi UMKM hanya boleh melihat scoring proposal
+    miliknya sendiri. UMKM lain yang lolos require_role di atas harus tetap
+    ditolak 404 di sini.
+    """
+    if user.role is Role.UMKM:
+        proposal = await ambil_proposal(session, proposal_id)
+        if proposal is None or proposal.umkm_id != user.id:
+            raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")

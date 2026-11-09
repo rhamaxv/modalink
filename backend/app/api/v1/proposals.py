@@ -11,9 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.engine import ScoringEngine
 from app.api.deps import (
+    ambil_proposal_untuk_rescore_milik_sendiri,
     get_clock,
     get_scoring_engine,
     get_session_factory,
+    jaga_akses_scoring_milik_sendiri,
     pengguna_opsional,
     require_role,
 )
@@ -35,7 +37,6 @@ from app.services.proposal import (
 )
 from app.services.scoring import (
     SessionFactory,
-    ambil_proposal_untuk_rescore,
     ambil_scoring_terbaru,
     jalankan_scoring_job,
     minta_rescore,
@@ -103,15 +104,13 @@ async def ambil_proposal_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def rescore_proposal_endpoint(
-    proposal_id: UUID,
     background_tasks: BackgroundTasks,
-    _: User = Depends(require_role(Role.UMKM, Role.INVESTOR)),
+    proposal: Proposal = Depends(ambil_proposal_untuk_rescore_milik_sendiri),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     engine: ScoringEngine = Depends(get_scoring_engine),
     session_factory: SessionFactory = Depends(get_session_factory),
 ) -> dict[str, str]:
-    proposal = await ambil_proposal_untuk_rescore(session, proposal_id)
     await minta_rescore(session, proposal)
     InlineRunner(background_tasks).submit(
         lambda: jalankan_scoring_job(session_factory, proposal.id, engine, clock)
@@ -122,13 +121,10 @@ async def rescore_proposal_endpoint(
 @router.get(
     "/api/v1/proposals/{proposal_id}/scoring",
     response_model=ScoringResultOut,
+    dependencies=[Depends(jaga_akses_scoring_milik_sendiri)],
 )
 async def ambil_scoring_endpoint(
     proposal_id: UUID,
-    # Peran saja, bukan kepemilikan: red flag dan brief disembunyikan dari
-    # komunitas (BR-35), sementara UMKM pemilik dan investor manapun boleh
-    # melihatnya (10-api-contract.md).
-    _: User = Depends(require_role(Role.UMKM, Role.INVESTOR)),
     session: AsyncSession = Depends(get_session),
 ) -> ScoringResult:
     return await ambil_scoring_terbaru(session, proposal_id)
