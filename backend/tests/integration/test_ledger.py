@@ -8,7 +8,7 @@ from app.models.ledger import EntryType, LedgerEntry
 from app.services.ledger import catat_entri
 
 
-async def test_br54_entri_nol_ditolak_database(db, listed_proposal):
+async def test_br54_zero_entry_rejected_by_database(db, listed_proposal):
     db.add(
         LedgerEntry(
             proposal_id=listed_proposal.id,
@@ -21,7 +21,7 @@ async def test_br54_entri_nol_ditolak_database(db, listed_proposal):
         await db.flush()
 
 
-async def test_br54_entri_negatif_ditolak_database(db, listed_proposal):
+async def test_br54_negative_entry_rejected_by_database(db, listed_proposal):
     db.add(
         LedgerEntry(
             proposal_id=listed_proposal.id,
@@ -34,7 +34,7 @@ async def test_br54_entri_negatif_ditolak_database(db, listed_proposal):
         await db.flush()
 
 
-async def test_br55_idempotency_key_mencegah_entri_ganda(db, listed_proposal):
+async def test_br55_idempotency_key_prevents_duplicate_entry(db, listed_proposal):
     kunci = f"pledge:{listed_proposal.id}"
     pertama = await catat_entri(
         db, listed_proposal.id, EntryType.PLEDGE_IN, 5_000_000, kunci
@@ -52,9 +52,7 @@ async def test_br55_idempotency_key_mencegah_entri_ganda(db, listed_proposal):
     assert jumlah == 1
 
 
-async def test_0a_catat_entri_nol_mengangkat_integrity_error_bukan_menelan(
-    db, listed_proposal
-):
+async def test_0a_catat_entri_zero_amount_raises_integrity_error(db, listed_proposal):
     """catat_entri hanya boleh menelan pelanggaran unique idempotency_key
     (BR-55). Pelanggaran CHECK (amount > 0, BR-54) wajib tetap meledak,
     bukan diam-diam dikembalikan sebagai None yang di seluruh kode ini
@@ -65,9 +63,7 @@ async def test_0a_catat_entri_nol_mengangkat_integrity_error_bukan_menelan(
         )
 
 
-async def test_br55_entri_berikutnya_setelah_duplikat_tetap_tersimpan(
-    db, listed_proposal
-):
+async def test_br55_next_entry_after_duplicate_still_persists(db, listed_proposal):
     """Savepoint (begin_nested) pada catat_entri wajib membatasi kerusakan ke
     entri yang gagal saja: transaksi luar tidak boleh ikut ter-abort, atau
     entri sah berikutnya di request yang sama akan ikut hilang."""
