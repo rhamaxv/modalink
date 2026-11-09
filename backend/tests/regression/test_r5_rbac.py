@@ -65,6 +65,24 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # benar tapi bukan pemilik (404) ada di tests/integration/test_scoring_flow.py.
     ("POST", "/api/v1/proposals/{proposal_id}/rescore", "community", 403),
     ("GET", "/api/v1/proposals/{proposal_id}/scoring", None, 401),
+    ("POST", "/api/v1/proposals/{proposal_id}/pledges", None, 401),
+    # BR-28: peran salah ditolak 403 sebelum literal "{proposal_id}" dicoba
+    # divalidasi sebagai UUID, dibuktikan empiris sama seperti baris rescore
+    # di atas, bukan ditebak dari urutan dependency FastAPI.
+    ("POST", "/api/v1/proposals/{proposal_id}/pledges", "umkm", 403),
+    ("POST", "/api/v1/proposals/{proposal_id}/pledges", "community", 403),
+    # Investor lolos pagar peran; 422 di sini membuktikan itu (literal
+    # "{proposal_id}" gagal UUID sekaligus body kosong kehilangan `amount`),
+    # bukan body kosong semata. Cakupan BR-20/21/22/25/26/27 sungguhan ada
+    # di tests/integration/test_pledge.py dan test_pledge_amount.py.
+    ("POST", "/api/v1/proposals/{proposal_id}/pledges", "investor", 422),
+    ("DELETE", "/api/v1/pledges/{pledge_id}", None, 401),
+    ("DELETE", "/api/v1/pledges/{pledge_id}", "umkm", 403),
+    ("DELETE", "/api/v1/pledges/{pledge_id}", "community", 403),
+    # Investor lolos pagar peran; 422 karena literal "{pledge_id}" gagal
+    # divalidasi sebagai UUID. Kasus peran benar tapi bukan pemilik (403) dan
+    # pembatalan sungguhan ada di tests/integration/test_pledge.py.
+    ("DELETE", "/api/v1/pledges/{pledge_id}", "investor", 422),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

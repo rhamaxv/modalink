@@ -13,9 +13,11 @@ from app.db.session import engine, get_session
 from app.domain.clock import FrozenClock, SystemClock
 from app.main import create_app
 from app.models.campaign import Campaign, CampaignStatus, Sector
+from app.models.pledge import Pledge
 from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
 from app.models.user import Role, User
 from app.services.auth import hash_password, issue_token
+from app.services.pledge import create_pledge
 from app.services.scoring import jalankan_scoring
 
 
@@ -261,6 +263,43 @@ async def listed_proposal(db, campaign, umkm_lain, clock):
     await jalankan_scoring(db, p.id, MockScoringEngine(), clock)
     await db.refresh(p)
     return p
+
+
+@dataclass
+class ProposalDenganPledge:
+    """Proposal dibungkus pledge-nya, khusus untuk fixture test.
+
+    SQLModel (lewat validasi Pydantic v2) menolak menitipkan atribut bebas
+    seperti `.pledges` langsung ke instance Proposal -- Proposal sengaja
+    tidak punya relationship() ke Pledge (lihat models/proposal.py), jadi
+    pembungkus tipis ini yang menyediakan funded_proposal.pledges[0].id
+    tanpa query tambahan maupun relationship ORM yang tidak dibutuhkan
+    produksi.
+    """
+
+    proposal: Proposal
+    pledges: list[Pledge]
+
+    def __getattr__(self, name: str):
+        return getattr(self.proposal, name)
+
+
+@pytest.fixture
+async def funded_proposal(db, listed_proposal, investor, clock):
+    """Proposal yang sudah funded lewat satu pledge penuh sungguhan (BR-25),
+    bukan status yang diset langsung: dipakai menguji bahwa pledge yang
+    sudah terkunci (proposal funded) tidak bisa dibatalkan lagi.
+
+    Pledge-nya dibuat oleh `investor`, bukan `investor_lain`, karena test
+    yang memakai fixture ini membatalkan lewat akun `investor` -- kalau
+    pledge-nya milik akun lain, test itu akan berhenti di pemeriksaan
+    kepemilikan (403) sebelum sempat membuktikan BR-25 (409).
+    """
+    pledge = await create_pledge(
+        db, investor.user, listed_proposal, listed_proposal.requested_amount, clock
+    )
+    await db.refresh(listed_proposal)
+    return ProposalDenganPledge(proposal=listed_proposal, pledges=[pledge])
 
 
 @pytest.fixture

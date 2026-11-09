@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.v1 import auth, campaigns, health, proposals
+from app.api.v1 import auth, campaigns, health, pledges, proposals
 from app.errors import register_error_handlers
 from app.logging import log_request
 
@@ -11,6 +11,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(campaigns.router)
     app.include_router(proposals.router)
+    app.include_router(pledges.router)
     register_error_handlers(app)
     app.middleware("http")(log_request)
     return app

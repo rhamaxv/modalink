@@ -13,10 +13,12 @@ from app.db.session import get_session
 from app.domain.clock import Clock, SystemClock
 from app.errors import DomainError, ForbiddenError, NotFoundError
 from app.models.campaign import Campaign
+from app.models.pledge import Pledge
 from app.models.proposal import Proposal
 from app.models.user import Role, User
 from app.services.auth import ambil_user, decode_token
 from app.services.campaign import ambil_campaign
+from app.services.pledge import get_pledge
 from app.services.proposal import ambil_proposal
 from app.services.scoring import (
     SessionFactory,
@@ -116,6 +118,26 @@ async def ambil_campaign_milik_sendiri(
     if campaign.investor_id != user.id:
         raise ForbiddenError("bukan_pemilik", "Campaign ini bukan milik Anda.")
     return campaign
+
+
+async def get_own_pledge(
+    pledge_id: UUID,
+    user: User = Depends(require_role(Role.INVESTOR)),
+    session: AsyncSession = Depends(get_session),
+) -> Pledge:
+    """BR-28 (lewat require_role) dan kepemilikan pledge (BR-25/BR-26) adalah
+    dua pemeriksaan berbeda, sama seperti ambil_campaign_milik_sendiri di atas.
+    404 untuk pledge yang tidak ada, 403 untuk pledge yang ada tapi bukan
+    milik investor ini: pledge investor lain tetap "diketahui ada" lewat
+    GET /proposals/{id}/pledges yang terbuka untuk investor manapun, jadi
+    403 di sini tidak menambah kebocoran baru.
+    """
+    pledge = await get_pledge(session, pledge_id)
+    if pledge is None:
+        raise NotFoundError("pledge_tidak_ada", "Pledge tidak ditemukan.")
+    if pledge.investor_id != user.id:
+        raise ForbiddenError("bukan_pemilik_pledge", "Pledge ini bukan milik Anda.")
+    return pledge
 
 
 async def ambil_proposal_untuk_rescore_milik_sendiri(
