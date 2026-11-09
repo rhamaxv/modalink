@@ -160,40 +160,39 @@ teruji, dan dipakai oleh halaman frontend), diverifikasi langsung dari
 
 ## Yang belum dibangun
 
-Bagian ini ada supaya README tidak melebih-lebihkan. Rencana penuh produk ada di
-`.claude/prd/` dan `.claude/plan/`; yang berikut ini **didokumentasikan di spesifikasi
-tapi belum punya implementasi yang berjalan** pada commit yang disebut di submission:
+Bagian ini ada supaya README tidak melebih-lebihkan, dan juga supaya ia tidak merendahkan:
+daftar di bawah diperiksa ulang terhadap kode, bukan diwarisi dari rencana.
 
-- **Endpoint API milestone** (`GET /api/v1/proposals/{id}/milestones`,
-  `POST /api/v1/milestones/{id}/reports`, `.../approve`, `.../reject`). Aturan bisnisnya
-  (jumlah minimal milestone, milestone pertama cair tanpa laporan tapi tetap butuh
-  approve, milestone berikutnya butuh laporan dan baru bisa cair setelah milestone
-  sebelumnya cair) sudah ditulis sebagai fungsi murni teruji di
-  `backend/app/domain/milestone_plan.py` dan `milestone_rules.py`, dan rencana milestone
-  sudah tersimpan saat proposal diajukan. Yang belum ada adalah endpoint untuk UMKM
-  melaporkan progres dan investor menyetujui atau menolak pencairannya. Halaman frontend
-  untuk melaporkan milestone (`frontend/app/umkm/milestone/[id]/lapor/page.tsx`) sudah
-  dibangun dan memanggil endpoint ini, jadi saat ini halaman tersebut akan gagal memuat
-  data karena endpoint-nya belum ada di backend.
-- **Endpoint API komunitas** (vote dan komentar pada proposal). Komponen frontend-nya
-  (`CommentForm.tsx`, `CommentList.tsx`) sudah dibangun dan sudah memanggil API, tapi
-  belum ada router backend yang melayaninya.
-- **Transisi otomatis proposal ke `failed` saat `funding_deadline` lewat, dan refund
-  simulasinya.** Logikanya ada di `backend/app/domain/funding.py`
-  (`compute_funding_status`), tapi saat ini hanya dievaluasi ulang saat ada pledge baru
-  atau pembatalan pledge, bukan setiap kali proposal dibaca. Proposal yang melewati
-  `funding_deadline` tanpa ada aktivitas pledge susulan tidak akan otomatis berubah
-  menjadi `failed` hanya dengan dilihat.
-- **Endpoint internal untuk demo** (`POST /api/v1/internal/clock/tick`,
-  `.../clock/reset`, `GET /api/v1/internal/ledger/{id}`,
-  `POST /api/v1/internal/seed`). Keempatnya didokumentasikan di
-  `.claude/prd/10-api-contract.md` sebagai alat bantu demo untuk juri (memajukan jam
-  virtual tanpa menunggu, melihat isi ledger mentah, mengisi data contoh), tapi belum
-  diimplementasikan. Ini juga sebab mengapa [akun demonstrasi](#akun-demonstrasi) di
-  bawah belum bisa diisi: belum ada data seed yang membuat akun itu ada.
-- **Filter dan pengurutan lanjutan** pada daftar campaign dan proposal (`sector`, `page`,
-  `sort`, dan endpoint `GET /api/v1/proposals/mine`). Endpoint yang berjalan saat ini
-  mengembalikan daftar penuh tanpa parameter tersebut.
+Yang **sudah** dibangun dan teruji, meski versi dokumen ini sebelumnya menyebut sebaliknya:
+endpoint milestone (`GET /proposals/{id}/milestones`, `POST /milestones/{id}/reports`,
+`.../approve`, `.../reject`), endpoint komunitas (vote, komentar, hapus komentar),
+transisi otomatis ke `failed` saat `funding_deadline` lewat beserta refund seluruh pledge
+aktif yang dievaluasi setiap kali proposal dibaca, dan endpoint internal
+`POST /internal/clock/tick` serta `GET /internal/ledger/{id}`.
+
+Yang benar-benar belum ada pada commit ini:
+
+- **`POST /api/v1/internal/clock/reset`.** Layanannya ada dan teruji
+  (`backend/app/services/clock_service.py`, fungsi `reset_jam`), tapi tidak ada endpoint
+  yang memanggilnya, jadi jam virtual hanya bisa dimajukan, tidak dikembalikan. Pagar
+  `backend/tests/unit/test_contract_coverage.py` mencatatnya sebagai satu-satunya endpoint
+  kontrak yang belum terdaftar, supaya ia tidak hilang dari ingatan.
+- **`POST /api/v1/internal/seed` sebagai endpoint** sengaja tidak dipakai untuk produksi.
+  Data demo disemai lewat `python -m app.seed` yang dijalankan sekali di server, karena
+  seluruh router `/internal/` hanya aktif saat `ENV=dev` (BR-63). Lihat
+  [Akun demonstrasi](#akun-demonstrasi).
+- **Pembatas laju permintaan.** Tidak ada rate limit pada pendaftaran, login, pengajuan
+  proposal, maupun pendanaan. Konsekuensinya nyata dan sudah diukur dalam review keamanan
+  internal: 60 pendaftaran paralel berhasil dalam 2,2 detik, dan jalur scoring AI bisa
+  dipanggil tanpa batas oleh akun yang gratis dibuat. Ini kelemahan yang diketahui, bukan
+  yang tidak disadari.
+- **Paginasi pada endpoint daftar.** `GET /proposals` dan `GET /campaigns` mengembalikan
+  seluruh baris, dan `GET /proposals` menyertakan teks proposal penuh, sehingga responsnya
+  tumbuh seiring data.
+- **Batas panjang pada sebagian field teks.** Beberapa field punya panjang minimum tapi
+  tidak punya maksimum.
+
+Rencana penuh produk ada di `.claude/prd/` dan `.claude/plan/` kalau ingin dibandingkan.
 
 ## Teknologi
 
@@ -459,36 +458,44 @@ pada server deploy.
 
 ## Akun demonstrasi
 
-**[ISI SEBELUM SUBMIT: belum ada akun demo pada commit yang ditulis dokumen ini.]**
+Tujuh akun dibuat oleh perintah seed, semuanya dengan password yang sama. Domain
+`.test` dipakai dengan sengaja: ia dicadangkan oleh RFC 2606 dan tidak pernah resolve ke
+mana pun, jadi tidak ada alamat email sungguhan milik siapa pun yang terpakai di sini.
 
-Produk ini memakai autentikasi (lihat [Variabel lingkungan](#variabel-lingkungan) dan
-[Fitur](#fitur-utama-yang-berhasil-diimplementasikan)), jadi juri butuh akun untuk mencoba
-peran investor dan peran UMKM. Akun itu belum dibuat, bukan belum didokumentasikan: data
-seed yang membuatnya belum berjalan (lihat endpoint `POST /api/v1/internal/seed` di
-[Yang belum dibangun](#yang-belum-dibangun)), jadi tidak ada kredensial sungguhan yang bisa
-dituliskan di sini tanpa mengarang. README ini sengaja tidak mengisi baris
-email/password dengan nilai contoh, karena kredensial palsu di repositori publik lebih
-buruk daripada kolom kosong.
+| Peran | Email | Password |
+| --- | --- | --- |
+| Investor | `investor1@demo.modalink.test` | `Demo#Modalink2026` |
+| Investor | `investor2@demo.modalink.test` | `Demo#Modalink2026` |
+| Investor | `investor3@demo.modalink.test` | `Demo#Modalink2026` |
+| UMKM | `umkm1@demo.modalink.test` | `Demo#Modalink2026` |
+| UMKM | `umkm2@demo.modalink.test` | `Demo#Modalink2026` |
+| UMKM | `umkm3@demo.modalink.test` | `Demo#Modalink2026` |
+| UMKM | `umkm4@demo.modalink.test` | `Demo#Modalink2026` |
 
-Sebelum submission, pemilik project wajib mengisi tabel ini dengan akun yang sungguh ada
-di database produksi:
+Password ini memang publik, dan itu disengaja: ketujuh akun hanya ada di deployment
+demonstrasi, tidak memegang data siapa pun, dan dibuat ulang kapan saja oleh perintah di
+bawah. Tidak ada kredensial lain di repositori ini yang bisa dipakai di mana pun.
 
-| Peran | Email | Password | Catatan |
-| --- | --- | --- | --- |
-| Investor | **[ISI]** | **[ISI]** | |
-| UMKM | **[ISI]** | **[ISI]** | |
+Akun komunitas tidak ikut disemai. Peran itu bisa dicoba dengan mendaftar sendiri lewat
+`/daftar`, yang justru memperlihatkan alur pendaftarannya.
 
-Cara membuatnya secara manual, sampai endpoint seed dibangun:
+**Menjalankan seed di server, sekali saja:**
 
 ```bash
-curl -X POST https://<domain>/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"investor-demo@example.com","password":"<password>","name":"Investor Demo","role":"investor"}'
-
-curl -X POST https://<domain>/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"umkm-demo@example.com","password":"<password>","name":"UMKM Demo","role":"umkm"}'
+docker compose -f docker-compose.prod.yml exec backend python -m app.seed
 ```
+
+Perintahnya **idempoten**: dijalankan dua kali tidak menghasilkan akun ganda atau proposal
+ganda. Itu diuji, dan dibuktikan bisa gagal dengan sengaja mematikan penjaganya lalu
+menyaksikan setiap tabel berlipat.
+
+Perhatikan bahwa ini **modul yang dijalankan di server**, bukan endpoint HTTP.
+`POST /api/v1/internal/seed` tidak pernah terdaftar di produksi, karena seluruh router
+`/internal/` hanya aktif saat `ENV=dev` (BR-63). Menyalakan `ENV=dev` di server publik
+untuk mengakalinya juga akan membuka `POST /internal/clock/tick` ke internet, yang
+memungkinkan siapa pun memajukan jam virtual dan menggagalkan campaign yang sedang
+berjalan.
+
 
 Lalu login lewat `/masuk` di frontend, atau lewat `POST /api/v1/auth/login`, dan isi
 tabel di atas dengan kredensial yang sungguh dipakai.
