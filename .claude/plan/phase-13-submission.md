@@ -6,6 +6,28 @@
 
 ---
 
+## Peringatan: endpoint seed tidak ada di produksi
+
+`POST /internal/seed` hanya terdaftar bila `ENV=dev` (BR-63, lihat `app/main.py`), dan
+`docker-compose.prod.yml` menyetel `ENV: prod`. Jadi **deployment yang dilihat juri tidak
+bisa disemai lewat endpoint itu.** Tanpa jalan lain, juri membuka aplikasi kosong tanpa akun
+demo, dan README yang mewajibkan akun demo jadi tidak terpenuhi: itu syarat kelayakan
+submission, bukan kenyamanan.
+
+Jangan menyalakan `ENV=dev` di server publik untuk mengakalinya. Itu sekaligus membuka
+`POST /internal/clock/tick` ke internet, sehingga siapa pun bisa memajukan jam virtual dan
+menggagalkan campaign yang sedang berjalan di depan juri.
+
+Yang harus ada: **modul yang bisa dijalankan sekali di server**, misalnya
+`python -m app.seed`, dipanggil pemilik project lewat
+`docker compose exec backend python -m app.seed`. Logika semai hidup di satu tempat
+(`app/services/seed.py` atau serupa); endpoint `POST /internal/seed` tetap ada untuk test
+lokal dan memanggil logika yang sama, bukan menyalinnya.
+
+Modul itu wajib **idempoten**: dijalankan dua kali tidak menghasilkan akun ganda atau
+proposal ganda. Pemilik project akan menjalankannya di server tanpa tahu apakah ia sudah
+pernah jalan, dan dua set data demo lebih buruk daripada nol.
+
 ### Task 1: Data seed yang jujur
 
 **Files:**
