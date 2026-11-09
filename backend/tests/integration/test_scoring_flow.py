@@ -214,3 +214,18 @@ async def test_scoring_get_diterima_untuk_investor_manapun(
         f"/api/v1/proposals/{listed_proposal.id}/scoring", headers=investor_lain.headers
     )
     assert res.status_code == 200
+
+
+async def test_c30_scoring_get_diterima_untuk_umkm_pemilik_proposal(
+    client, umkm_lain, listed_proposal
+):
+    """C-30: listed_proposal milik umkm_lain. Pemeriksaan kepemilikan yang
+    terbalik (umkm_id == user.id dibalik jadi !=) akan lolos di
+    test_scoring_get_ditolak_404_untuk_umkm_bukan_pemilik_proposal di atas
+    (keduanya sama-sama mengharapkan penolakan), tapi mengunci pemilik
+    sungguhan dari datanya sendiri. Test ini satu-satunya yang membuktikan
+    pemilik sungguhan tetap bisa membaca."""
+    res = await client.get(
+        f"/api/v1/proposals/{listed_proposal.id}/scoring", headers=umkm_lain.headers
+    )
+    assert res.status_code == 200
