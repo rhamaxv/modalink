@@ -9,6 +9,7 @@ import { SignInForm } from "@/components/SignInForm";
 // di-mock.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 function fakeResponse(status: number, body: unknown) {

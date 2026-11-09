@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Source_Sans_3 } from "next/font/google";
+import { AppHeader } from "@/components/AppHeader";
 import "./globals.css";
 
 // Satu keluarga sans humanis untuk seluruh produk (DESIGN.md). Source Sans 3
@@ -58,6 +59,14 @@ export default function RootLayout({
         >
           Lewati ke konten utama
         </a>
+        {/*
+          Header bersama (Fase 11, Task 11): sebelum ini ThemeToggle hanya
+          dirender di "/", jadi siapa pun yang membuka halaman lain langsung
+          tidak bisa mengubah tema di sana. Dirender satu kali di sini
+          supaya hadir di seluruh route tanpa menambal tiap halaman satu
+          per satu.
+        */}
+        <AppHeader />
         <main id="konten-utama">{children}</main>
       </body>
     </html>

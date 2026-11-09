@@ -2,6 +2,25 @@ import { readFileSync } from "node:fs";
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ExplorePage from "@/app/jelajah/page";
+import Beranda from "@/app/page";
+
+// Dipakai oleh dua halaman (jelajah dan landing): tidak boleh ada dua
+// <section> berurutan dengan data-pola yang sama (RHYTHM 3, DESIGN.md).
+function checkPolaBerurutanBerbeda(sourcePath: string) {
+  const source = readFileSync(sourcePath, "utf8");
+  const patterns = [...source.matchAll(/data-pola="([a-z-]+)"/g)].map((m) => m[1]);
+  expect(patterns.length).toBeGreaterThanOrEqual(4);
+  patterns.forEach((pattern, i) => {
+    if (i > 0) expect(pattern).not.toBe(patterns[i - 1]);
+  });
+}
+
+function checkSetiapSectionBerpola(sourcePath: string) {
+  const source = readFileSync(sourcePath, "utf8");
+  const sectionCount = (source.match(/<section/g) ?? []).length;
+  const patternCount = (source.match(/data-pola=/g) ?? []).length;
+  expect(patternCount).toBe(sectionCount);
+}
 
 // ProposalList (dalam ProposalCard.tsx) memanggil fetch begitu ia dipasang.
 // Tes di bawah ini hanya menyoroti struktur halaman (RHYTHM, H1, navigasi),
@@ -20,19 +39,39 @@ afterEach(() => {
 
 describe("RHYTHM 3 on the explore page", () => {
   it("has no two consecutive sections sharing the same composition pattern", () => {
-    const source = readFileSync("app/jelajah/page.tsx", "utf8");
-    const patterns = [...source.matchAll(/data-pola="([a-z-]+)"/g)].map((m) => m[1]);
-    expect(patterns.length).toBeGreaterThanOrEqual(4);
-    patterns.forEach((pattern, i) => {
-      if (i > 0) expect(pattern).not.toBe(patterns[i - 1]);
-    });
+    checkPolaBerurutanBerbeda("app/jelajah/page.tsx");
   });
 
   it("gives every section an explicit pattern attribute", () => {
-    const source = readFileSync("app/jelajah/page.tsx", "utf8");
-    const sectionCount = (source.match(/<section/g) ?? []).length;
-    const patternCount = (source.match(/data-pola=/g) ?? []).length;
-    expect(patternCount).toBe(sectionCount);
+    checkSetiapSectionBerpola("app/jelajah/page.tsx");
+  });
+});
+
+describe("RHYTHM 3 on the landing page", () => {
+  it("has no two consecutive sections sharing the same composition pattern", () => {
+    checkPolaBerurutanBerbeda("app/page.tsx");
+  });
+
+  it("gives every section an explicit pattern attribute", () => {
+    checkSetiapSectionBerpola("app/page.tsx");
+  });
+
+  it("proves the guard actually fails when two consecutive sections share a pattern", () => {
+    // Pembuktian bahwa pagar ini bisa merah: dua pola identik berurutan
+    // yang disuntikkan langsung ke string sumber, bukan ke file sungguhan,
+    // supaya tidak perlu menulis-lalu-memulihkan app/page.tsx di tengah test run.
+    const palsu = `
+      <section data-pola="naratif-kiri">a</section>
+      <section data-pola="naratif-kiri">b</section>
+      <section data-pola="daftar-bernomor">c</section>
+      <section data-pola="dua-kolom-setara">d</section>
+    `;
+    const patterns = [...palsu.matchAll(/data-pola="([a-z-]+)"/g)].map((m) => m[1]);
+    expect(() => {
+      patterns.forEach((pattern, i) => {
+        if (i > 0) expect(pattern).not.toBe(patterns[i - 1]);
+      });
+    }).toThrow();
   });
 });
 
@@ -71,6 +110,54 @@ describe("explore page is free of default AI-slop shapes", () => {
       const isProposalDetailRoute = /^\/proposal\/[^/]+$/.test(path);
       expect(staticRoutes.includes(path) || isProposalDetailRoute).toBe(true);
     });
+  });
+});
+
+describe("landing page is free of default AI-slop shapes", () => {
+  it("has no eyebrow pill badge above the H1", () => {
+    render(<Beranda />);
+    const h1 = screen.getByRole("heading", { level: 1 });
+    const previousSibling = h1.previousElementSibling;
+    expect(previousSibling).toBeNull();
+  });
+
+  it("does not use the product name as the H1", () => {
+    render(<Beranda />);
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.textContent?.trim().toLowerCase()).not.toBe("modalink");
+  });
+
+  it("has no statistic with no real data source", () => {
+    render(<Beranda />);
+    expect(screen.queryByText(/\d+(rb|k|jt)\+/i)).toBeNull();
+  });
+
+  it("has no testimonial", () => {
+    render(<Beranda />);
+    expect(screen.queryByText(/testimoni/i)).toBeNull();
+  });
+
+  it("has no em dash in its copy", () => {
+    const source = readFileSync("app/page.tsx", "utf8");
+    const textBlocks = [...source.matchAll(/>([^<>{}]*)</g)].map((m) => m[1]);
+    textBlocks.forEach((text) => expect(text).not.toContain("—"));
+  });
+
+  it("links every navigation item to a route that actually exists", () => {
+    render(<Beranda />);
+    const staticRoutes = ["/", "/jelajah", "/masuk", "/daftar"];
+    screen.getAllByRole("link").forEach((a) => {
+      const href = a.getAttribute("href") ?? "";
+      if (!href.startsWith("/")) return;
+      const path = href.split("#")[0] ?? href;
+      expect(staticRoutes.includes(path)).toBe(true);
+    });
+  });
+
+  it("uses the accent colour on at most one primary action on this screen", () => {
+    const { container } = render(<Beranda />);
+    const akzen = container.querySelectorAll(".bg-accent");
+    expect(akzen.length).toBeLessThanOrEqual(1);
   });
 });
 
