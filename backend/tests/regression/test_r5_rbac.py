@@ -58,6 +58,12 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # (403 komunitas, 202/409 rescore) ada di tests/integration/test_scoring_flow.py
     # dan tests/regression/test_r6_ai_failure.py.
     ("POST", "/api/v1/proposals/{proposal_id}/rescore", None, 401),
+    # H-4: require_role di dalam ambil_proposal_untuk_rescore_milik_sendiri
+    # tetap sub-dependency, jadi peran yang salah (community, bukan UMKM
+    # atau INVESTOR) ditolak 403 sebelum literal "{proposal_id}" dicoba
+    # divalidasi sebagai UUID, sama seperti baris 401 di atas. Kasus peran
+    # benar tapi bukan pemilik (404) ada di tests/integration/test_scoring_flow.py.
+    ("POST", "/api/v1/proposals/{proposal_id}/rescore", "community", 403),
     ("GET", "/api/v1/proposals/{proposal_id}/scoring", None, 401),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
