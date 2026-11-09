@@ -34,3 +34,6 @@ Thumbs.db
 
 # Workspace subagent-driven-development (scratch, bukan bagian produk)
 .superpowers/
+
+# Worktree sementara milik agent paralel, bukan bagian produk
+.claude/worktrees/
