@@ -95,6 +95,62 @@ async def test_br67_lead_investor_marker_moves_after_largest_cancelled(
     assert items[0]["is_lead_investor"] is True
 
 
+async def test_br67_pledges_list_hides_investor_identity_before_funded(
+    client, db, investor, investor_lain, listed_proposal, clock
+):
+    """10-api-contract.md:106-107: endpoint ini terbuka untuk investor
+    manapun (bukan hanya pemilik campaign), tapi sebelum proposal ini
+    `funded` tidak boleh ada satu pun `investor_id` yang terbaca -- review
+    keamanan menemukan investor yang belum pledge apa pun bisa membaca UUID
+    dan nominal pasti investor lain pada proposal `partially_funded`, cukup
+    untuk sengaja menyaingi pledge lead investor sebelum posisinya settle.
+    `investor_lain` dipilih sebagai pembaca justru karena dia TIDAK pledge
+    apa pun di sini: kalau test ini memakai akun yang pledge sendiri,
+    lolosnya bisa jadi karena ia membaca pledge-nya sendiri, bukan karena
+    redaksinya benar-benar bekerja untuk pledge milik orang lain."""
+    proposal = await get_locked_proposal(db, listed_proposal.id)
+    pledge = await create_pledge(db, investor.user, proposal, 3_000_000, clock)
+    await db.refresh(listed_proposal)
+    assert listed_proposal.status is ProposalStatus.PARTIALLY_FUNDED
+
+    res = await client.get(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges",
+        headers=investor_lain.headers,
+    )
+    assert res.status_code == 200
+    items = res.json()["items"]
+    assert len(items) == 1
+    assert items[0]["investor_id"] is None
+    # Bukan identitas: amount dan is_lead_investor tetap informasi publik
+    # yang sah (bilah progres, penanda lead), dan harus tetap tampil.
+    assert items[0]["amount"] == 3_000_000
+    assert items[0]["is_lead_investor"] is True
+    assert items[0]["id"] == str(pledge.id)
+
+
+async def test_br67_pledges_list_reveals_investor_identity_once_funded(
+    client, db, investor, listed_proposal, clock
+):
+    """Pelengkap wajib test di atas (lihat skill testing-and-regression:
+    'pagar yang tidak pernah terbukti bisa merah mungkin tidak memagari apa
+    pun'): tanpa test ini, redaksi di atas bisa saja menyembunyikan
+    investor_id SELAMANYA karena bug, bukan karena aturannya memang begitu."""
+    proposal = await get_locked_proposal(db, listed_proposal.id)
+    pledge = await create_pledge(
+        db, investor.user, proposal, listed_proposal.requested_amount, clock
+    )
+    await db.refresh(listed_proposal)
+    assert listed_proposal.status is ProposalStatus.FUNDED
+
+    res = await client.get(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges", headers=investor.headers
+    )
+    assert res.status_code == 200
+    items = res.json()["items"]
+    assert items[0]["investor_id"] == str(investor.user.id)
+    assert items[0]["id"] == str(pledge.id)
+
+
 async def test_milestones_visible_for_public_proposal_and_404_for_private_non_owner(
     client, db, listed_proposal, submitted_proposal, umkm, umkm_lain
 ):

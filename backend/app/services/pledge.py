@@ -342,11 +342,20 @@ class PledgeAktifDenganLeadMarker:
     bebas (lihat ProposalWithPledge di tests/conftest.py untuk alasan yang
     sama), dan is_lead_investor bukan kolom tabel sama sekali, hanya
     perbandingan terhadap proposal.lead_investor_id yang satu-satunya
-    penulisnya recompute_funding_status di atas."""
+    penulisnya recompute_funding_status di atas.
+
+    `investor_id` None sebelum proposal `funded` (10-api-contract.md:106-107,
+    Task 2 review keamanan): endpoint ini terbuka untuk investor manapun,
+    bukan hanya yang sudah pledge, dan lead investor sendirian yang
+    mengendalikan pencairan begitu posisi settle -- melihat siapa unggul dan
+    berapa nominalnya sebelum itu cukup untuk sengaja menyaingi pledge-nya.
+    `amount` dan `is_lead_investor` tetap tampil apa adanya: keduanya
+    informasi publik yang sah (bilah progres, penanda lead), bukan
+    identitas."""
 
     id: UUID
     proposal_id: UUID
-    investor_id: UUID
+    investor_id: UUID | None
     amount: int
     status: PledgeStatus
     created_at: datetime
@@ -368,11 +377,18 @@ async def daftar_pledge_aktif(
             .order_by(desc("created_at"), desc("id"))
         )
     ).all()
+    # PLEDGE_LOCKED_PROPOSAL_STATUSES (bukan {FUNDED} yang dieja tangan):
+    # closure yang sama persis dipakai cancel_pledge di atas untuk "posisi
+    # sudah settle", jadi status hilir baru dari FUNDED otomatis ikut
+    # membuka identitas tanpa menyentuh baris ini lagi.
+    identitas_boleh_tampil = (
+        DomainProposalStatus(proposal.status.value) in PLEDGE_LOCKED_PROPOSAL_STATUSES
+    )
     return [
         PledgeAktifDenganLeadMarker(
             id=p.id,
             proposal_id=p.proposal_id,
-            investor_id=p.investor_id,
+            investor_id=p.investor_id if identitas_boleh_tampil else None,
             amount=p.amount,
             status=p.status,
             created_at=p.created_at,
