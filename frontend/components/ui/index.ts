@@ -1,4 +1,4 @@
-export { KeadaanGalat } from "./KeadaanGalat";
-export { KeadaanKosong } from "./KeadaanKosong";
-export { KeadaanMuat } from "./KeadaanMuat";
+export { EmptyState } from "./EmptyState";
+export { ErrorState } from "./ErrorState";
+export { LoadingState } from "./LoadingState";
 export { Nominal } from "./Nominal";

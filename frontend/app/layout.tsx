@@ -28,14 +28,14 @@ export default function RootLayout({
       <head>
         {/*
           Tema disetel sebelum cat pertama supaya tidak ada kedipan dari terang
-          ke gelap saat halaman dimuat. SakelarTema (fase berikutnya) menulis
-          dan membaca kunci localStorage yang sama: "tema", nilai "light"/"dark".
+          ke gelap saat halaman dimuat. ThemeToggle menulis dan membaca kunci
+          localStorage yang sama: "theme", nilai "light"/"dark".
         */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function () {
               try {
-                var tersimpan = localStorage.getItem("tema");
+                var tersimpan = localStorage.getItem("theme");
                 var gelap = tersimpan === "dark" ||
                   (!tersimpan && window.matchMedia("(prefers-color-scheme: dark)").matches);
                 if (gelap) document.documentElement.setAttribute("data-theme", "dark");
