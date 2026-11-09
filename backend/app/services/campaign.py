@@ -14,6 +14,7 @@ from app.models.campaign import Campaign, CampaignStatus
 from app.models.proposal import Proposal, ProposalStatus
 from app.models.user import User
 from app.schemas.campaign import CampaignIn, CampaignUpdateIn
+from app.services.expiry import evaluasi_kedaluwarsa
 from app.services.status import advance_campaign
 
 # Status proposal yang dianggap publik: "listed ke atas" menurut
@@ -131,12 +132,15 @@ async def ubah_campaign(
 
 
 async def daftar_proposal_campaign(
-    session: AsyncSession, campaign: Campaign, pemilik: bool
+    session: AsyncSession, campaign: Campaign, pemilik: bool, clock: Clock
 ) -> list[Proposal]:
     kueri = select(Proposal).where(Proposal.campaign_id == campaign.id)
     if not pemilik:
         # Publik hanya melihat yang listed ke atas; submitted dan rejected
         # hanya boleh dilihat pembuat campaign (03-feature-investor.md).
         kueri = kueri.where(col(Proposal.status).in_(STATUS_PROPOSAL_PUBLIK))
-    hasil = await session.scalars(kueri.order_by(desc("created_at"), desc("id")))
-    return list(hasil)
+    hasil = list(await session.scalars(kueri.order_by(desc("created_at"), desc("id"))))
+    # D-06/BR-61: daftar proposal sebuah campaign juga "pembacaan proposal".
+    for p in hasil:
+        await evaluasi_kedaluwarsa(session, p, clock)
+    return hasil

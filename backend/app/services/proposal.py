@@ -21,6 +21,7 @@ from app.models.proposal import (
 from app.models.user import User
 from app.schemas.proposal import ProposalIn
 from app.services.campaign import STATUS_PROPOSAL_PUBLIK
+from app.services.expiry import evaluasi_kedaluwarsa
 
 MINIMAL_REQUESTED_AMOUNT = 500_000  # BR-12: di bawah ini biaya screening tidak sepadan.
 
@@ -108,13 +109,20 @@ def boleh_melihat(proposal: Proposal, campaign: Campaign, user: User | None) -> 
     return user.id in {proposal.umkm_id, campaign.investor_id}
 
 
-async def daftar_proposal_publik(session: AsyncSession) -> list[Proposal]:
+async def daftar_proposal_publik(session: AsyncSession, clock: Clock) -> list[Proposal]:
     # Urutan diputus created_at lalu id, sama seperti daftar_campaign (BR-05):
     # dua proposal dengan created_at identik tidak boleh bertukar posisi
     # antar-request.
-    hasil = await session.scalars(
-        select(Proposal)
-        .where(col(Proposal.status).in_(STATUS_PROPOSAL_PUBLIK))
-        .order_by(desc("created_at"), desc("id"))
+    hasil = list(
+        await session.scalars(
+            select(Proposal)
+            .where(col(Proposal.status).in_(STATUS_PROPOSAL_PUBLIK))
+            .order_by(desc("created_at"), desc("id"))
+        )
     )
-    return list(hasil)
+    # D-06/BR-61: daftar ini juga "pembacaan proposal", jadi proposal yang
+    # funding_deadline-nya lewat harus ikut direkonsiliasi di sini, bukan
+    # hanya saat dibaca satu-satu lewat GET /proposals/{id}.
+    for p in hasil:
+        await evaluasi_kedaluwarsa(session, p, clock)
+    return hasil

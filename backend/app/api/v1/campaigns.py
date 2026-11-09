@@ -90,5 +90,5 @@ async def daftar_proposal_campaign_endpoint(
     if campaign is None:
         raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")
     pemilik = user is not None and user.id == campaign.investor_id
-    proposals = await daftar_proposal_campaign(session, campaign, pemilik)
+    proposals = await daftar_proposal_campaign(session, campaign, pemilik, clock)
     return ProposalListOut(items=proposals)

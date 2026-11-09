@@ -126,14 +126,22 @@ async def test_br28_umkm_and_community_have_no_pledge_access(
 
 
 async def test_br62_pledge_after_deadline_rejected_not_accepted_then_refunded(
-    client, investor, listed_proposal, majukan
+    client, db, investor, listed_proposal, majukan
 ):
     """Review f06-b Finding 1: sebelum fix, pledge yang masuk setelah
     funding_deadline lewat tetap diterima (201 Created, baris pledge_in
     tercatat) dan baru dipaksa-refund balik oleh recompute_funding_status di
     akhir create_pledge. Investor sempat "berhasil" pledge pada proposal yang
     pada request yang sama juga ditulis `failed`. Sekarang pledge-nya
-    ditolak sebelum satu baris pun ditulis."""
+    ditolak sebelum satu baris pun ditulis.
+
+    Status `failed` yang muncul di GET di bawah bukan akibat pledge yang
+    ditolak -- ia berasal dari evaluasi_kedaluwarsa (BR-61, fase 09) yang
+    berjalan di setiap pembacaan proposal begitu funding_deadline lewat,
+    terlepas dari percobaan pledge apa pun. Yang dibuktikan di sini tetap
+    sama seperti sebelum fase 09 ada: percobaan pledge yang ditolak itu
+    sendiri tidak menulis satu baris pun.
+    """
     await majukan(hari=30)  # funding_deadline campaign fixture jatuh di hari ke-21
 
     res = await client.post(
@@ -144,9 +152,25 @@ async def test_br62_pledge_after_deadline_rejected_not_accepted_then_refunded(
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "pendanaan_sudah_ditutup"
 
+    pledges = (
+        await db.scalars(select(Pledge).where(Pledge.proposal_id == listed_proposal.id))
+    ).all()
+    assert pledges == [], "pledge yang ditolak tidak boleh menulis baris pledge apa pun"
+
     entries = (await client.get(f"/api/v1/proposals/{listed_proposal.id}")).json()
-    assert entries["status"] == "listed", (
-        "pledge yang ditolak tidak boleh ikut mengubah status proposal"
+    assert entries["status"] == "failed", (
+        "deadline sudah lewat tanpa pledge aktif; evaluasi lazy (BR-61) wajib "
+        "menulis failed begitu proposal ini dibaca"
+    )
+
+    entries_rows = (
+        await db.scalars(
+            select(LedgerEntry).where(LedgerEntry.proposal_id == listed_proposal.id)
+        )
+    ).all()
+    assert entries_rows == [], (
+        "tidak ada pledge aktif yang perlu direfund; pledge yang ditolak tidak "
+        "pernah tercatat untuk direfund balik"
     )
 
 
