@@ -14,6 +14,7 @@ from app.models.proposal import (
     ScoringStatus,
 )
 from app.models.scoring import ScoringResult, ScoringVerdict
+from app.models.system_clock import SystemClockRow
 from app.models.user import Role, User
 from app.models.vote import Vote
 
@@ -36,6 +37,7 @@ __all__ = [
     "ScoringStatus",
     "ScoringVerdict",
     "Sector",
+    "SystemClockRow",
     "User",
     "Vote",
 ]

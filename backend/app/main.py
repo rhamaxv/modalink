@@ -24,10 +24,11 @@ def create_app() -> FastAPI:
     app.include_router(pledges.router)
     app.include_router(milestones.router)
     app.include_router(community.router)
-    # BR-63: router internal tidak didaftarkan sama sekali di ENV=prod,
-    # sehingga setiap endpoint di bawahnya mengembalikan 404 murni dari
-    # routing, bukan dari pemeriksaan di dalam handler yang bisa lupa dipasang.
-    if settings.env != "prod":
+    if settings.env == "dev":
+        # Router internal tidak pernah ada di produksi, bukan sekadar menolak
+        # request-nya (BR-63): include_router di luar blok ini berarti ia
+        # terdaftar di app.routes apa pun ENV-nya. `== "dev"`, bukan
+        # `!= "prod"`, karena BR-63 menyebut ENV=dev secara eksplisit.
         app.include_router(internal.router)
     register_error_handlers(app)
     app.middleware("http")(log_request)

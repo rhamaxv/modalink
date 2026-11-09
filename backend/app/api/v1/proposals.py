@@ -34,6 +34,7 @@ from app.schemas.proposal import (
 )
 from app.schemas.scoring import ScoringResultOut
 from app.services.campaign import ambil_campaign
+from app.services.expiry import evaluasi_kedaluwarsa
 from app.services.proposal import (
     ambil_proposal,
     boleh_melihat,
@@ -82,8 +83,9 @@ async def submit_proposal_endpoint(
 @router.get("/api/v1/proposals", response_model=ProposalListOut)
 async def daftar_proposal_endpoint(
     session: AsyncSession = Depends(get_session),
+    clock: Clock = Depends(get_clock),
 ) -> ProposalListOut:
-    return ProposalListOut(items=await daftar_proposal_publik(session))
+    return ProposalListOut(items=await daftar_proposal_publik(session, clock))
 
 
 @router.get("/api/v1/proposals/mine", response_model=list[ProposalOut])
@@ -103,10 +105,15 @@ async def ambil_proposal_endpoint(
     proposal_id: UUID,
     user: User | None = Depends(pengguna_opsional),
     session: AsyncSession = Depends(get_session),
+    clock: Clock = Depends(get_clock),
 ) -> Proposal:
     proposal = await ambil_proposal(session, proposal_id)
     if proposal is None:
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
+    # D-06/BR-61: evaluasi lazy berjalan di sini, sebelum pengecekan akses di
+    # bawah, supaya status yang dilihat pemanggil (termasuk boleh_melihat())
+    # selalu yang terbaru, bukan status yang sudah basi karena deadline lewat.
+    await evaluasi_kedaluwarsa(session, proposal, clock)
     campaign = await ambil_campaign(session, proposal.campaign_id)
     # campaign is None di sini praktis mustahil (FK menjamin keberadaannya),
     # tapi tetap dianggap "tidak boleh dilihat" alih-alih mengandalkan None

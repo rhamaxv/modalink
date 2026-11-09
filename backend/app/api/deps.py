@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.engine import ScoringEngine, build_engine
 from app.config import settings
 from app.db.session import get_session
-from app.domain.clock import Clock, SystemClock
+from app.domain.clock import Clock
 from app.errors import DomainError, ForbiddenError, NotFoundError
 from app.models.campaign import Campaign
 from app.models.comment import Comment
@@ -19,6 +19,7 @@ from app.models.proposal import Proposal, ProposalMilestone
 from app.models.user import Role, User
 from app.services.auth import ambil_user, decode_token
 from app.services.campaign import ambil_campaign
+from app.services.clock_service import ambil_clock
 from app.services.community import ambil_komentar_aktif
 from app.services.milestone import get_milestone
 from app.services.pledge import get_pledge
@@ -55,10 +56,13 @@ class TidakTerautentikasi(DomainError):
     status = 401
 
 
-def get_clock() -> Clock:
+async def get_clock(session: AsyncSession = Depends(get_session)) -> Clock:
     # Dependency, bukan import langsung: test fase 09 mengganti ini lewat
-    # dependency_overrides tanpa menyentuh satu pun pemanggilnya.
-    return SystemClock()
+    # dependency_overrides tanpa menyentuh satu pun pemanggilnya. Dibaca dari
+    # jam virtual tersimpan (D-06) supaya endpoint tick sungguhan punya efek
+    # nyata ke seluruh pembacaan lain, bukan sekadar menulis baris yang tidak
+    # pernah dibaca balik.
+    return await ambil_clock(session)
 
 
 async def current_user(

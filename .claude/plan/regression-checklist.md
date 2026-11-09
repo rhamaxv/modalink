@@ -84,7 +84,14 @@ File: `backend/tests/regression/test_r4_failure_paths.py`
 - Pledge melebihi sisa dana ditolak `409`, dan respons memuat `remaining_amount` yang benar.
 - UMKM yang sama submit proposal kedua ke campaign yang sama, ditolak.
 - Milestone 2 dilaporkan sebelum milestone 1 cair, ditolak `409`.
-- Investor yang bukan lead investor mencoba approve, ditolak `403`.
+- Investor yang bukan lead investor mencoba approve, ditolak **`404`, bukan `403`**. Pola
+  seluruh project ini adalah menolak tanpa memberitahu bahwa sumber dayanya ada; `403` akan
+  mengonfirmasi ke investor mana pun bahwa milestone dengan id itu nyata.
+- Approve pada proposal `failed` tidak pernah mencairkan dana. Yang dijamin **tidak ada
+  `disbursement_out`**, bukan satu kode status tertentu: proposal yang gagal tanpa pledge
+  tidak punya lead investor, jadi pagar otorisasi menolak lebih dulu, dan kode mana yang
+  muncul tergantung pagar mana yang lebih dulu kena. Itu detail implementasi; ledger yang
+  tetap bersih adalah jaminannya.
 - Proposal yang sudah `funded` menerima pledge baru, ditolak `409`.
 - **Tidak ada keadaan di mana proposal `failed` memegang pledge `active`.** Ini invarian, bukan
   skenario: ia dijaga apa pun jalan yang membuat proposal itu gagal, termasuk pledge yang masuk

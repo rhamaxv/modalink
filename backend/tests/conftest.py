@@ -102,6 +102,16 @@ async def _buat_akun(db: AsyncSession, email: str, role: Role) -> Akun:
 
 
 @pytest.fixture
+def buat_akun():
+    """Pabrik akun untuk test yang butuh lebih banyak peran daripada fixture
+    siap pakai di bawah. Dikirim sebagai fixture, bukan diimpor, karena
+    tests/ bukan package dan ada beberapa conftest.py: `from conftest import
+    ...` resolve ke conftest yang salah tergantung dari mana pytest dijalankan.
+    """
+    return _buat_akun
+
+
+@pytest.fixture
 async def investor(db):
     return await _buat_akun(db, "investor-teruji@contoh.id", Role.INVESTOR)
 

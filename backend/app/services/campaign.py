@@ -18,6 +18,7 @@ from app.models.scoring import ScoringResult
 from app.models.user import User
 from app.models.vote import Vote
 from app.schemas.campaign import CampaignIn, CampaignUpdateIn
+from app.services.expiry import evaluasi_kedaluwarsa
 from app.services.status import advance_campaign
 
 # Status proposal yang dianggap publik: "listed ke atas" menurut
@@ -152,7 +153,7 @@ class ProposalDenganSinyal:
 
 
 async def daftar_proposal_campaign(
-    session: AsyncSession, campaign: Campaign, pemilik: bool
+    session: AsyncSession, campaign: Campaign, pemilik: bool, clock: Clock
 ) -> list[ProposalDenganSinyal]:
     """Skor lalu vote lalu waktu submit (10-api-contract.md). `created_at`
     lalu `id` di akhir yang membuat urutan ini benar-benar deterministik:
@@ -197,6 +198,14 @@ async def daftar_proposal_campaign(
     kueri = kueri.order_by(desc("total_score"), desc("vote_count"), "created_at", "id")
 
     baris = (await session.execute(kueri)).all()
+
+    # D-06/BR-61: daftar proposal sebuah campaign juga "pembacaan proposal",
+    # jadi kedaluwarsa dievaluasi di sini. Dijalankan setelah kueri, bukan
+    # sebelumnya: objek yang dikembalikan adalah instance ORM yang sama, jadi
+    # perubahan status dari evaluasi langsung terbaca pemanggil.
+    for p, _, _ in baris:
+        await evaluasi_kedaluwarsa(session, p, clock)
+
     return [
         ProposalDenganSinyal(proposal=p, total_score=skor, vote_count=vote)
         for p, skor, vote in baris

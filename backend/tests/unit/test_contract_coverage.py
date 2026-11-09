@@ -63,7 +63,6 @@ def _terdaftar() -> set[str]:
 # yang melahirkan pagar ini. Entri dihapus begitu fasenya mendarat, dan
 # test_daftar_tunggu_tidak_menyimpan_yang_sudah_jadi di bawah yang memaksanya.
 BELUM_DIBANGUN = {
-    "POST /internal/clock/tick": "Fase 09, jam virtual (D-06, BR-63)",
     "POST /internal/clock/reset": "Fase 09, jam virtual (D-06, BR-63)",
     "POST /internal/seed": "Fase 13, data demo",
 }
