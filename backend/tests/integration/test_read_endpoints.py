@@ -252,3 +252,183 @@ async def test_internal_ledger_unknown_proposal_returns_404(client):
     res = await client.get(f"/api/v1/internal/ledger/{hantu}")
     assert res.status_code == 404
     assert res.json()["error"]["code"] == "proposal_tidak_ada"
+
+
+async def test_t2_proposal_detail_hides_lead_investor_before_funded(
+    client, db, investor, listed_proposal, clock
+):
+    """10-api-contract.md:106-107 lewat ProposalOut.lead_investor_id, bukan
+    hanya lewat GET .../pledges: recompute_funding_status (services/pledge.py)
+    menulis lead_investor_id begitu ada pledge aktif, apa pun status
+    proposal-nya sekarang -- kolomnya SUDAH terisi di database saat proposal
+    ini masih listed/partially_funded, jadi kalau redaksinya tidak benar-benar
+    jalan, test ini akan merah, bukan hijau karena kolomnya kosong."""
+    proposal = await get_locked_proposal(db, listed_proposal.id)
+    await create_pledge(db, investor.user, proposal, 3_000_000, clock)
+    await db.refresh(listed_proposal)
+    assert listed_proposal.lead_investor_id == investor.user.id  # terisi di DB
+
+    res = await client.get(f"/api/v1/proposals/{listed_proposal.id}")
+    assert res.status_code == 200
+    assert res.json()["lead_investor_id"] is None
+
+
+async def test_t2_proposal_detail_reveals_lead_investor_once_funded(
+    client, db, investor, listed_proposal, clock
+):
+    proposal = await get_locked_proposal(db, listed_proposal.id)
+    await create_pledge(
+        db, investor.user, proposal, listed_proposal.requested_amount, clock
+    )
+
+    res = await client.get(f"/api/v1/proposals/{listed_proposal.id}")
+    assert res.status_code == 200
+    assert res.json()["lead_investor_id"] == str(investor.user.id)
+
+
+async def test_t1_public_proposal_detail_includes_collected_amount(
+    client, db, investor, listed_proposal, clock
+):
+    """Task 1: pengunjung tanpa akun tidak punya cara lain melihat progres
+    funding -- GET /proposals/{id}/pledges mewajibkan investor atau pemilik
+    (api/deps.py `ambil_proposal_untuk_daftar_pledge`). collected_amount
+    harus muncul tanpa header Authorization apa pun."""
+    proposal = await get_locked_proposal(db, listed_proposal.id)
+    await create_pledge(db, investor.user, proposal, 3_000_000, clock)
+
+    res = await client.get(f"/api/v1/proposals/{listed_proposal.id}")
+    assert res.status_code == 200
+    assert res.json()["collected_amount"] == 3_000_000
+
+
+async def test_t1_public_proposal_list_includes_collected_amount(
+    client, db, investor, investor_lain, listed_proposal, clock
+):
+    """collected_amount di daftar publik harus dijumlahkan dari ledger
+    sungguhan (pledge_in dikurangi refund_out), bukan sekadar hadir sebagai
+    angka apa pun: membatalkan satu pledge harus mengurangi angkanya."""
+    proposal = await get_locked_proposal(db, listed_proposal.id)
+    await create_pledge(db, investor.user, proposal, 3_000_000, clock)
+    proposal2 = await get_locked_proposal(db, listed_proposal.id)
+    dibatalkan = await create_pledge(
+        db, investor_lain.user, proposal2, 2_000_000, clock
+    )
+    proposal3 = await get_locked_proposal(db, listed_proposal.id)
+    await cancel_pledge(db, proposal3, dibatalkan, clock)
+
+    res = await client.get("/api/v1/proposals")
+    assert res.status_code == 200
+    item = next(p for p in res.json()["items"] if p["id"] == str(listed_proposal.id))
+    assert item["collected_amount"] == 3_000_000
+    # Task 4: proyeksi daftar tidak membawa tiga field teks panjang.
+    assert "business_profile" not in item
+    assert "fund_usage_plan" not in item
+    assert "business_projection" not in item
+
+
+async def test_t1_proposal_list_collected_amount_has_no_n_plus_1(
+    db, campaign, buat_akun, clock
+):
+    """Review keamanan: GET /proposals mengembalikan 7.2 MB untuk dua belas
+    proposal seeded, dan bilah progres publik (Task 1) tidak boleh menambah
+    satu query ledger per baris di atas itu. Dibuktikan lewat jumlah SELECT
+    sungguhan yang dieksekusi connection ini, dibandingkan antara satu
+    proposal publik dan enam: kalau collected_amount dihitung satu-satu
+    lewat `total_terkumpul_proposal` di dalam loop (N+1), selisihnya akan
+    bertambah mengikuti jumlah proposal baru, bukan tetap."""
+    from sqlalchemy import event
+
+    from app.models.proposal import Proposal
+    from app.models.user import Role
+    from app.services.proposal import daftar_proposal_publik
+
+    def _proposal(i: int, umkm_id) -> Proposal:
+        return Proposal(
+            campaign_id=campaign.id,
+            umkm_id=umkm_id,
+            business_name=f"Warung uji N+1 {i}",
+            business_profile="x" * 110,
+            fund_usage_plan="x" * 110,
+            business_projection="x" * 60,
+            requested_amount=10_000_000,
+            status=ProposalStatus.LISTED,
+        )
+
+    satu = await buat_akun(db, "t1-n-plus-1-satu@contoh.id", Role.UMKM)
+    db.add(_proposal(0, satu.user.id))
+    await db.flush()
+
+    async def _hitung_query() -> int:
+        conn = await db.connection()
+        jumlah = 0
+
+        def _tambah(*_args, **_kwargs):
+            nonlocal jumlah
+            jumlah += 1
+
+        event.listen(conn.sync_connection, "before_cursor_execute", _tambah)
+        try:
+            await daftar_proposal_publik(db, clock, page=1, page_size=20)
+        finally:
+            event.remove(conn.sync_connection, "before_cursor_execute", _tambah)
+        return jumlah
+
+    query_dengan_satu = await _hitung_query()
+
+    for i in range(1, 6):
+        akun = await buat_akun(db, f"t1-n-plus-1-{i}@contoh.id", Role.UMKM)
+        db.add(_proposal(i, akun.user.id))
+    await db.flush()
+
+    query_dengan_enam = await _hitung_query()
+
+    # Selisih tetap kecil (bukan +5, satu per proposal baru) membuktikan
+    # collected_amount tidak dihitung satu-satu dalam loop.
+    assert query_dengan_enam - query_dengan_satu <= 1
+
+
+async def test_t4_proposal_list_pagination_shape_and_server_enforced_max(
+    client, db, campaign, buat_akun
+):
+    """Task 4: GET /proposals mengembalikan 7.2 MB untuk dua belas proposal
+    seeded karena tidak ada batas atas sama sekali. page_size harus diklem
+    server, bukan sekadar default klien yang sopan -- klien yang minta
+    page_size besar harus ditolak, bukan dilayani."""
+    from app.models.proposal import Proposal
+    from app.models.user import Role
+
+    for i in range(3):
+        akun = await buat_akun(db, f"t4-pagination-{i}@contoh.id", Role.UMKM)
+        db.add(
+            Proposal(
+                campaign_id=campaign.id,
+                umkm_id=akun.user.id,
+                business_name=f"Warung uji paginasi {i}",
+                business_profile="x" * 110,
+                fund_usage_plan="x" * 110,
+                business_projection="x" * 60,
+                requested_amount=10_000_000,
+                status=ProposalStatus.LISTED,
+            )
+        )
+    await db.flush()
+
+    res = await client.get("/api/v1/proposals", params={"page": 1, "page_size": 2})
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["items"]) == 2
+    assert body["page"] == 1
+    assert body["page_size"] == 2
+    assert body["total"] >= 3
+
+    res_halaman_dua = await client.get(
+        "/api/v1/proposals", params={"page": 2, "page_size": 2}
+    )
+    halaman_dua = {p["id"] for p in res_halaman_dua.json()["items"]}
+    halaman_satu = {p["id"] for p in body["items"]}
+    assert halaman_dua.isdisjoint(halaman_satu)
+
+    res_terlalu_besar = await client.get(
+        "/api/v1/proposals", params={"page_size": 10_000}
+    )
+    assert res_terlalu_besar.status_code == 422

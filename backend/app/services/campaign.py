@@ -19,6 +19,7 @@ from app.models.user import User
 from app.models.vote import Vote
 from app.schemas.campaign import CampaignIn, CampaignUpdateIn
 from app.services.expiry import evaluasi_kedaluwarsa
+from app.services.ledger import jumlah_terkumpul_subquery
 from app.services.status import advance_campaign
 
 # Status proposal yang dianggap publik: "listed ke atas" menurut
@@ -147,6 +148,10 @@ class ProposalDenganSinyal:
     proposal: Proposal
     total_score: int
     vote_count: int
+    # Task 1: ProposalOut (yang ProposalWithSignalsOut mewarisi) sekarang
+    # wajib punya collected_amount, jadi baris ini wajib ikut diisi di sini
+    # juga, bukan hanya di services/proposal.py.
+    collected_amount: int
 
     def __getattr__(self, name: str):
         return getattr(self.proposal, name)
@@ -180,15 +185,18 @@ async def daftar_proposal_campaign(
             col(Vote.proposal_id)
         )
     ).subquery("jumlah_vote")
+    terkumpul = jumlah_terkumpul_subquery()
 
     kueri = (
         select(
             Proposal,
             func.coalesce(skor_terbaru.c.total_score, 0).label("total_score"),
             func.coalesce(jumlah_vote.c.n, 0).label("vote_count"),
+            func.coalesce(terkumpul.c.collected_amount, 0).label("collected_amount"),
         )
         .outerjoin(skor_terbaru, skor_terbaru.c.proposal_id == Proposal.id)
         .outerjoin(jumlah_vote, jumlah_vote.c.proposal_id == Proposal.id)
+        .outerjoin(terkumpul, terkumpul.c.proposal_id == Proposal.id)
         .where(Proposal.campaign_id == campaign.id)
     )
     if not pemilik:
@@ -203,10 +211,12 @@ async def daftar_proposal_campaign(
     # jadi kedaluwarsa dievaluasi di sini. Dijalankan setelah kueri, bukan
     # sebelumnya: objek yang dikembalikan adalah instance ORM yang sama, jadi
     # perubahan status dari evaluasi langsung terbaca pemanggil.
-    for p, _, _ in baris:
+    for p, _, _, _ in baris:
         await evaluasi_kedaluwarsa(session, p, clock)
 
     return [
-        ProposalDenganSinyal(proposal=p, total_score=skor, vote_count=vote)
-        for p, skor, vote in baris
+        ProposalDenganSinyal(
+            proposal=p, total_score=skor, vote_count=vote, collected_amount=int(jumlah)
+        )
+        for p, skor, vote, jumlah in baris
     ]

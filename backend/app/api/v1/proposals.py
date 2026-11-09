@@ -6,7 +6,7 @@ dengan tidak pernah menulisnya, bukan dengan menolaknya di runtime.
 
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.engine import ScoringEngine
@@ -35,7 +35,11 @@ from app.schemas.proposal import (
 from app.schemas.scoring import ScoringResultOut
 from app.services.campaign import ambil_campaign
 from app.services.expiry import evaluasi_kedaluwarsa
+from app.services.ledger import total_terkumpul_proposal
 from app.services.proposal import (
+    PROPOSAL_PAGE_SIZE_DEFAULT,
+    PROPOSAL_PAGE_SIZE_MAX,
+    ProposalDenganTerkumpul,
     ambil_proposal,
     boleh_melihat,
     daftar_milestone_proposal,
@@ -67,7 +71,7 @@ async def submit_proposal_endpoint(
     clock: Clock = Depends(get_clock),
     engine: ScoringEngine = Depends(get_scoring_engine),
     session_factory: SessionFactory = Depends(get_session_factory),
-) -> Proposal:
+) -> ProposalDenganTerkumpul:
     campaign = await ambil_campaign(session, campaign_id)
     if campaign is None:
         raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")
@@ -77,22 +81,29 @@ async def submit_proposal_endpoint(
     InlineRunner(background_tasks, session).submit(
         lambda: jalankan_scoring_job(session_factory, proposal.id, engine, clock)
     )
-    return proposal
+    # collected_amount=0 langsung, tanpa query: proposal yang baru disubmit
+    # berstatus submitted, dan status itu tidak pernah menerima pledge
+    # (FUNDABLE_PROPOSAL_STATUSES di services/pledge.py), jadi angkanya pasti
+    # nol tanpa perlu dihitung.
+    return ProposalDenganTerkumpul(proposal=proposal, collected_amount=0)
 
 
 @router.get("/api/v1/proposals", response_model=ProposalListOut)
 async def daftar_proposal_endpoint(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(PROPOSAL_PAGE_SIZE_DEFAULT, ge=1, le=PROPOSAL_PAGE_SIZE_MAX),
 ) -> ProposalListOut:
-    return ProposalListOut(items=await daftar_proposal_publik(session, clock))
+    items, total = await daftar_proposal_publik(session, clock, page, page_size)
+    return ProposalListOut(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/api/v1/proposals/mine", response_model=list[ProposalOut])
 async def daftar_proposal_mine_endpoint(
     umkm: User = Depends(require_role(Role.UMKM)),
     session: AsyncSession = Depends(get_session),
-) -> list[Proposal]:
+) -> list[ProposalDenganTerkumpul]:
     # Didaftarkan sebelum GET /proposals/{proposal_id} di bawah: keduanya
     # satu segmen setelah /proposals, dan FastAPI mencocokkan route sesuai
     # urutan pendaftaran, jadi "mine" harus menang lebih dulu atau akan
@@ -106,7 +117,7 @@ async def ambil_proposal_endpoint(
     user: User | None = Depends(pengguna_opsional),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
-) -> Proposal:
+) -> ProposalDenganTerkumpul:
     proposal = await ambil_proposal(session, proposal_id)
     if proposal is None:
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
@@ -122,7 +133,8 @@ async def ambil_proposal_endpoint(
         # 404, bukan 403: mengonfirmasi keberadaan proposal yang tidak boleh
         # dilihat sudah jadi kebocoran tersendiri.
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
-    return proposal
+    collected_amount = await total_terkumpul_proposal(session, proposal.id)
+    return ProposalDenganTerkumpul(proposal=proposal, collected_amount=collected_amount)
 
 
 @router.post(
