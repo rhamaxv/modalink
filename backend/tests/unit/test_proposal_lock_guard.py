@@ -36,16 +36,76 @@ def _calls_session_get_proposal(tree: ast.AST) -> bool:
     return False
 
 
+def _is_select_proposal_call(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "select"
+        and bool(node.args)
+        and isinstance(node.args[0], ast.Name)
+        and node.args[0].id == "Proposal"
+    )
+
+
+def _is_with_for_update_call(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "with_for_update"
+    )
+
+
+def _selects_proposal_without_lock(tree: ast.AST) -> bool:
+    """True kalau ada `select(Proposal)` yang tidak diikuti `.with_for_update()`
+    di manapun pada rantai pemanggilan yang sama.
+
+    Pagar lama (`_calls_session_get_proposal`) hanya menangkap bentuk
+    `session.get(Proposal, ...)`. Itu menyisakan jalan masuk yang sama
+    sekali tidak terlihat: `session.scalar(select(Proposal).where(...))`
+    tanpa `.with_for_update()` membaca baris proposal yang sama-sama tidak
+    terkunci, cuma lewat API yang berbeda. Review f06-b membuktikan pagar
+    lama lolos terhadap bentuk ini (RF-1, RF-4, RF-5).
+    """
+    # Setiap select(Proposal) yang muncul di dalam subtree sebuah panggilan
+    # .with_for_update() dianggap terkunci: method chaining membuat
+    # with_for_update() selalu jadi node paling luar dari rantainya, jadi
+    # select(Proposal) yang menjadi pasangannya pasti ikut tercakup saat
+    # subtree panggilan luar itu di-walk.
+    guarded_ids = {
+        id(inner)
+        for node in ast.walk(tree)
+        if _is_with_for_update_call(node)
+        for inner in ast.walk(node)
+        if _is_select_proposal_call(inner)
+    }
+    return any(
+        _is_select_proposal_call(node) and id(node) not in guarded_ids
+        for node in ast.walk(tree)
+    )
+
+
 @pytest.mark.parametrize("file_name", MONEY_SERVICES)
 def test_money_service_does_not_fetch_proposal_via_session_get(file_name: str) -> None:
     # AST, bukan regex atas teks mentah berkas: regex atas teks mentah bisa
     # false positive kena docstring yang justru menjelaskan pagar ini (lihat
     # docstring get_locked_proposal di pledge.py yang menyebut
-    # "session.get(Proposal, ...)" sebagai contoh yang DILARANG).
+    # "session.get(Proposal, ...)" sebagai contoh yang dilarang).
     tree = ast.parse((BASIS / file_name).read_text())
     assert not _calls_session_get_proposal(tree), (
         f"{file_name} mengambil Proposal dengan session.get. "
         "Pakai get_locked_proposal() supaya barisnya terkunci (RF-1)."
+    )
+
+
+@pytest.mark.parametrize("file_name", MONEY_SERVICES)
+def test_money_service_selects_proposal_only_with_lock(file_name: str) -> None:
+    # Pelanggaran yang sebenarnya kehilangan uang: select(Proposal) tanpa
+    # with_for_update() lolos dari pagar session.get di atas sepenuhnya,
+    # karena bentuknya memang berbeda, bukan karena lebih tersembunyi.
+    tree = ast.parse((BASIS / file_name).read_text())
+    assert not _selects_proposal_without_lock(tree), (
+        f"{file_name} mengambil Proposal lewat select() tanpa .with_for_update(). "
+        "Pakai get_locked_proposal() supaya barisnya terkunci (RF-1, RF-4, RF-5)."
     )
 
 
@@ -106,3 +166,23 @@ def test_guard_actually_catches_something() -> None:
         if isinstance(node, ast.AsyncFunctionDef)
     )
     assert not _calls(function_node, "recompute_funding_status")
+
+    # select(Proposal) dengan .with_for_update() tetap terkunci: harus tidak
+    # memicu pagar baru, persis seperti bentuk sungguhan di get_locked_proposal.
+    example_locked_select = ast.parse(
+        "async def get_locked_proposal(session, proposal_id):\n"
+        "    return await session.scalar(\n"
+        "        select(Proposal).where(Proposal.id == proposal_id).with_for_update()\n"
+        "    )\n"
+    )
+    assert not _selects_proposal_without_lock(example_locked_select)
+
+    # Mutasi yang betul-betul kehilangan uang menurut review f06-b: tidak ada
+    # session.get(Proposal, ...) sama sekali, tapi .with_for_update() dibuang
+    # dari select(Proposal) yang sama.
+    example_unlocked_select = ast.parse(
+        "async def get_locked_proposal(session, proposal_id):\n"
+        "    return await session.scalar(select(Proposal).where(Proposal.id == proposal_id))\n"
+    )
+    assert not _calls_session_get_proposal(example_unlocked_select)
+    assert _selects_proposal_without_lock(example_unlocked_select)
