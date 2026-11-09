@@ -768,10 +768,78 @@ naik. Catat angka sebelum dan sesudah.
 
 Run: `make check && make test-regression`
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Pagar yang membuat lubang ini tidak bisa terulang**
+
+Empat endpoint ini hilang karena tidak ada apa pun yang membandingkan kontrak dengan
+kenyataan. `10-api-contract.md` mendeklarasikan 30 endpoint; kode punya 17; tidak satu test
+pun menyebut selisihnya. Lubang sejenis pernah terjadi di sisi frontend, di mana fase 11
+mendeklarasikan sembilan halaman lalu hanya mengerjakan dua.
+
+```python
+# backend/tests/unit/test_contract_coverage.py
+# Setiap endpoint di 10-api-contract.md harus benar-benar terdaftar di aplikasi.
+# Pagar ini ada karena empat endpoint baca sempat hilang dari seluruh plan: kontrak
+# menyebutnya, tidak ada task yang membangunnya, dan tidak ada test yang menyadarinya.
+import re
+from pathlib import Path
+
+from app.main import app
+
+KONTRAK = Path(__file__).resolve().parents[3] / ".claude/prd/10-api-contract.md"
+POLA = re.compile(r"`(GET|POST|PATCH|PUT|DELETE) (/[a-zA-Z0-9{}/_-]+)`")
+
+
+def _samakan(path: str) -> str:
+    # Nama parameter berbeda antara dokumen dan kode ({id} vs {proposal_id}), dan
+    # yang dibandingkan adalah bentuk route-nya, bukan ejaan parameternya.
+    return re.sub(r"\{[a-zA-Z_]+\}", "{}", path.replace("/api/v1", ""))
+
+
+def _terdaftar() -> set[str]:
+    hasil = set()
+    for route in app.routes:
+        for method in getattr(route, "methods", set()) or set():
+            if method in {"HEAD", "OPTIONS"}:
+                continue
+            hasil.add(f"{method} {_samakan(route.path)}")
+    return hasil
+
+
+def test_setiap_endpoint_kontrak_terdaftar_di_aplikasi():
+    terdaftar = _terdaftar()
+    diminta = {
+        f"{m} {_samakan(p)}": f"{m} {p}"
+        for m, p in POLA.findall(KONTRAK.read_text())
+    }
+    hilang = sorted(asli for kunci, asli in diminta.items() if kunci not in terdaftar)
+    assert not hilang, (
+        "endpoint ini ada di 10-api-contract.md tapi tidak terdaftar di aplikasi: "
+        f"{hilang}"
+    )
+
+
+def test_pagar_ini_benar_benar_membandingkan_sesuatu():
+    # Tanpa test ini, pagar di atas bisa hijau karena daftarnya kosong.
+    diminta = POLA.findall(KONTRAK.read_text())
+    assert len(diminta) >= 25, (
+        f"hanya {len(diminta)} endpoint terbaca dari kontrak; polanya berhenti cocok"
+    )
+    assert len(_terdaftar()) >= 20
+```
+
+`app.routes` **tidak** memperlihatkan route sub-router kalau dibaca secara naif: FastAPI
+membungkus `include_router()`, dan pagar sejenis di project ini pernah hijau palsu selama
+satu fase penuh dengan matriks 6 baris dari 21. Periksa jumlah yang benar-benar terbaca
+lebih dulu, dan kalau `app.routes` ternyata tidak cukup, telusuri `route.routes` secara
+rekursif. Test kedua di atas ada untuk itu.
+
+Buktikan pagarnya bisa merah: hapus sementara satu endpoint dari routernya, jalankan, lihat
+ia menyebut endpoint itu, lalu pulihkan.
+
+- [ ] **Step 7: Commit**
 
 Satu commit per endpoint kalau pengerjaannya terpisah, atau satu commit untuk keempatnya
-kalau dikerjakan bersama. Namai sesuai isinya.
+kalau dikerjakan bersama. Pagar kontrak masuk commitnya sendiri. Namai sesuai isinya.
 
 ---
 
