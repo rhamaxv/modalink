@@ -1,3 +1,5 @@
+import { getToken } from "./token";
+
 // Default relatif, bukan URL absolut: di produksi frontend dan backend berada
 // di balik proxy yang sama, dan di dev `NEXT_PUBLIC_API_URL` menimpanya ke
 // origin backend. Lihat .claude/prd/10-api-contract.md untuk bentuk error.
@@ -20,19 +22,16 @@ export class ApiError extends Error {
   }
 }
 
-// Token ditulis oleh alur login (fase berikutnya). Dibungkus try/catch karena
-// localStorage tidak tersedia saat komponen ini dirender di server.
-function ambilToken(): string | null {
-  try {
-    return localStorage.getItem("modalink_token");
-  } catch {
-    return null;
-  }
-}
-
 function headerPermintaan(): HeadersInit {
   const header: Record<string, string> = { "Content-Type": "application/json" };
-  const token = ambilToken();
+  // getToken() dari lib/token.ts, bukan localStorage.getItem mentah: modul
+  // itu menolak token kosong dan literal "undefined" (bug fase 10 yang
+  // menulis String(undefined) saat login gagal diam-diam). Sebelum ini,
+  // fungsi ambilToken() di sini membaca localStorage langsung tanpa pagar
+  // itu, jadi token rusak tetap terkirim sebagai "Bearer undefined" di
+  // setiap permintaan walau header AppHeader sudah benar menunjukkan "Masuk"
+  // (lihat laporan Fase 11 Task 12).
+  const token = getToken();
   if (token) header.Authorization = `Bearer ${token}`;
   return header;
 }
@@ -73,3 +72,25 @@ export const api = {
   patch: <T>(jalur: string, body?: unknown) => minta<T>("PATCH", jalur, body),
   del: <T>(jalur: string) => minta<T>("DELETE", jalur),
 };
+
+// `minta<T>` di atas mengembalikan `respons.json()` yang dipaksa ke tipe T
+// lewat generic, tanpa memeriksa bentuknya sungguh cocok (lihat laporan Fase
+// 11 Task 12: dua halaman mengira endpoint daftar mengembalikan array
+// mentah, padahal backend selalu membungkusnya { items: [...] }; keduanya
+// lolos tsc dan test unit karena mock masing-masing menebak bentuk yang sama
+// salahnya, lalu gagal di browser sungguhan dengan TypeError yang jauh dari
+// baris fetch-nya sendiri). Dipakai di titik pemanggilan endpoint daftar
+// sebagai pagar tipis: kalau field "items" tidak ada, pemanggil tahu lewat
+// ApiError yang jelas, bukan lewat .find/.map yang melempar beberapa baris
+// kemudian tanpa menyebut endpoint mana yang salah bentuk.
+export function daftarDariRespons<T>(data: unknown, jalur: string): T[] {
+  const items = (data as { items?: unknown } | null)?.items;
+  if (!Array.isArray(items)) {
+    throw new ApiError(
+      "bentuk_respons_tidak_terduga",
+      `Bentuk respons dari ${jalur} tidak sesuai yang diharapkan: field "items" tidak ditemukan.`,
+      0,
+    );
+  }
+  return items as T[];
+}

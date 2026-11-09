@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Nominal } from "@/components/ui/Nominal";
-import { ApiError, api } from "@/lib/api";
+import { ApiError, api, daftarDariRespons } from "@/lib/api";
 
 // Panjang minimum narasi laporan sesuai .claude/prd/04-feature-umkm.md.
 const MIN_NARRATIVE = 50;
@@ -54,7 +54,17 @@ export default function MilestoneLapor() {
     }
     setMuatan({ status: "loading" });
     try {
-      const milestones = await api.get<Milestone[]>(`/proposals/${proposalId}/milestones`);
+      // GET /proposals/{id}/milestones membungkus daftarnya dalam
+      // { items: [...] } (backend/app/schemas/proposal.py: MilestoneListOut),
+      // bukan array mentah. Sebelumnya field ini dibaca seolah array
+      // langsung, yang di browser sungguhan melempar TypeError saat .find
+      // dipanggil pada objek di bawah (lihat laporan Fase 11 Task 12:
+      // ditemukan lewat e2e terhadap backend asli). daftarDariRespons
+      // melempar ApiError yang jelas kalau bentuknya menyimpang lagi.
+      const milestones = daftarDariRespons<Milestone>(
+        await api.get(`/proposals/${proposalId}/milestones`),
+        `/proposals/${proposalId}/milestones`,
+      );
       setMuatan({ status: "siap", milestones });
     } catch (error) {
       setMuatan({
