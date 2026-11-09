@@ -27,40 +27,40 @@ from app.services.pledge import create_pledge, get_locked_proposal
 from app.services.scoring import jalankan_scoring
 
 
-async def _buat_user_committed(role: Role, label: str) -> User:
-    async with SessionLocal() as sesi:
+async def _create_committed_user(role: Role, label: str) -> User:
+    async with SessionLocal() as session:
         user = User(
             email=f"concurrency-{label}-{uuid4().hex}@contoh.id",
             password_hash=hash_password("rahasia123"),
-            name=f"Pengguna Uji Konkurensi {label}",
+            name=f"Concurrency Test User {label}",
             role=role,
         )
-        sesi.add(user)
-        await sesi.commit()
-        await sesi.refresh(user)
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
         return user
 
 
-async def _hapus_user_committed(user_id) -> None:
-    async with SessionLocal() as sesi:
-        await sesi.execute(
+async def _delete_committed_user(user_id) -> None:
+    async with SessionLocal() as session:
+        await session.execute(
             text("DELETE FROM users WHERE id = :uid"), {"uid": str(user_id)}
         )
-        await sesi.commit()
+        await session.commit()
 
 
 @pytest.fixture
 async def investor_a():
-    user = await _buat_user_committed(Role.INVESTOR, "a")
+    user = await _create_committed_user(Role.INVESTOR, "a")
     yield user
-    await _hapus_user_committed(user.id)
+    await _delete_committed_user(user.id)
 
 
 @pytest.fixture
 async def investor_b():
-    user = await _buat_user_committed(Role.INVESTOR, "b")
+    user = await _create_committed_user(Role.INVESTOR, "b")
     yield user
-    await _hapus_user_committed(user.id)
+    await _delete_committed_user(user.id)
 
 
 @pytest.fixture
@@ -82,23 +82,23 @@ async def listed_proposal_committed(investor_a, investor_b, clock):
     menghapus baris proposals yang masih merujuknya lewat lead_investor_id,
     dan DELETE itu gagal kena foreign key constraint.
     """
-    umkm = await _buat_user_committed(Role.UMKM, "pengaju")
-    mulai = clock.now()
-    async with SessionLocal() as sesi:
+    umkm = await _create_committed_user(Role.UMKM, "applicant")
+    started_at = clock.now()
+    async with SessionLocal() as session:
         campaign = Campaign(
             investor_id=investor_a.id,
             title="Campaign uji konkurensi pledge",
             description="Mendanai warung kopi skala rumahan." * 2,
             sector=Sector.KULINER,
             target_amount=50_000_000,
-            apply_deadline=mulai + timedelta(days=7),
-            funding_deadline=mulai + timedelta(days=21),
+            apply_deadline=started_at + timedelta(days=7),
+            funding_deadline=started_at + timedelta(days=21),
             score_threshold=60,
             status=CampaignStatus.OPEN,
-            created_at=mulai,
+            created_at=started_at,
         )
-        sesi.add(campaign)
-        await sesi.flush()
+        session.add(campaign)
+        await session.flush()
 
         proposal = Proposal(
             campaign_id=campaign.id,
@@ -110,71 +110,70 @@ async def listed_proposal_committed(investor_a, investor_b, clock):
             requested_amount=10_000_000,
             status=ProposalStatus.SUBMITTED,
             scoring_status=ScoringStatus.PENDING,
-            created_at=mulai,
+            created_at=started_at,
         )
-        sesi.add(proposal)
-        await sesi.flush()
-        await jalankan_scoring(sesi, proposal.id, MockScoringEngine(), clock)
-        await sesi.commit()
-        await sesi.refresh(proposal)
+        session.add(proposal)
+        await session.flush()
+        await jalankan_scoring(session, proposal.id, MockScoringEngine(), clock)
+        await session.commit()
+        await session.refresh(proposal)
 
     yield proposal
 
-    async with SessionLocal() as sesi:
-        for tabel in (
+    async with SessionLocal() as session:
+        for table in (
             "ledger_entries",
             "pledges",
             "scoring_results",
             "proposal_milestones",
         ):
-            await sesi.execute(
-                text(f"DELETE FROM {tabel} WHERE proposal_id = :pid"),
+            await session.execute(
+                text(f"DELETE FROM {table} WHERE proposal_id = :pid"),
                 {"pid": str(proposal.id)},
             )
-        await sesi.execute(
+        await session.execute(
             text("DELETE FROM proposals WHERE id = :pid"), {"pid": str(proposal.id)}
         )
-        await sesi.execute(
+        await session.execute(
             text("DELETE FROM campaigns WHERE investor_id = :iid"),
             {"iid": str(investor_a.id)},
         )
-        await sesi.commit()
-    await _hapus_user_committed(umkm.id)
+        await session.commit()
+    await _delete_committed_user(umkm.id)
 
 
 async def test_rf1_concurrent_pledges_do_not_exceed_target(
     listed_proposal_committed, investor_a, investor_b, clock
 ):
-    sisa = listed_proposal_committed.requested_amount  # belum ada pledge
+    remaining = listed_proposal_committed.requested_amount  # belum ada pledge
 
-    async def coba(investor):
-        async with SessionLocal() as sesi, sesi.begin():
-            proposal = await get_locked_proposal(sesi, listed_proposal_committed.id)
+    async def attempt(investor):
+        async with SessionLocal() as session, session.begin():
+            proposal = await get_locked_proposal(session, listed_proposal_committed.id)
             try:
-                await create_pledge(sesi, investor, proposal, sisa, clock)
-                return "lolos"
+                await create_pledge(session, investor, proposal, remaining, clock)
+                return "succeeded"
             except ConflictError:
-                return "ditolak"
+                return "rejected"
 
-    hasil = await asyncio.gather(coba(investor_a), coba(investor_b))
-    assert sorted(hasil) == ["ditolak", "lolos"]
+    outcomes = await asyncio.gather(attempt(investor_a), attempt(investor_b))
+    assert sorted(outcomes) == ["rejected", "succeeded"]
 
 
 async def test_rf1_total_pledged_never_exceeds_requested_amount(
     listed_proposal_committed, investor_a, investor_b, clock
 ):
-    separuh = (
-        listed_proposal_committed.requested_amount // 2 + 1_000_000
-    )  # sengaja > separuh
+    # Sengaja lebih dari separuh: dua pledge nilai ini sekaligus pasti melebihi target.
+    half_plus = listed_proposal_committed.requested_amount // 2 + 1_000_000
 
-    async def coba(investor):
-        async with SessionLocal() as sesi, sesi.begin():
-            proposal = await get_locked_proposal(sesi, listed_proposal_committed.id)
+    async def attempt(investor):
+        async with SessionLocal() as session, session.begin():
+            proposal = await get_locked_proposal(session, listed_proposal_committed.id)
             with contextlib.suppress(ConflictError):
-                await create_pledge(sesi, investor, proposal, separuh, clock)
+                await create_pledge(session, investor, proposal, half_plus, clock)
 
-    await asyncio.gather(coba(investor_a), coba(investor_b))
+    await asyncio.gather(attempt(investor_a), attempt(investor_b))
 
-    async with SessionLocal() as sesi:
-        total = await total_terkumpul_proposal(sesi, listed_proposal_committed.id)
+    async with SessionLocal() as session:
+        total = await total_terkumpul_proposal(session, listed_proposal_committed.id)
     assert total <= listed_proposal_committed.requested_amount

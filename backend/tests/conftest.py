@@ -266,7 +266,7 @@ async def listed_proposal(db, campaign, umkm_lain, clock):
 
 
 @dataclass
-class ProposalDenganPledge:
+class ProposalWithPledge:
     """Proposal dibungkus pledge-nya, khusus untuk fixture test.
 
     SQLModel (lewat validasi Pydantic v2) menolak menitipkan atribut bebas
@@ -299,7 +299,7 @@ async def funded_proposal(db, listed_proposal, investor, clock):
         db, investor.user, listed_proposal, listed_proposal.requested_amount, clock
     )
     await db.refresh(listed_proposal)
-    return ProposalDenganPledge(proposal=listed_proposal, pledges=[pledge])
+    return ProposalWithPledge(proposal=listed_proposal, pledges=[pledge])
 
 
 @pytest.fixture

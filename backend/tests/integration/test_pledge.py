@@ -65,24 +65,24 @@ async def test_br25_pledge_cannot_be_cancelled_after_funded(
 async def test_br26_cancellation_records_refund_not_delete(
     client, db, investor, listed_proposal
 ):
-    buat = await client.post(
+    create_response = await client.post(
         f"/api/v1/proposals/{listed_proposal.id}/pledges",
         headers=investor.headers,
         json={"amount": 4_000_000},
     )
     await client.delete(
-        f"/api/v1/pledges/{buat.json()['id']}", headers=investor.headers
+        f"/api/v1/pledges/{create_response.json()['id']}", headers=investor.headers
     )
 
-    entri = (
+    entries = (
         await db.scalars(
             select(LedgerEntry).where(LedgerEntry.proposal_id == listed_proposal.id)
         )
     ).all()
-    tipe = [e.entry_type for e in entri]
-    assert EntryType.PLEDGE_IN in tipe
-    assert EntryType.REFUND_OUT in tipe
-    assert len(entri) == 2  # entri pledge_in tidak dihapus
+    entry_types = [e.entry_type for e in entries]
+    assert EntryType.PLEDGE_IN in entry_types
+    assert EntryType.REFUND_OUT in entry_types
+    assert len(entries) == 2  # entri pledge_in tidak dihapus
 
 
 async def test_t07_cancelling_last_pledge_returns_proposal_to_listed(
@@ -92,7 +92,7 @@ async def test_t07_cancelling_last_pledge_returns_proposal_to_listed(
     pembatalan wajib memicu recompute_funding_status di transaksi yang sama,
     bukan hanya mencatat refund_out. Tanpa itu, proposal tetap kelihatan
     partially_funded padahal tidak ada satu pun pledge aktif lagi."""
-    buat = await client.post(
+    create_response = await client.post(
         f"/api/v1/proposals/{listed_proposal.id}/pledges",
         headers=investor.headers,
         json={"amount": 4_000_000},
@@ -101,7 +101,7 @@ async def test_t07_cancelling_last_pledge_returns_proposal_to_listed(
     assert listed_proposal.status is ProposalStatus.PARTIALLY_FUNDED
 
     res = await client.delete(
-        f"/api/v1/pledges/{buat.json()['id']}", headers=investor.headers
+        f"/api/v1/pledges/{create_response.json()['id']}", headers=investor.headers
     )
     assert res.status_code == 200
     await db.refresh(listed_proposal)
@@ -111,10 +111,10 @@ async def test_t07_cancelling_last_pledge_returns_proposal_to_listed(
 async def test_br28_umkm_and_community_have_no_pledge_access(
     client, umkm, community, listed_proposal
 ):
-    for akun in (umkm, community):
+    for account in (umkm, community):
         res = await client.post(
             f"/api/v1/proposals/{listed_proposal.id}/pledges",
-            headers=akun.headers,
+            headers=account.headers,
             json={"amount": 1_000_000},
         )
         assert res.status_code == 403
