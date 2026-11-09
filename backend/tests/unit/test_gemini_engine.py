@@ -1,6 +1,8 @@
 """Test buang_evidence_halusinasi (RF-3): kutipan karangan tidak boleh
 sampai ke pemilik usaha sebagai alasan penolakan."""
 
+from dataclasses import dataclass
+
 import pytest
 
 from app.ai.gemini_engine import GeminiEngine, buang_evidence_halusinasi
@@ -76,3 +78,103 @@ def test_gemini_engine_menolak_dibuat_tanpa_kunci_api():
     assert isinstance(tanpa_kunci, Settings)
     with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
         GeminiEngine.from_settings(tanpa_kunci)
+
+
+class _StubCompletions:
+    """Pengganti instructor.AsyncInstructor.chat.completions, tanpa jaringan
+    (C-28). Mencatat messages yang dikirim supaya test bisa memeriksa prompt
+    yang sungguh dirakit _rakit_isi(), bukan cuma bahwa score() mengembalikan
+    sesuatu."""
+
+    def __init__(self, hasil: ProposalScore) -> None:
+        self._hasil = hasil
+        self.messages_terkirim: list[dict[str, str]] | None = None
+
+    async def create(self, *, model, response_model, max_retries, messages):
+        self.messages_terkirim = messages
+        return self._hasil
+
+
+class _StubChat:
+    def __init__(self, completions: _StubCompletions) -> None:
+        self.completions = completions
+
+
+class _StubClient:
+    def __init__(self, hasil: ProposalScore) -> None:
+        self.chat = _StubChat(_StubCompletions(hasil))
+
+
+@dataclass
+class _CampaignLengkap:
+    """campaign_draft di unit/conftest.py sengaja cuma punya target_amount
+    (C-25: hanya field yang dibaca MockScoringEngine). GeminiEngine._rakit_isi
+    juga membaca title/sector/description, jadi test ini butuh draft sendiri
+    yang lebih lengkap."""
+
+    title: str
+    sector: str
+    description: str
+    target_amount: int
+
+
+@pytest.fixture
+def campaign_gemini_draft() -> _CampaignLengkap:
+    return _CampaignLengkap(
+        title="Modal warung kopi Jakarta Timur",
+        sector="kuliner",
+        description="Mendanai warung kopi skala rumahan.",
+        target_amount=50_000_000,
+    )
+
+
+def _bangun_engine_dengan_stub(stub: _StubClient) -> GeminiEngine:
+    # __new__, bukan GeminiEngine(client, model, timeout_s): __init__
+    # membungkus client lewat instructor.from_genai(client, use_async=True),
+    # yang menolak objek selain genai.Client sungguhan. Stub ini menggantikan
+    # _client secara langsung, menjaga score() dan _rakit_isi() tetap
+    # kode sungguhan yang diuji, tanpa menyentuh jaringan maupun instructor.
+    engine = GeminiEngine.__new__(GeminiEngine)
+    engine._client = stub
+    engine.model = "gemini-2.5-flash"
+    engine._timeout_s = 20
+    return engine
+
+
+async def test_score_memanggil_stub_dan_membuang_evidence_halusinasi(
+    proposal_draft, campaign_gemini_draft
+):
+    hasil_mentah = ProposalScore(
+        fit_score=30,
+        data_quality_score=20,
+        impact_score=20,
+        red_flags=[
+            RedFlag(
+                code="angka_tidak_konsisten",
+                severity="critical",
+                message="genuine",
+                # Persis ada di proposal_draft.business_profile (unit/conftest.py).
+                evidence="omzet rata-rata Rp12 juta per bulan",
+            ),
+            RedFlag(
+                code="projeksi_tidak_realistis",
+                severity="critical",
+                message="halusinasi",
+                evidence="proyeksi Rp900 juta per hari",
+            ),
+        ],
+        brief=Brief(strengths=["a"], risks=["b"], recommendation="c"),
+    )
+    stub = _StubClient(hasil_mentah)
+    engine = _bangun_engine_dengan_stub(stub)
+
+    skor = await engine.score(proposal_draft, campaign_gemini_draft)
+
+    assert [f.code for f in skor.red_flags] == ["angka_tidak_konsisten"]
+
+    prompt_terkirim = stub.chat.completions.messages_terkirim[0]["content"]
+    assert proposal_draft.business_name in prompt_terkirim
+    assert proposal_draft.business_profile in prompt_terkirim
+    assert proposal_draft.fund_usage_plan in prompt_terkirim
+    assert proposal_draft.business_projection in prompt_terkirim
+    assert str(proposal_draft.requested_amount) in prompt_terkirim
