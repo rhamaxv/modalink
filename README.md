@@ -393,18 +393,8 @@ dalam container. Siapkan virtualenv itu dulu bila belum ada:
 ```bash
 cd backend
 python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"   # lihat catatan di bawah bila ini gagal
+.venv/bin/pip install -e ".[dev]"
 ```
-
-Catatan yang ditemukan saat menulis dokumen ini: `pip install -e ".[dev]"` di repo pada
-titik ini gagal dengan pesan `Multiple top-level packages discovered in a flat-layout`,
-karena `app/` dan `alembic/` sama-sama terlihat sebagai package tingkat atas oleh
-setuptools saat instalasi dijalankan dari dalam `backend/` secara langsung (bukan lewat
-Docker, yang meng-copy `pyproject.toml` lebih dulu sebelum source-nya, sehingga tidak
-kena masalah yang sama). Cara yang terbukti bekerja: instal dependency satu per satu dari
-daftar di `pyproject.toml` tanpa flag `-e`, lalu jalankan pytest dengan
-`PYTHONPATH=backend` (atau dari dalam `backend/` dengan `PYTHONPATH=.`). Ini layak
-diperbaiki di `pyproject.toml` sebelum code freeze.
 
 Setelah backend dan database jalan, di terminal lain:
 

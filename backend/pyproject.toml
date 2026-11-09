@@ -1,3 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Tanpa dua baris di bawah, `pip install -e .` gagal dengan "Multiple top-level
+# packages discovered in a flat-layout: ['app', 'alembic']": setuptools mencoba
+# menebak paketnya dan menemukan dua kandidat di akar. Hanya `app` yang paket;
+# `alembic` adalah direktori migrasi dan `tests` tidak ikut dipasang.
+[tool.setuptools]
+packages = ["app"]
+
 [project]
 name = "modalink-backend"
 version = "0.1.0"
