@@ -49,6 +49,8 @@ class GeminiEngine:
         # bukan hanya saat timeout.
         self._client = instructor.from_genai(client, use_async=True)
         self.model = model
+        # Disimpan tapi sudah mati: timeout sekarang diterapkan lewat
+        # http_options client (lihat from_settings), bukan per-panggilan.
         self._timeout_s = timeout_s
 
     @classmethod
@@ -85,7 +87,10 @@ class GeminiEngine:
         hasil = await self._client.chat.completions.create(
             model=self.model,
             response_model=ProposalScore,
-            max_retries=2,  # Instructor mengirim ulang saat validasi gagal
+            # max_retries=2 digabung timeout di level client berarti worst
+            # case satu pemanggilan score() bisa menggantung sampai hampir
+            # 3x gemini_timeout_s sebelum menyerah.
+            max_retries=2,
             messages=[{"role": "user", "content": PROMPT.format(**isi)}],
         )
         return buang_evidence_halusinasi(hasil, isi["isi_proposal"])
