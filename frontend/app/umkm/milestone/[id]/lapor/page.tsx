@@ -108,7 +108,7 @@ export default function MilestoneLapor() {
     <div className="mx-auto flex max-w-measure flex-col gap-space-5 px-space-3 py-space-6">
       <div>
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold text-ink">{milestone.title}</h1>
-        <div className="mt-space-3 flex items-center gap-space-3">
+        <div className="mt-space-3 flex flex-wrap items-center gap-space-3">
           <StatusBadge status={milestone.status} />
           <Nominal label="Nominal tahap ini" nominal={milestone.amount} ukuran="sedang" />
         </div>

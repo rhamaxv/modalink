@@ -100,8 +100,8 @@ export default function UmkmBeranda() {
                 data-testid="kartu-proposal"
                 className="rounded-card border border-warn bg-surface p-space-4"
               >
-                <div className="flex items-center justify-between gap-space-3">
-                  <p className="text-[1.125rem] font-semibold text-ink">{p.business_name}</p>
+                <div className="flex flex-wrap items-center justify-between gap-space-3">
+                  <p className="min-w-0 text-[1.125rem] font-semibold text-ink">{p.business_name}</p>
                   <StatusBadge status={p.status} />
                 </div>
                 {/* D-09: kegagalan mesin skor bukan keputusan atas usaha ini.
@@ -146,8 +146,8 @@ export default function UmkmBeranda() {
 function ProposalCard({ proposal }: { proposal: ProposalMine }) {
   return (
     <div data-testid="kartu-proposal" className="rounded-card border border-line bg-surface p-space-4">
-      <div className="flex items-center justify-between gap-space-3">
-        <p className="text-[1.125rem] font-semibold text-ink">{proposal.business_name}</p>
+      <div className="flex flex-wrap items-center justify-between gap-space-3">
+        <p className="min-w-0 text-[1.125rem] font-semibold text-ink">{proposal.business_name}</p>
         <StatusBadge status={proposal.status} />
       </div>
       <div className="mt-space-2">
