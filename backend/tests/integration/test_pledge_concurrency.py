@@ -21,10 +21,45 @@ from app.errors import ConflictError
 from app.models.campaign import Campaign, CampaignStatus, Sector
 from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
 from app.models.user import Role, User
+from app.services import pledge as pledge_service
 from app.services.auth import hash_password
 from app.services.ledger import total_terkumpul_proposal
 from app.services.pledge import create_pledge, get_locked_proposal
 from app.services.scoring import jalankan_scoring
+
+# Review menemukan RF-1 lolos byte-identik setelah with_for_update() dihapus
+# dari get_locked_proposal: asyncio.gather(attempt(a), attempt(b)) terlihat
+# konkuren tapi di Postgres lokal yang cepat, coroutine pertama kerap
+# menyelesaikan seluruh create_pledge (baca remaining, tulis pledge, commit)
+# sebelum event loop pernah memberi giliran ke coroutine kedua -- jendela
+# baca-remaining-lalu-tulis yang sebenarnya diuji RF-1 tidak pernah benar-
+# benar tumpang tindih. _RF1_READ_DELAY_S memaksa jendela itu terbuka lebar
+# di DUA sisi secara simetris (bukan memenangkan salah satu), lewat
+# asyncio.sleep SETELAH baca remaining tapi SEBELUM keputusan tulis.
+#
+# Ini bukan sleep waktu bisnis yang dilarang skill testing-and-regression
+# (itu dikendalikan FrozenClock) -- ini jeda penjadwalan event loop yang
+# memaksa interleaving nyata, satu-satunya cara membuktikan sebuah lock
+# baris database benar-benar bekerja tanpa thread/proses OS sungguhan.
+# Kalau with_for_update() aktif, delay ini terjadi SAMBIL baris masih
+# terkunci -- lawannya menunggu di level Postgres, bukan di barrier Python,
+# jadi tidak ada risiko deadlock menunggu lawan yang belum pernah berjalan.
+_RF1_READ_DELAY_S = 0.05
+
+
+@pytest.fixture
+def paksa_interleaving_baca_remaining(monkeypatch):
+    """Lihat komentar modul di atas: menyisipkan jeda tepat setelah
+    total_terkumpul_proposal (baca "sisa dana") dikembalikan ke create_pledge,
+    sebelum create_pledge memutuskan menulis pledge atau menolak."""
+    asli = pledge_service.total_terkumpul_proposal
+
+    async def _dengan_delay(session, proposal_id):
+        hasil = await asli(session, proposal_id)
+        await asyncio.sleep(_RF1_READ_DELAY_S)
+        return hasil
+
+    monkeypatch.setattr(pledge_service, "total_terkumpul_proposal", _dengan_delay)
 
 
 async def _create_committed_user(role: Role, label: str) -> User:
@@ -143,7 +178,11 @@ async def listed_proposal_committed(investor_a, investor_b, clock):
 
 
 async def test_rf1_concurrent_pledges_do_not_exceed_target(
-    listed_proposal_committed, investor_a, investor_b, clock
+    listed_proposal_committed,
+    investor_a,
+    investor_b,
+    clock,
+    paksa_interleaving_baca_remaining,
 ):
     remaining = listed_proposal_committed.requested_amount  # belum ada pledge
 
@@ -159,9 +198,17 @@ async def test_rf1_concurrent_pledges_do_not_exceed_target(
     outcomes = await asyncio.gather(attempt(investor_a), attempt(investor_b))
     assert sorted(outcomes) == ["rejected", "succeeded"]
 
+    async with SessionLocal() as session:
+        total = await total_terkumpul_proposal(session, listed_proposal_committed.id)
+    assert total == remaining  # R2: dana terkumpul tidak pernah melebihi yang diminta
+
 
 async def test_rf1_total_pledged_never_exceeds_requested_amount(
-    listed_proposal_committed, investor_a, investor_b, clock
+    listed_proposal_committed,
+    investor_a,
+    investor_b,
+    clock,
+    paksa_interleaving_baca_remaining,
 ):
     # Sengaja lebih dari separuh: dua pledge nilai ini sekaligus pasti melebihi target.
     half_plus = listed_proposal_committed.requested_amount // 2 + 1_000_000
