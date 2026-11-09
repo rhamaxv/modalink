@@ -205,7 +205,7 @@ async def recompute_funding_status(
     session: AsyncSession, proposal: Proposal, clock: Clock
 ) -> None:
     """Satu-satunya penulis status funding yang didorong pledge: `listed`,
-    `partially_funded`, dan `funded` (D-05).
+    `partially_funded`, `funded`, dan `failed` lewat deadline (D-05, BR-62).
 
     Bukan satu-satunya penulis `proposal.status` secara keseluruhan: T-01
     (`submitted` -> `listed` saat scoring lolos, lihat
@@ -213,6 +213,22 @@ async def recompute_funding_status(
     akibat pledge, dan sengaja tidak lewat sini. Service yang mengubah pledge
     wajib memanggil fungsi ini di transaksi yang sama. Regression test R2b
     yang menegakkannya.
+
+    Kalau hasilnya `failed`, BR-62 mewajibkan SELURUH pledge aktif yang masih
+    tersisa ikut dibatalkan dengan `refund_out` di transaksi yang sama, bukan
+    hanya pledge yang memicu pemanggilan ini. Alasannya: create_pledge
+    menolak pledge baru begitu deadline lewat (lihat pengecekan di atas),
+    tapi cancel_pledge tidak bisa ikut menolak pembatalan yang sah milik
+    investor lain -- kalau proposal ini berubah jadi `failed` gara-gara satu
+    pembatalan, pledge investor lain yang masih aktif tidak boleh
+    ditinggalkan tanpa refund_out hanya karena bukan dia yang membatalkan.
+    Direproduksi persis begini oleh review f06-b Finding 1: batalkan satu
+    pledge setelah funding_deadline lewat sementara pledge investor lain
+    masih aktif, proposal jadi `failed`, dan pledge investor lain itu tetap
+    `active` selamanya tanpa satu pun entri lawan. Menunggu evaluasi lazy
+    penuh (Fase 09, yang belum ada) bukan pilihan di sini: fungsi inilah
+    satu-satunya titik tulis yang melihat transisi ke `failed` terjadi
+    sekarang, lewat jalur yang sudah ada.
     """
     aktif = (
         await session.scalars(
@@ -244,6 +260,23 @@ async def recompute_funding_status(
         total, proposal.requested_amount, clock.now(), campaign.funding_deadline
     )
     proposal.status = ProposalStatus(baru.value)
+
+    if proposal.status is ProposalStatus.FAILED:
+        for p in aktif:
+            p.status = PledgeStatus.CANCELLED
+            session.add(p)
+            await catat_entri(
+                session,
+                proposal.id,
+                EntryType.REFUND_OUT,
+                p.amount,
+                idempotency_key=f"refund:{p.id}",
+                ref_type="pledge",
+                ref_id=p.id,
+                actor_id=p.investor_id,
+            )
+        aktif = []  # sudah seluruhnya direfund; lead investor jadi None di bawah
+
     proposal.lead_investor_id = pick_lead_investor(
         [PledgeRingkas(p.investor_id, p.amount, p.created_at) for p in aktif]
     )

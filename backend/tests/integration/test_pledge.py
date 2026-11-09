@@ -5,7 +5,9 @@ from sqlalchemy import select
 
 from app.errors import UnprocessableError
 from app.models.ledger import EntryType, LedgerEntry
+from app.models.pledge import Pledge, PledgeStatus
 from app.models.proposal import ProposalStatus
+from app.services.ledger import hitung_saldo
 from app.services.pledge import create_pledge
 
 
@@ -146,6 +148,60 @@ async def test_br62_pledge_after_deadline_rejected_not_accepted_then_refunded(
     assert entries["status"] == "listed", (
         "pledge yang ditolak tidak boleh ikut mengubah status proposal"
     )
+
+
+async def test_br62_cancelling_one_pledge_past_deadline_refunds_every_active_pledge(
+    client, db, investor, investor_lain, listed_proposal, majukan
+):
+    """Review f06-b Finding 1: sebelum fix, membatalkan SATU pledge setelah
+    funding_deadline lewat membuat recompute_funding_status menuliskan
+    `failed`, sementara pledge investor lain yang tidak ikut dibatalkan tetap
+    `active` selamanya tanpa entri `refund_out` pasangannya -- escrow-nya
+    tersangkut permanen (BR-62). Sekarang pembatalan itu memicu refund untuk
+    SELURUH pledge aktif yang tersisa, bukan hanya yang dibatalkan."""
+    pledge_a = await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges",
+        headers=investor.headers,
+        json={"amount": 4_000_000},
+    )
+    pledge_b = await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges",
+        headers=investor_lain.headers,
+        json={"amount": 3_000_000},
+    )
+    await majukan(hari=30)
+
+    res = await client.delete(
+        f"/api/v1/pledges/{pledge_b.json()['id']}", headers=investor_lain.headers
+    )
+    assert res.status_code == 200
+
+    await db.refresh(listed_proposal)
+    assert listed_proposal.status is ProposalStatus.FAILED
+
+    pledges = (
+        await db.scalars(select(Pledge).where(Pledge.proposal_id == listed_proposal.id))
+    ).all()
+    assert {str(p.id) for p in pledges} == {
+        pledge_a.json()["id"],
+        pledge_b.json()["id"],
+    }
+    assert all(p.status is PledgeStatus.CANCELLED for p in pledges), (
+        "proposal failed tidak boleh memegang satu pun pledge aktif"
+    )
+
+    entries_rows = (
+        await db.scalars(
+            select(LedgerEntry).where(LedgerEntry.proposal_id == listed_proposal.id)
+        )
+    ).all()
+    refunded_pledge_ids = {
+        e.ref_id for e in entries_rows if e.entry_type is EntryType.REFUND_OUT
+    }
+    assert refunded_pledge_ids == {p.id for p in pledges}, (
+        "setiap pledge aktif pada proposal failed wajib punya refund_out pasangannya"
+    )
+    assert hitung_saldo(entries_rows) == 0
 
 
 async def test_br27_service_layer_rejects_amount_below_minimum_without_http(
