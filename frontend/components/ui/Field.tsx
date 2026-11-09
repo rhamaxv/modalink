@@ -9,7 +9,7 @@ type FieldOption = {
 
 type FieldProps = {
   label: string;
-  type?: "text" | "email" | "password";
+  type?: "text" | "email" | "password" | "date" | "number";
   value: string;
   onChange: (value: string) => void;
   error?: string;
@@ -17,6 +17,10 @@ type FieldProps = {
   autoComplete?: string;
   /** Saat diisi, Field merender <select> berisi opsi ini, bukan <input>. */
   options?: FieldOption[];
+  /** Saat true, Field merender <textarea>, untuk teks panjang seperti deskripsi. */
+  multiline?: boolean;
+  /** Batas bawah untuk type="number" atau type="date" (format sesuai tipe input native). */
+  min?: string;
 };
 
 // Satu komponen dipakai di setiap field di seluruh aplikasi, supaya
@@ -32,9 +36,13 @@ export function Field({
   required,
   autoComplete,
   options,
+  multiline,
+  min,
 }: FieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
+  const controlClassName =
+    "min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink";
 
   return (
     <div className="flex flex-col gap-space-1">
@@ -52,7 +60,7 @@ export function Field({
           required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className="min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink"
+          className={controlClassName}
         >
           {options.map((item) => (
             <option key={item.value} value={item.value}>
@@ -60,6 +68,17 @@ export function Field({
             </option>
           ))}
         </select>
+      ) : multiline ? (
+        <textarea
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          required={required}
+          rows={5}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className={controlClassName}
+        />
       ) : (
         <input
           id={id}
@@ -67,10 +86,11 @@ export function Field({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           required={required}
+          min={min}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           autoComplete={autoComplete}
-          className="min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink"
+          className={controlClassName}
         />
       )}
       {error && (
