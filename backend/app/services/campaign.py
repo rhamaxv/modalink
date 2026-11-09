@@ -8,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from app.domain.clock import Clock
-from app.domain.transitions import CampaignEvent, IllegalTransition, apply_campaign
-from app.domain.transitions import CampaignStatus as DomainCampaignStatus
+from app.domain.transitions import CampaignEvent, IllegalTransition
 from app.errors import ConflictError, UnprocessableError
 from app.models.campaign import Campaign, CampaignStatus
 from app.models.proposal import Proposal, ProposalStatus
 from app.models.user import User
 from app.schemas.campaign import CampaignIn, CampaignUpdateIn
+from app.services.status import advance_campaign
 
 # Status proposal yang dianggap publik: "listed ke atas" menurut
 # 03-feature-investor.md. submitted (belum dinilai) dan rejected disembunyikan
@@ -72,15 +72,6 @@ async def daftar_campaign(session: AsyncSession) -> list[Campaign]:
     return list(hasil)
 
 
-def _tutup(campaign: Campaign, event: CampaignEvent) -> None:
-    # Jembatan nilai, bukan assignment langsung: CampaignStatus di models/
-    # berbeda kelas dari CampaignStatus di domain/transitions.py (lihat
-    # docstring modul campaign.py), tapi nilai stringnya sama sehingga
-    # apply_campaign tetap bisa dipanggil (D-04).
-    baru = apply_campaign(DomainCampaignStatus(campaign.status.value), event)
-    campaign.status = CampaignStatus(baru.value)
-
-
 async def ambil_campaign(session: AsyncSession, campaign_id: UUID) -> Campaign | None:
     return await session.get(Campaign, campaign_id)
 
@@ -94,14 +85,14 @@ async def ambil_campaign_detail(
     if campaign.status is CampaignStatus.OPEN and clock.now() > campaign.apply_deadline:
         # Penutupan lambat (T-41): tidak ada job terjadwal di fase ini, jadi
         # status disesuaikan begitu campaign ini dibaca lagi setelah lewat.
-        _tutup(campaign, CampaignEvent.APPLY_DEADLINE_LEWAT)
+        advance_campaign(campaign, CampaignEvent.APPLY_DEADLINE_LEWAT)
         await session.flush()
     return campaign
 
 
 async def tutup_campaign_manual(session: AsyncSession, campaign: Campaign) -> Campaign:
     try:
-        _tutup(campaign, CampaignEvent.TUTUP_MANUAL)
+        advance_campaign(campaign, CampaignEvent.TUTUP_MANUAL)
     except IllegalTransition:
         raise ConflictError(
             "campaign_sudah_tertutup", "Campaign ini sudah tertutup."

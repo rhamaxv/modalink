@@ -1,11 +1,11 @@
 """Orkestrasi scoring: jalankan satu percobaan, dan picu ulang saat gagal
 (BR-70 sampai BR-78, D-09).
 
-Jembatan nilai antar-enum domain dan model muncul berulang di sini
-(_majukan_proposal, _majukan_scoring), seperti _tutup() di services/campaign.py:
-ProposalStatus/ScoringStatus di app.models.proposal adalah tipe kolom
-database, beda kelas dari pasangannya di app.domain.transitions yang dipakai
-mesin transisi, meski nilai stringnya sama.
+Jembatan nilai antar-enum domain dan model (ProposalStatus/ScoringStatus di
+app.models.proposal adalah tipe kolom database, beda kelas dari pasangannya
+di app.domain.transitions yang dipakai mesin transisi, meski nilai stringnya
+sama) tidak lagi ditulis di sini: dipusatkan di app/services/status.py
+(advance_proposal, advance_scoring), lihat docstring modul itu.
 """
 
 from collections.abc import AsyncIterator, Callable
@@ -20,32 +20,15 @@ from sqlmodel import select
 from app.ai.engine import CampaignLike, ScoringEngine
 from app.db.session import SessionLocal
 from app.domain.clock import Clock
-from app.domain.transitions import (
-    IllegalTransition,
-    ProposalEvent,
-    ScoringEvent,
-    apply_proposal,
-    apply_scoring,
-)
-from app.domain.transitions import ProposalStatus as DomainProposalStatus
-from app.domain.transitions import ScoringStatus as DomainScoringStatus
+from app.domain.transitions import IllegalTransition, ProposalEvent, ScoringEvent
 from app.domain.verdict import Verdict, decide_verdict, total_score
 from app.errors import ConflictError, NotFoundError
 from app.models.campaign import Campaign
 from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
 from app.models.scoring import ScoringResult, ScoringVerdict
+from app.services.status import advance_proposal, advance_scoring
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
-
-
-def _majukan_proposal(proposal: Proposal, event: ProposalEvent) -> None:
-    baru = apply_proposal(DomainProposalStatus(proposal.status.value), event)
-    proposal.status = ProposalStatus(baru.value)
-
-
-def _majukan_scoring(proposal: Proposal, event: ScoringEvent) -> None:
-    baru = apply_scoring(DomainScoringStatus(proposal.scoring_status.value), event)
-    proposal.scoring_status = ScoringStatus(baru.value)
 
 
 async def jalankan_scoring(
@@ -55,7 +38,7 @@ async def jalankan_scoring(
     if proposal is None or proposal.status is not ProposalStatus.SUBMITTED:
         return  # compare-and-set: job kedua tidak melakukan apa-apa (BR-75)
 
-    _majukan_scoring(proposal, ScoringEvent.AMBIL)  # T-50
+    advance_scoring(proposal, ScoringEvent.AMBIL)  # T-50
     await session.flush()
 
     campaign = await session.get(Campaign, proposal.campaign_id)
@@ -63,7 +46,7 @@ async def jalankan_scoring(
         # Praktis mustahil (FK menjamin keberadaannya), tapi mypy tidak tahu
         # itu; dianggap kegagalan teknis yang sama seperti exception di bawah,
         # bukan AttributeError yang bocor keluar jalur D-09.
-        _majukan_scoring(proposal, ScoringEvent.GAGAL)  # T-52
+        advance_scoring(proposal, ScoringEvent.GAGAL)  # T-52
         await session.flush()
         return
     mulai = clock.now()
@@ -78,7 +61,7 @@ async def jalankan_scoring(
         # schema, atau RuntimeError kunci API tidak ada semuanya harus jatuh
         # ke jalur yang sama (D-09, BR-74). proposal.status sengaja tidak
         # disentuh, hanya scoring_status.
-        _majukan_scoring(proposal, ScoringEvent.GAGAL)  # T-52
+        advance_scoring(proposal, ScoringEvent.GAGAL)  # T-52
         await session.flush()
         return
 
@@ -105,8 +88,8 @@ async def jalankan_scoring(
         if verdict is Verdict.LISTED
         else ProposalEvent.SCORING_GAGAL
     )
-    _majukan_proposal(proposal, event)
-    _majukan_scoring(proposal, ScoringEvent.SELESAI)  # T-51
+    advance_proposal(proposal, event)
+    advance_scoring(proposal, ScoringEvent.SELESAI)  # T-51
     await session.flush()
 
 
@@ -150,7 +133,7 @@ async def minta_rescore(session: AsyncSession, proposal: Proposal) -> None:
             "Rescore hanya bisa dilakukan saat penilaian sebelumnya gagal.",
         )
     try:
-        _majukan_scoring(proposal, ScoringEvent.NILAI_ULANG)  # T-53
+        advance_scoring(proposal, ScoringEvent.NILAI_ULANG)  # T-53
     except IllegalTransition:
         # Tidak seharusnya tercapai: proposal.scoring_status sudah dipastikan
         # FAILED di atas, dan FAILED->NILAI_ULANG selalu ada di SCORING_MAP.
