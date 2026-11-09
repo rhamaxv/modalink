@@ -1,0 +1,247 @@
+"use client";
+
+import { useId, useState } from "react";
+import { Field } from "@/components/ui/Field";
+import {
+  MIN_MILESTONES,
+  MilestonePlan,
+  totalMilestone,
+  type MilestoneDraft,
+} from "@/components/MilestonePlan";
+
+// Minimum panjang field sesuai .claude/prd/04-feature-umkm.md. Diekspor
+// supaya halaman pemanggil (umkm/proposal/baru) bisa menyusun pesan yang
+// sama tanpa mengetik ulang angkanya.
+export const MIN_BUSINESS_NAME = 3;
+export const MAX_BUSINESS_NAME = 120;
+export const MIN_BUSINESS_PROFILE = 100;
+export const MIN_FUND_USAGE_PLAN = 100;
+export const MIN_BUSINESS_PROJECTION = 50;
+// BR-12: requested_amount minimal Rp500.000.
+export const MIN_REQUESTED_AMOUNT = 500_000;
+
+export type ProposalSubmission = {
+  business_name: string;
+  business_profile: string;
+  requested_amount: number;
+  fund_usage_plan: string;
+  business_projection: string;
+  milestones: { title: string; description: string; amount: number }[];
+};
+
+type ProposalFormProps = {
+  /** Nilai awal dana yang diminta. Form tetap mengizinkan pengguna
+   *  mengubahnya; prop ini hanya titik mula, bukan nilai terkunci. */
+  requestedAmount?: number;
+  /** target_amount campaign, batas atas requested_amount (BR-11). */
+  maxAmount?: number;
+  /** Alasan form tidak bisa dikirim sama sekali, misal tenggat pengajuan
+   *  campaign sudah lewat (BR-17). Diperiksa dan ditampilkan sebelum
+   *  request dikirim, bukan menunggu jawaban server. */
+  disabledReason?: string;
+  submitting?: boolean;
+  onSubmit?: (payload: ProposalSubmission) => void;
+};
+
+function kurangKarakter(nilai: string, minimum: number): number {
+  return Math.max(0, minimum - nilai.trim().length);
+}
+
+export function ProposalForm({
+  requestedAmount,
+  maxAmount,
+  disabledReason,
+  submitting = false,
+  onSubmit,
+}: ProposalFormProps) {
+  const [businessName, setBusinessName] = useState("");
+  const [businessProfile, setBusinessProfile] = useState("");
+  const [requestedAmountInput, setRequestedAmountInput] = useState(
+    requestedAmount !== undefined ? String(requestedAmount) : "",
+  );
+  const [fundUsagePlan, setFundUsagePlan] = useState("");
+  const [businessProjection, setBusinessProjection] = useState("");
+  const [milestones, setMilestones] = useState<MilestoneDraft[]>(
+    Array.from({ length: MIN_MILESTONES }, () => ({ title: "", description: "", amount: "" })),
+  );
+  const [touched, setTouched] = useState(false);
+
+  const requestedAmountValue = Number(requestedAmountInput) || 0;
+  const milestoneTotal = totalMilestone(milestones);
+  const milestoneCocok = milestoneTotal === requestedAmountValue;
+
+  const kurangFundUsagePlan = kurangKarakter(fundUsagePlan, MIN_FUND_USAGE_PLAN);
+  const kurangBusinessProfile = kurangKarakter(businessProfile, MIN_BUSINESS_PROFILE);
+  const kurangBusinessProjection = kurangKarakter(businessProjection, MIN_BUSINESS_PROJECTION);
+  const namaUsahaKurangPanjang = businessName.trim().length < MIN_BUSINESS_NAME;
+  const jumlahDimintaTerlaluKecil = requestedAmountValue < MIN_REQUESTED_AMOUNT;
+  const jumlahDimintaMelebihiTarget =
+    maxAmount !== undefined && requestedAmountValue > maxAmount;
+
+  const formValid =
+    !namaUsahaKurangPanjang &&
+    kurangBusinessProfile === 0 &&
+    !jumlahDimintaTerlaluKecil &&
+    !jumlahDimintaMelebihiTarget &&
+    kurangFundUsagePlan === 0 &&
+    kurangBusinessProjection === 0 &&
+    milestoneCocok;
+
+  const tidakBisaDikirim = Boolean(disabledReason) || !formValid || submitting;
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setTouched(true);
+    if (tidakBisaDikirim) return;
+    onSubmit?.({
+      business_name: businessName,
+      business_profile: businessProfile,
+      requested_amount: requestedAmountValue,
+      fund_usage_plan: fundUsagePlan,
+      business_projection: businessProjection,
+      milestones: milestones.map((m) => ({
+        title: m.title,
+        description: m.description,
+        amount: Number(m.amount) || 0,
+      })),
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} noValidate className="flex max-w-none flex-col gap-space-5">
+      {disabledReason && (
+        <p
+          role="alert"
+          className="rounded-sm border border-warn bg-surface px-space-3 py-space-2 text-base leading-[1.6] text-warn"
+        >
+          {disabledReason}
+        </p>
+      )}
+
+      <Field label="Nama usaha" value={businessName} onChange={setBusinessName} required />
+      {touched && namaUsahaKurangPanjang && (
+        <p role="alert" className="text-[0.8125rem] text-danger">
+          Nama usaha minimal {MIN_BUSINESS_NAME} karakter.
+        </p>
+      )}
+
+      <TextAreaField
+        label="Profil usaha"
+        hint="Jenis usaha, lama berjalan, lokasi, jumlah pekerja."
+        value={businessProfile}
+        onChange={setBusinessProfile}
+        required
+      />
+      {touched && kurangBusinessProfile > 0 && (
+        <p role="alert" className="text-[0.8125rem] text-danger">
+          Profil usaha masih kurang {kurangBusinessProfile} karakter dari minimum {MIN_BUSINESS_PROFILE}.
+        </p>
+      )}
+
+      <Field
+        label="Jumlah dana yang diminta"
+        value={requestedAmountInput}
+        onChange={(value) => setRequestedAmountInput(value.replace(/[^0-9]/g, ""))}
+        required
+      />
+      {touched && jumlahDimintaTerlaluKecil && (
+        <p role="alert" className="text-[0.8125rem] text-danger">
+          Dana yang diminta minimal Rp500.000.
+        </p>
+      )}
+      {touched && jumlahDimintaMelebihiTarget && (
+        <p role="alert" className="text-[0.8125rem] text-danger">
+          Dana yang diminta tidak boleh melebihi target campaign.
+        </p>
+      )}
+
+      <TextAreaField
+        label="Rencana penggunaan dana"
+        hint="Rincian penggunaan dana per pos."
+        value={fundUsagePlan}
+        onChange={setFundUsagePlan}
+        required
+      />
+      {touched && kurangFundUsagePlan > 0 && (
+        <p role="alert" className="text-[0.8125rem] text-danger">
+          Rencana penggunaan dana masih kurang {kurangFundUsagePlan} karakter dari minimum {MIN_FUND_USAGE_PLAN}.
+        </p>
+      )}
+
+      <TextAreaField
+        label="Proyeksi usaha"
+        hint="Proyeksi omzet atau dampak."
+        value={businessProjection}
+        onChange={setBusinessProjection}
+        required
+      />
+      {touched && kurangBusinessProjection > 0 && (
+        <p role="alert" className="text-[0.8125rem] text-danger">
+          Proyeksi usaha masih kurang {kurangBusinessProjection} karakter dari minimum {MIN_BUSINESS_PROJECTION}.
+        </p>
+      )}
+
+      <div>
+        <h2 className="text-[1.125rem] font-semibold text-ink">Rencana milestone</h2>
+        <p className="mt-space-1 text-[0.8125rem] text-muted">
+          Jumlah seluruh tahap harus sama persis dengan dana yang diminta.
+        </p>
+        <div className="mt-space-3">
+          <MilestonePlan
+            requestedAmount={requestedAmountValue}
+            milestones={milestones}
+            onChange={setMilestones}
+          />
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={tidakBisaDikirim}
+        aria-busy={submitting}
+        className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-ink disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+      >
+        Kirim proposal
+      </button>
+    </form>
+  );
+}
+
+type TextAreaFieldProps = {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+};
+
+// Field (fase 10) hanya merender <input>, tidak <textarea>, dan field ini
+// bukan bagian dari file-file yang boleh disentuh stream ini. TextAreaField
+// mengulang kontrak aksesibilitas yang sama (htmlFor, aria-describedby)
+// khusus untuk area teks panjang di formulir proposal.
+function TextAreaField({ label, hint, value, onChange, required }: TextAreaFieldProps) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+  return (
+    <div className="flex flex-col gap-space-1">
+      <label htmlFor={id} className="text-[0.8125rem] font-medium text-muted">
+        {label}
+        {required && <span aria-hidden="true"> *</span>}
+      </label>
+      {hint && (
+        <p id={hintId} className="text-[0.8125rem] text-muted">
+          {hint}
+        </p>
+      )}
+      <textarea
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required={required}
+        aria-describedby={hint ? hintId : undefined}
+        rows={4}
+        className="min-h-[88px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink"
+      />
+    </div>
+  );
+}
