@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # and mock mode never does, so leaving it unset must not block startup.
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
-    gemini_timeout_s: int = 20
+    gemini_timeout_s: int = 60
 
 
 settings = Settings()

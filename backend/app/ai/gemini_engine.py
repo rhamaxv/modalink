@@ -70,9 +70,17 @@ class GeminiEngine:
         # dikenal yang dilempar balik sebagai TypeError pada tiap
         # pemanggilan. http_options di level client sudah diverifikasi
         # memangkas panggilan yang menggantung sesuai batas yang diminta.
+        # api_version="v1beta" wajib, bukan preferensi: Instructor meminta
+        # structured output lewat function calling, dan endpoint v1 menolaknya
+        # dengan 400 INVALID_ARGUMENT "Function calling is not enabled for api
+        # version v1". Kegagalannya hanya muncul dengan kunci sungguhan, jadi
+        # seluruh test bermock tetap hijau tanpa baris ini.
         client = genai.Client(
             api_key=settings.gemini_api_key,
-            http_options=types.HttpOptions(timeout=settings.gemini_timeout_s * 1000),
+            http_options=types.HttpOptions(
+                api_version="v1beta",
+                timeout=settings.gemini_timeout_s * 1000,
+            ),
         )
         return cls(
             client=client,
