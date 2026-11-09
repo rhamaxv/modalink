@@ -85,6 +85,7 @@ def full_scenario(
             EntryType.DISBURSEMENT_OUT,
             6_000_000,
             idempotency_key=f"disburse:{listed_proposal.id}:1",
+            clock=clock,
         )
         await _periksa()
         yield listed_proposal
@@ -95,6 +96,7 @@ def full_scenario(
             EntryType.DISBURSEMENT_OUT,
             4_000_000,
             idempotency_key=f"disburse:{listed_proposal.id}:2",
+            clock=clock,
         )
         await _periksa()
         yield listed_proposal
@@ -110,7 +112,7 @@ async def test_r2_invariants_hold_after_every_step_of_a_full_scenario(
 
 
 async def test_r2_calling_the_same_disbursement_twice_does_not_add_a_row(
-    db, funded_proposal
+    db, funded_proposal, clock
 ):
     key = f"disburse:{funded_proposal.id}:milestone-1"
 
@@ -120,6 +122,7 @@ async def test_r2_calling_the_same_disbursement_twice_does_not_add_a_row(
         EntryType.DISBURSEMENT_OUT,
         4_000_000,
         idempotency_key=key,
+        clock=clock,
     )
     kedua = await catat_entri(
         db,
@@ -127,6 +130,7 @@ async def test_r2_calling_the_same_disbursement_twice_does_not_add_a_row(
         EntryType.DISBURSEMENT_OUT,
         4_000_000,
         idempotency_key=key,
+        clock=clock,
     )
     assert pertama is not None
     assert kedua is None  # panggilan kedua dengan kunci yang sama tidak menambah baris
@@ -156,7 +160,9 @@ async def _ledger_fingerprint(db, proposal_id: UUID) -> frozenset[tuple]:
     return frozenset((e.id, e.entry_type, e.amount, e.idempotency_key) for e in entries)
 
 
-async def test_r2_ledger_rows_are_never_altered_after_insert(db, funded_proposal):
+async def test_r2_ledger_rows_are_never_altered_after_insert(
+    db, funded_proposal, clock
+):
     before = await _ledger_fingerprint(db, funded_proposal.id)
     await catat_entri(
         db,
@@ -164,6 +170,7 @@ async def test_r2_ledger_rows_are_never_altered_after_insert(db, funded_proposal
         EntryType.DISBURSEMENT_OUT,
         5_000_000,
         idempotency_key=f"disburse:{funded_proposal.id}:milestone-1",
+        clock=clock,
     )
     after = await _ledger_fingerprint(db, funded_proposal.id)
     assert before <= after, "ada baris lama yang berubah atau hilang"

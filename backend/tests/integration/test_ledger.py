@@ -34,13 +34,15 @@ async def test_br54_negative_entry_rejected_by_database(db, listed_proposal):
         await db.flush()
 
 
-async def test_br55_idempotency_key_prevents_duplicate_entry(db, listed_proposal):
+async def test_br55_idempotency_key_prevents_duplicate_entry(
+    db, listed_proposal, clock
+):
     kunci = f"pledge:{listed_proposal.id}"
     pertama = await catat_entri(
-        db, listed_proposal.id, EntryType.PLEDGE_IN, 5_000_000, kunci
+        db, listed_proposal.id, EntryType.PLEDGE_IN, 5_000_000, kunci, clock=clock
     )
     kedua = await catat_entri(
-        db, listed_proposal.id, EntryType.PLEDGE_IN, 5_000_000, kunci
+        db, listed_proposal.id, EntryType.PLEDGE_IN, 5_000_000, kunci, clock=clock
     )
     assert pertama is not None
     assert kedua is None  # panggilan kedua tidak menambah apa pun
@@ -53,7 +55,7 @@ async def test_br55_idempotency_key_prevents_duplicate_entry(db, listed_proposal
 
 
 async def test_br54_catat_entri_does_not_swallow_zero_amount_integrity_error(
-    db, listed_proposal
+    db, listed_proposal, clock
 ):
     """catat_entri hanya boleh menelan pelanggaran unique idempotency_key
     (BR-55). Pelanggaran CHECK (amount > 0, BR-54) wajib tetap meledak,
@@ -61,20 +63,37 @@ async def test_br54_catat_entri_does_not_swallow_zero_amount_integrity_error(
     berarti 'aman, sudah pernah tercatat'."""
     with pytest.raises(IntegrityError):
         await catat_entri(
-            db, listed_proposal.id, EntryType.PLEDGE_IN, 0, "uji:nol-ditelan"
+            db,
+            listed_proposal.id,
+            EntryType.PLEDGE_IN,
+            0,
+            "uji:nol-ditelan",
+            clock=clock,
         )
 
 
-async def test_br55_next_entry_after_duplicate_still_persists(db, listed_proposal):
+async def test_br55_next_entry_after_duplicate_still_persists(
+    db, listed_proposal, clock
+):
     """Savepoint (begin_nested) pada catat_entri wajib membatasi kerusakan ke
     entri yang gagal saja: transaksi luar tidak boleh ikut ter-abort, atau
     entri sah berikutnya di request yang sama akan ikut hilang."""
     kunci_duplikat = f"pledge:{listed_proposal.id}"
     await catat_entri(
-        db, listed_proposal.id, EntryType.PLEDGE_IN, 5_000_000, kunci_duplikat
+        db,
+        listed_proposal.id,
+        EntryType.PLEDGE_IN,
+        5_000_000,
+        kunci_duplikat,
+        clock=clock,
     )
     gagal = await catat_entri(
-        db, listed_proposal.id, EntryType.PLEDGE_IN, 5_000_000, kunci_duplikat
+        db,
+        listed_proposal.id,
+        EntryType.PLEDGE_IN,
+        5_000_000,
+        kunci_duplikat,
+        clock=clock,
     )
     assert gagal is None
 
@@ -84,6 +103,7 @@ async def test_br55_next_entry_after_duplicate_still_persists(db, listed_proposa
         EntryType.PLEDGE_IN,
         2_000_000,
         f"pledge-lain:{listed_proposal.id}",
+        clock=clock,
     )
     assert berikutnya is not None
     await db.flush()

@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from app.domain.clock import SystemClock
+from app.domain.clock import Clock
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.pledge import Pledge, PledgeStatus
 
@@ -29,12 +29,6 @@ KELUAR = {EntryType.REFUND_OUT, EntryType.DISBURSEMENT_OUT}
 # ditebak dari dokumentasi): tidak perlu menelusuri __cause__ untuk sampai ke
 # asyncpg.exceptions.UniqueViolationError di baliknya.
 SQLSTATE_UNIQUE_VIOLATION = "23505"
-
-# Instance tunggal dari Clock, bukan memanggil jam sistem langsung: catat_entri
-# tetap butuh jam meski pemanggil (termasuk test brief ini) tidak selalu
-# menyediakannya, jadi fallback-nya memakai Clock sungguhan, sama seperti
-# _clock di services/auth.py.
-_clock = SystemClock()
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +58,8 @@ async def catat_entri(
     entry_type: EntryType,
     amount: int,
     idempotency_key: str,
+    *,
+    clock: Clock,
     ref_type: str = "",
     ref_id: UUID | None = None,
     actor_id: UUID | None = None,
@@ -75,6 +71,15 @@ async def catat_entri(
     membuat Postgres mengabort seluruh transaksi luar ("current transaction
     is aborted"), sehingga satu entri duplikat menggagalkan seluruh request
     yang menumpangi sesi ini, bukan hanya entri yang gagal.
+
+    `clock` wajib diisi pemanggil (BR-60, review Finding 4), tidak ada
+    fallback ke SystemClock di sini. Sebelum ini modul punya `_clock`
+    sendiri terlepas dari clock yang disuntikkan permintaan HTTP: di bawah
+    VirtualClock, baris pledge/milestone tercatat dengan waktu virtual lewat
+    kolom created_at masing-masing, tapi entri ledger-nya tetap memakai
+    SystemClock, sehingga GET /internal/ledger/{id} -- yang diurutkan
+    created_at justru untuk diaudit juri -- bisa menampilkan refund lazy
+    expiry tertanggal SEBELUM deadline virtual yang memicunya.
     """
     entri = LedgerEntry(
         proposal_id=proposal_id,
@@ -84,7 +89,7 @@ async def catat_entri(
         ref_id=ref_id,
         actor_id=actor_id,
         idempotency_key=idempotency_key,
-        created_at=_clock.now(),
+        created_at=clock.now(),
     )
     try:
         async with session.begin_nested():

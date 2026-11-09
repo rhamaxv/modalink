@@ -17,6 +17,9 @@ from app.domain.clock import Clock
 from app.domain.funding import compute_funding_status, remaining_amount
 from app.domain.lead_investor import PledgeRingkas, pick_lead_investor
 from app.domain.money import format_rupiah
+from app.domain.transitions import PLEDGE_LOCKED_PROPOSAL_STATUSES
+from app.domain.transitions import ProposalEvent as DomainProposalEvent
+from app.domain.transitions import ProposalStatus as DomainProposalStatus
 from app.errors import ConflictError, NotFoundError, UnprocessableError
 from app.models.campaign import Campaign
 from app.models.ledger import EntryType
@@ -25,9 +28,24 @@ from app.models.proposal import Proposal, ProposalStatus
 from app.models.user import User
 from app.schemas.pledge import MIN_PLEDGE_AMOUNT
 from app.services.ledger import catat_entri, total_terkumpul_proposal
+from app.services.status import advance_proposal
 
 # BR-20: hanya proposal pada status ini yang boleh menerima pledge baru.
 FUNDABLE_PROPOSAL_STATUSES = {ProposalStatus.LISTED, ProposalStatus.PARTIALLY_FUNDED}
+
+# compute_funding_status (app/domain/funding.py) mengembalikan status TARGET
+# hasil hitungan murni dari jumlah dan waktu, bukan event -- ia tidak tahu
+# apa-apa soal status proposal SAAT INI. recompute_funding_status di bawah
+# menerjemahkannya balik jadi event supaya tetap bisa lewat advance_proposal
+# (lihat penjelasan panjang di badan fungsi). Hanya empat target yang pernah
+# dihasilkan compute_funding_status: REJECTED, SUBMITTED, dan COMPLETED bukan
+# bagian dari hitungan ini sama sekali.
+_FUNDING_EVENT_FOR: dict[DomainProposalStatus, DomainProposalEvent] = {
+    DomainProposalStatus.LISTED: DomainProposalEvent.PLEDGE_KOSONG,
+    DomainProposalStatus.PARTIALLY_FUNDED: DomainProposalEvent.PLEDGE_SEBAGIAN,
+    DomainProposalStatus.FUNDED: DomainProposalEvent.PLEDGE_PENUH,
+    DomainProposalStatus.FAILED: DomainProposalEvent.DEADLINE_LEWAT,
+}
 
 
 async def get_locked_proposal(session: AsyncSession, proposal_id: UUID) -> Proposal:
@@ -145,6 +163,7 @@ async def create_pledge(
         EntryType.PLEDGE_IN,
         amount,
         idempotency_key=f"pledge:{pledge.id}",
+        clock=clock,
         ref_type="pledge",
         ref_id=pledge.id,
         actor_id=investor.id,
@@ -172,10 +191,17 @@ async def cancel_pledge(
     ini. Window ini sudah dicoba dipaksa lewat forced interleaving 0.4 detik
     dan gagal direproduksi, justru karena pagar idempotensi itu yang menahan
     (review f06-b Finding 1)."""
-    if proposal.status is ProposalStatus.FUNDED:
+    # BR-25, review Finding 1: menolak hanya status FUNDED secara harfiah
+    # lolos begitu proposal maju ke completed (T-09 ada SETELAH funded, dan
+    # tidak pernah tertutup kembali). PLEDGE_LOCKED_PROPOSAL_STATUSES adalah
+    # closure dari PROPOSAL_MAP mulai dari FUNDED, bukan {FUNDED, COMPLETED}
+    # yang dieja tangan, supaya status baru yang ditambahkan sebagai hilir
+    # dari FUNDED otomatis ikut terkunci tanpa menyentuh baris ini lagi.
+    if DomainProposalStatus(proposal.status.value) in PLEDGE_LOCKED_PROPOSAL_STATUSES:
         raise ConflictError(
             "proposal_sudah_funded",
             "Pledge tidak bisa dibatalkan karena proposal sudah funded.",
+            detail={"current_status": proposal.status.value},
         )
     if pledge.status is not PledgeStatus.ACTIVE:
         raise ConflictError(
@@ -196,6 +222,7 @@ async def cancel_pledge(
         EntryType.REFUND_OUT,
         pledge.amount,
         idempotency_key=f"refund:{pledge.id}",
+        clock=clock,
         ref_type="pledge",
         ref_id=pledge.id,
         actor_id=pledge.investor_id,
@@ -255,14 +282,33 @@ async def recompute_funding_status(
 
     total = sum(p.amount for p in aktif)
 
-    # ProposalStatus(baru.value), bukan assignment langsung: compute_funding_status
-    # mengembalikan tipe app.domain.transitions.ProposalStatus, kelas berbeda
-    # dari tipe kolom app.models.proposal.ProposalStatus meski nilai stringnya
-    # sama (lihat catatan _majukan_proposal di services/scoring.py).
     baru = compute_funding_status(
         total, proposal.requested_amount, clock.now(), campaign.funding_deadline
     )
-    proposal.status = ProposalStatus(baru.value)
+    # Dulu baris ini adalah `proposal.status = ProposalStatus(baru.value)`
+    # langsung (review Finding 1b). compute_funding_status murni menghitung
+    # dari jumlah dan waktu -- ia tidak tahu, dan tidak BISA tahu, status
+    # proposal ini SEKARANG. Begitu proposal sudah completed dan seluruh
+    # pledge-nya dibatalkan satu-satu (lewat jalur yang semestinya sudah
+    # ditolak BR-25 di cancel_pledge di atas), total jadi 0 dan fungsi ini
+    # menghitung "listed", yang lalu ditimpa langsung ke kolom status tanpa
+    # pernah bertanya pada PROPOSAL_MAP apakah completed->listed itu sah.
+    # Jawabannya tidak, tapi assignment langsung tidak pernah bertanya.
+    #
+    # Rute lewat advance_proposal, bukan menambah pengecualian status
+    # terminal di sini: PROPOSAL_MAP sudah satu-satunya sumber kebenaran
+    # transisi (D-04), dan dari FUNDED atau COMPLETED tidak ada satu pun
+    # event pledge yang terdaftar di sana. advance_proposal akan melempar
+    # IllegalTransition kalau baris ini pernah dipanggil saat status sudah
+    # terkunci -- dibiarkan menjalar, bukan diredam, karena pemanggil yang
+    # sah (create_pledge lewat FUNDABLE_PROPOSAL_STATUSES, cancel_pledge
+    # lewat PLEDGE_LOCKED_PROPOSAL_STATUSES) seharusnya sudah menutup jalan
+    # ke sini sebelum fungsi ini pernah dipanggil; kalau masih sampai sini,
+    # itu pelanggaran invarian yang harus meledak, bukan status yang salah
+    # dan diam-diam tersimpan.
+    baru_model = ProposalStatus(baru.value)
+    if baru_model != proposal.status:
+        advance_proposal(proposal, _FUNDING_EVENT_FOR[baru])
 
     if proposal.status is ProposalStatus.FAILED:
         for p in aktif:
@@ -274,6 +320,7 @@ async def recompute_funding_status(
                 EntryType.REFUND_OUT,
                 p.amount,
                 idempotency_key=f"refund:{p.id}",
+                clock=clock,
                 ref_type="pledge",
                 ref_id=p.id,
                 actor_id=p.investor_id,
