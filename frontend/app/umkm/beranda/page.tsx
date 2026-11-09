@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, LoadingState, Nominal } from "@/components/ui";
 // diimpor langsung dari filenya tanpa mengubah barrel itu sendiri.
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ApiError, api } from "@/lib/api";
+import { ScorePanel, type ProposalScore } from "@/components/ScorePanel";
 
 type ProposalMine = {
   id: string;
@@ -158,31 +159,14 @@ function ProposalCard({ proposal }: { proposal: ProposalMine }) {
   );
 }
 
-type RedFlag = { code: string; severity: "info" | "warning" | "critical"; message: string; evidence: string };
-type ScoreResult = {
-  fit_score: number;
-  data_quality_score: number;
-  impact_score: number;
-  red_flags: RedFlag[];
-  brief: { strengths: string[]; risks: string[]; recommendation: string };
-};
-
-const SEVERITAS: Record<RedFlag["severity"], { label: string; kelas: string }> = {
-  critical: { label: "Kritis", kelas: "text-danger" },
-  warning: { label: "Peringatan", kelas: "text-warn" },
-  info: { label: "Info", kelas: "text-muted" },
-};
-
-// Pengganti sementara panel skor: PanelSkor (Task 1, stream A) belum ada di
-// worktree ini karena dikerjakan paralel. Tampilan ini memenuhi kontrak yang
-// sama (skor terurai, red flag berikut kutipannya, brief) dan sebaiknya
-// ditukar ke PanelSkor sungguhan saat digabung kembali ke main.
+// Fetch per proposal tinggal di sini, tampilannya diserahkan ke ScorePanel:
+// panel skor kedua akan menyimpang dari yang pertama begitu salah satunya diubah.
 function ScoreSummary({ proposalId }: { proposalId: string }) {
   const [percobaan, setPercobaan] = useState(0);
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "error"; message: string }
-    | { status: "siap"; data: ScoreResult }
+    | { status: "siap"; data: ProposalScore }
   >({ status: "loading" });
 
   useEffect(() => {
@@ -190,7 +174,7 @@ function ScoreSummary({ proposalId }: { proposalId: string }) {
     setState({ status: "loading" });
     (async () => {
       try {
-        const data = await api.get<ScoreResult>(`/proposals/${proposalId}/scoring`);
+        const data = await api.get<ProposalScore>(`/proposals/${proposalId}/scoring`);
         if (!batal) setState({ status: "siap", data });
       } catch (error) {
         if (!batal) {
@@ -213,49 +197,9 @@ function ScoreSummary({ proposalId }: { proposalId: string }) {
     return <ErrorState message={state.message} onRetry={() => setPercobaan((n) => n + 1)} />;
   }
 
-  const { fit_score, data_quality_score, impact_score, red_flags, brief } = state.data;
-  const total = fit_score + data_quality_score + impact_score;
-
   return (
     <div className="mt-space-3 border-t border-line pt-space-3">
-      <p className="text-[0.8125rem] font-medium text-muted">Skor penilaian AI</p>
-      <p className="tabular text-[1.75rem] font-semibold text-ink">{total}</p>
-      <dl className="mt-space-2 grid grid-cols-3 gap-space-3 text-[0.8125rem]">
-        <div>
-          <dt className="text-muted">Kecocokan</dt>
-          <dd className="tabular font-medium text-ink">{fit_score}/40</dd>
-        </div>
-        <div>
-          <dt className="text-muted">Kualitas data</dt>
-          <dd className="tabular font-medium text-ink">{data_quality_score}/30</dd>
-        </div>
-        <div>
-          <dt className="text-muted">Potensi dampak</dt>
-          <dd className="tabular font-medium text-ink">{impact_score}/30</dd>
-        </div>
-      </dl>
-
-      {red_flags.length > 0 && (
-        <div className="mt-space-3">
-          <p className="text-[0.8125rem] font-medium text-muted">Red flag</p>
-          <ul className="mt-space-1 flex flex-col gap-space-2">
-            {red_flags.map((flag) => (
-              <li key={flag.code} className="text-base leading-[1.6] text-ink">
-                <span className={`font-medium ${SEVERITAS[flag.severity].kelas}`}>
-                  {SEVERITAS[flag.severity].label}:
-                </span>{" "}
-                {flag.message}
-                <span className="block text-[0.8125rem] text-muted">&quot;{flag.evidence}&quot;</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="mt-space-3">
-        <p className="text-[0.8125rem] font-medium text-muted">Rekomendasi</p>
-        <p className="text-base leading-[1.6] text-ink">{brief.recommendation}</p>
-      </div>
+      <ScorePanel score={state.data} />
     </div>
   );
 }
