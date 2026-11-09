@@ -1,0 +1,18 @@
+{$DOMAIN} {
+	# app/main.py memasang router health di /health, bukan di bawah /api/v1,
+	# sedangkan gerbang keluar fase ini menuntut /api/v1/health bisa diakses
+	# juri. Blok ini harus berada sebelum handle /api/* karena Caddy memilih
+	# handle pertama yang cocok.
+	handle /api/v1/health {
+		rewrite * /health
+		reverse_proxy backend:8000
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
