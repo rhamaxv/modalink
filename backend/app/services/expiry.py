@@ -69,7 +69,9 @@ async def evaluasi_kedaluwarsa(
         ada_pledge_aktif = await session.scalar(
             select(func.count())
             .select_from(Pledge)
-            .where(Pledge.proposal_id == proposal.id, Pledge.status == PledgeStatus.ACTIVE)
+            .where(
+                Pledge.proposal_id == proposal.id, Pledge.status == PledgeStatus.ACTIVE
+            )
         )
         if not ada_pledge_aktif:
             return
