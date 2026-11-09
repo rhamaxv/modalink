@@ -682,6 +682,99 @@ git add backend/tests/regression/test_r3_happy_path.py
 git commit -m "feat: add end-to-end happy path regression suite"
 ```
 
+### Task 6: Empat endpoint baca yang dipakai frontend
+
+Task ini ada karena audit controller terhadap `10-api-contract.md` menemukan empat endpoint
+yang dideklarasikan kontrak tapi tidak dimiliki task mana pun di seluruh plan. Tiga di
+antaranya sudah dipanggil kode frontend yang selesai dibangun hari ini, jadi tanpa task ini
+halaman-halaman itu menerima 404 dan demo tidak berjalan.
+
+**Files:**
+- Modify: `backend/app/api/v1/proposals.py`, `backend/app/api/v1/pledges.py`
+- Create: `backend/app/api/v1/milestones.py` bila Task 3 belum membuatnya
+- Create: `backend/app/api/v1/internal.py`
+- Modify: `backend/app/schemas/` sesuai kebutuhan tiap respons
+- Test: `backend/tests/integration/test_read_endpoints.py`
+
+**Empat endpoint, dengan hak akses yang dipatok spec:**
+
+| Endpoint | Siapa boleh | Isi |
+| --- | --- | --- |
+| `GET /proposals/mine` | umkm | Proposal milik pengguna saat ini beserta statusnya |
+| `GET /proposals/{id}/pledges` | investor, pemilik proposal | Pledge **aktif** beserta nominal dan penanda lead investor |
+| `GET /proposals/{id}/milestones` | publik bila proposal publik | Milestone beserta status dan laporan terakhir |
+| `GET /internal/ledger/{proposal_id}` | lihat catatan di bawah | Seluruh entri ledger beserta saldo hasil penjumlahan |
+
+`10-api-contract.md` baris 57, 67, 73, dan 96 adalah otoritasnya. Kalau task ini dan baris
+itu berselisih, baris itu yang benar.
+
+**Dua hal yang paling mudah salah di sini:**
+
+`GET /proposals/{id}/pledges` mengembalikan pledge **aktif saja**, bukan seluruh riwayat.
+Pledge yang dibatalkan tidak muncul. Frontend sudah dibangun dengan asumsi itu, dan asumsi
+itu berasal dari kontrak, bukan dari kenyamanan.
+
+`GET /internal/ledger/{proposal_id}` menghitung saldo dengan **menjumlahkan entri**, tidak
+pernah membaca kolom saldo, karena kolom itu tidak ada dan tidak boleh ada (BR-51, D-03).
+Endpoint ini ada supaya juri bisa memeriksa bahwa uang benar-benar dicatat, jadi ia harus
+memperlihatkan entrinya satu per satu, bukan hanya angka akhirnya.
+
+**Soal akses `/internal/`.** Kontrak tidak menyebut perannya. Putuskan sendiri dan tulis
+alasannya di docstring, dengan dua batasan: ia tidak boleh membuka data satu pengguna ke
+pengguna lain yang tidak berhak melihatnya lewat jalur biasa, dan ia tidak boleh dilindungi
+oleh sesuatu yang di-hardcode. Kalau pilihanmu membuat endpoint ini terbuka, katakan
+terang-terangan di laporan supaya controller bisa menolaknya.
+
+- [ ] **Step 1: Tulis test yang gagal**
+
+Enam test, masing-masing bisa merah karena alasan berbeda:
+
+1. `GET /proposals/mine` mengembalikan hanya proposal milik akun yang masuk. Test ini wajib
+   membuat proposal untuk **dua** UMKM berbeda dan memastikan yang satu tidak melihat milik
+   yang lain. Satu UMKM saja akan lolos tanpa membuktikan apa pun.
+2. `GET /proposals/mine` ditolak untuk peran investor.
+3. `GET /proposals/{id}/pledges` menyembunyikan pledge yang dibatalkan. Test ini membuat dua
+   pledge, membatalkan satu, dan memeriksa panjang daftarnya, bukan hanya statusnya.
+4. `GET /proposals/{id}/pledges` menandai lead investor dengan benar, dan penandanya ikut
+   berpindah setelah pledge terbesar dibatalkan.
+5. `GET /proposals/{id}/milestones` memuat laporan terakhir, bukan laporan pertama, untuk
+   milestone yang laporannya pernah ditolak lalu dikirim ulang.
+6. `GET /internal/ledger/{proposal_id}` menghasilkan saldo yang sama dengan penjumlahan
+   manual atas entri yang ia kembalikan. Test ini membandingkan dua angka yang dihitung
+   dengan cara berbeda; itulah yang membuatnya berguna.
+
+- [ ] **Step 2: Jalankan test, pastikan gagal**
+
+Run: `cd backend && .venv/bin/pytest tests/integration/test_read_endpoints.py -v`
+Expected: keenamnya FAIL karena endpointnya belum ada. Catat outputnya.
+
+- [ ] **Step 3: Implementasi**
+
+Seluruh query hidup di `services/`, bukan di router. Pagar AST di
+`tests/unit/test_pagar_layering.py` memeriksa setiap file di `app/api/` dan akan menangkapmu.
+
+Hak akses dipasang lewat dependency, bukan lewat `if` di dalam handler, dan mengikuti pola
+yang sudah ada: **bukan pemilik mendapat 404, bukan 403**, karena 403 memberi tahu bahwa
+sumber dayanya ada. Pengecualiannya `GET /proposals/mine` yang ditolak karena peran, bukan
+karena kepemilikan, dan di situ 403 benar.
+
+- [ ] **Step 4: Perbarui RBAC_MATRIX, jalankan R5**
+
+Empat endpoint baru kali setiap peran, ditambah kasus "peran benar tapi bukan pemilik".
+R5 adalah regression yang menolak endpoint yang lupa didaftarkan, jadi angka barisnya harus
+naik. Catat angka sebelum dan sesudah.
+
+- [ ] **Step 5: Jalankan semuanya**
+
+Run: `make check && make test-regression`
+
+- [ ] **Step 6: Commit**
+
+Satu commit per endpoint kalau pengerjaannya terpisah, atau satu commit untuk keempatnya
+kalau dikerjakan bersama. Namai sesuai isinya.
+
+---
+
 ## Gerbang keluar fase 07
 
 - [ ] `make test` dan `make test-regression` hijau
