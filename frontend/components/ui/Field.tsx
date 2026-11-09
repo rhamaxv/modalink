@@ -37,7 +37,7 @@ export function Field({
   const errorId = `${id}-error`;
 
   return (
-    <div className="flex flex-col gap-ruang-1">
+    <div className="flex flex-col gap-space-1">
       <label htmlFor={id} className="text-[0.8125rem] font-medium text-muted">
         {label}
         {/* Tanda bintang hanya dekorasi visual; status wajib yang sungguh
@@ -52,7 +52,7 @@ export function Field({
           required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className="min-h-[44px] rounded-kecil border border-ink bg-paper px-ruang-3 py-ruang-2 text-base leading-[1.6] text-ink"
+          className="min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink"
         >
           {options.map((item) => (
             <option key={item.value} value={item.value}>
@@ -70,7 +70,7 @@ export function Field({
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           autoComplete={autoComplete}
-          className="min-h-[44px] rounded-kecil border border-ink bg-paper px-ruang-3 py-ruang-2 text-base leading-[1.6] text-ink"
+          className="min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink"
         />
       )}
       {error && (

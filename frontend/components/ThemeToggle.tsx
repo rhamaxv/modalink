@@ -68,7 +68,7 @@ export function ThemeToggle() {
       aria-pressed={theme === "dark"}
       // border-ink, bukan border-line: border-line hanya 1.27:1 terhadap
       // bg-surface/paper, gagal ambang 3:1 untuk batas elemen interaktif.
-      className="inline-flex min-h-[44px] items-center gap-ruang-2 rounded-kecil border border-ink px-ruang-3 py-ruang-2 text-base leading-[1.6] font-medium text-ink"
+      className="inline-flex min-h-[44px] items-center gap-space-2 rounded-sm border border-ink px-space-3 py-space-2 text-base leading-[1.6] font-medium text-ink"
     >
       {theme === "dark" ? "Tema: gelap" : "Tema: terang"}
     </button>

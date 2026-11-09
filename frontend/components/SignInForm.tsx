@@ -56,9 +56,9 @@ export function SignInForm() {
   }
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-ruang-4">
+    <form onSubmit={submit} noValidate className="flex flex-col gap-space-4">
       {formError && (
-        <p role="alert" className="rounded-kecil border border-danger bg-surface px-ruang-3 py-ruang-2 text-base leading-[1.6] text-danger">
+        <p role="alert" className="rounded-sm border border-danger bg-surface px-space-3 py-space-2 text-base leading-[1.6] text-danger">
           {formError}
         </p>
       )}
@@ -92,7 +92,7 @@ export function SignInForm() {
         // dan 3.62:1 di tema terang, gagal 4.5:1. Diganti pasangan token yang
         // sudah terukur lolos: --muted di atas --surface (6.25:1 terang,
         // 6.50:1 gelap).
-        className="min-h-[44px] rounded-kecil bg-accent px-ruang-4 py-ruang-2 text-base leading-[1.6] font-semibold text-ink disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+        className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-ink disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
       >
         Masuk
       </button>

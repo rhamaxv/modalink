@@ -10,15 +10,15 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
     <div
       role="alert"
-      className="flex flex-col items-start gap-ruang-3 rounded-kartu border border-danger bg-surface px-ruang-4 py-ruang-5 text-left"
+      className="flex flex-col items-start gap-space-3 rounded-card border border-danger bg-surface px-space-4 py-space-5 text-left"
     >
-      <p className="max-w-baca text-base leading-[1.6] text-danger">{message}</p>
+      <p className="max-w-measure text-base leading-[1.6] text-danger">{message}</p>
       <button
         type="button"
         onClick={onRetry}
         // border-ink, bukan border-line: border-line hanya 1.27:1 terhadap
         // bg-surface, gagal ambang 3:1 untuk batas elemen interaktif.
-        className="min-h-[44px] rounded-kecil border border-ink px-ruang-3 py-ruang-2 text-base leading-[1.6] font-semibold text-ink"
+        className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-base leading-[1.6] font-semibold text-ink"
       >
         Coba lagi
       </button>

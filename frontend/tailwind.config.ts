@@ -22,25 +22,25 @@ const config: Config = {
         warn: "var(--warn)",
         danger: "var(--danger)",
       },
-      // Nama bertitik "ruang-N" sengaja dipilih, bukan "1".."7" polos: menimpa skala
+      // Nama bertitik "space-N" sengaja dipilih, bukan "1".."7" polos: menimpa skala
       // angka bawaan Tailwind akan membuat p-3 dan p-4 berarti ganda (bawaan vs token),
       // sehingga komponen lain diam-diam memakai angka yang salah tanpa galat apa pun.
       spacing: {
-        "ruang-1": "var(--ruang-1)",
-        "ruang-2": "var(--ruang-2)",
-        "ruang-3": "var(--ruang-3)",
-        "ruang-4": "var(--ruang-4)",
-        "ruang-5": "var(--ruang-5)",
-        "ruang-6": "var(--ruang-6)",
-        "ruang-7": "var(--ruang-7)",
+        "space-1": "var(--space-1)",
+        "space-2": "var(--space-2)",
+        "space-3": "var(--space-3)",
+        "space-4": "var(--space-4)",
+        "space-5": "var(--space-5)",
+        "space-6": "var(--space-6)",
+        "space-7": "var(--space-7)",
       },
       borderRadius: {
-        kecil: "var(--radius-kecil)",
-        kartu: "var(--radius-kartu)",
+        sm: "var(--radius-sm)",
+        card: "var(--radius-card)",
         panel: "var(--radius-panel)",
       },
       maxWidth: {
-        baca: "var(--lebar-baca)",
+        measure: "var(--measure)",
       },
       // "--font-sans" diisi next/font di app/layout.tsx; fallback dipakai hanya
       // selama font belum selesai dimuat.

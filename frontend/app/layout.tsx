@@ -54,7 +54,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <a
           href="#konten-utama"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-kecil focus:bg-ink focus:px-3 focus:py-2 focus:text-paper"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-sm focus:bg-ink focus:px-3 focus:py-2 focus:text-paper"
         >
           Lewati ke konten utama
         </a>

@@ -11,7 +11,7 @@ type LoadingStateProps = {
   minHeight?: number;
 };
 
-// --ruang-7 dari DESIGN.md (96px): ruang cadangan default yang aman, bukan
+// --space-7 dari DESIGN.md (96px): ruang cadangan default yang aman, bukan
 // angka sembarang, saat pemanggil tidak tahu atau tidak peduli tinggi
 // konten sungguhannya.
 const DEFAULT_MIN_HEIGHT = 96;
@@ -26,7 +26,7 @@ export function LoadingState({ label, minHeight = DEFAULT_MIN_HEIGHT }: LoadingS
       role="status"
       aria-live="polite"
       style={{ minHeight: `${minHeight}px` }}
-      className="flex items-center gap-ruang-2 rounded-kartu border border-line bg-surface px-ruang-4 py-ruang-3 text-base leading-[1.6] text-muted"
+      className="flex items-center gap-space-2 rounded-card border border-line bg-surface px-space-4 py-space-3 text-base leading-[1.6] text-muted"
     >
       <span
         aria-hidden="true"

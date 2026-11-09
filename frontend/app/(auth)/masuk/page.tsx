@@ -10,10 +10,10 @@ export const metadata: Metadata = {
 // state form dan memanggil api, yang perlu jadi client component.
 export default function Masuk() {
   return (
-    <div className="mx-auto flex max-w-baca flex-col gap-ruang-5 px-ruang-3 py-ruang-6">
+    <div className="mx-auto flex max-w-measure flex-col gap-space-5 px-space-3 py-space-6">
       <div>
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold text-ink">Masuk</h1>
-        <p className="mt-ruang-2 text-base leading-[1.6] text-muted">
+        <p className="mt-space-2 text-base leading-[1.6] text-muted">
           Masuk untuk melihat proposal, pledge, dan dashboard Anda.
         </p>
       </div>
