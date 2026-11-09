@@ -256,9 +256,13 @@ async def test_seed_is_idempotent_second_call_leaves_row_counts_unchanged(client
         ScoringResult,
     ]
 
+    # Tidak diassert bahwa panggilan pertama melaporkan belum pernah disemai:
+    # database test dibagi beberapa test yang sengaja commit baris sungguhan,
+    # dan `python -m app.seed` bisa sudah dijalankan terhadapnya. Klaim yang
+    # sebenarnya dijaga test ini adalah "dijalankan dua kali tidak menambah
+    # apa pun", dan itu benar entah database sudah disemai atau belum.
     res_pertama = await client.post("/api/v1/internal/seed")
     assert res_pertama.status_code == 200
-    assert res_pertama.json()["sudah_pernah_disemai"] is False
     jumlah_sebelum = {m: await _jumlah_baris(db, m) for m in tabel}
 
     res_kedua = await client.post("/api/v1/internal/seed")
