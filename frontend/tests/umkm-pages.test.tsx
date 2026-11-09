@@ -93,15 +93,22 @@ describe("umkm beranda", () => {
 });
 
 describe("umkm proposal submission", () => {
+  // GET /campaigns membungkus daftarnya dalam { items: [...] }
+  // (backend/app/schemas/campaign.py: CampaignListOut), bukan array mentah.
+  // Mock ini dulu memakai array mentah, yang lolos tsc dan test unit tapi
+  // mengkonfirmasi bentuk yang salah: halaman sungguhan melempar TypeError
+  // terhadap backend asli (laporan Fase 11 Task 12).
   function mockCampaigns(overrides: Partial<{ apply_deadline: string }> = {}) {
-    vi.mocked(api.get).mockResolvedValueOnce([
-      {
-        id: "c1",
-        title: "UMKM Kuliner Jabodetabek",
-        target_amount: 50_000_000,
-        apply_deadline: overrides.apply_deadline ?? "2099-01-01T00:00:00Z",
-      },
-    ]);
+    vi.mocked(api.get).mockResolvedValueOnce({
+      items: [
+        {
+          id: "c1",
+          title: "UMKM Kuliner Jabodetabek",
+          target_amount: 50_000_000,
+          apply_deadline: overrides.apply_deadline ?? "2099-01-01T00:00:00Z",
+        },
+      ],
+    });
   }
 
   it("refuses submission to a campaign whose apply deadline has passed, stating the reason before sending", async () => {

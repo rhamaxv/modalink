@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { clearToken, getToken } from "./token";
 
 export type Role = "investor" | "umkm" | "community";
 
@@ -10,33 +11,12 @@ export type CurrentUser = {
   created_at: string;
 };
 
-const TOKEN_KEY = "modalink_token";
-
-// "undefined" pernah benar-benar tersimpan di localStorage karena bug di
-// fase 10 (kode lama menulis String(undefined) saat login gagal diam-diam).
-// Token semacam itu harus diperlakukan sama dengan tidak ada token sama
-// sekali, bukan dikirim ke server dan membuat seluruh halaman menampilkan
-// galat 401 yang membingungkan.
-function tokenSah(token: string | null): token is string {
-  return typeof token === "string" && token.length > 0 && token !== "undefined";
-}
-
-export function getToken(): string | null {
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    return tokenSah(token) ? token : null;
-  } catch {
-    return null;
-  }
-}
-
-export function clearToken(): void {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // Tidak ada localStorage untuk dibersihkan; tidak ada yang perlu dilakukan.
-  }
-}
+// getToken/clearToken sekarang didefinisikan di lib/token.ts, bukan di sini:
+// lib/api.ts juga butuh pagar "token sah" yang sama persis untuk header
+// Authorization (laporan Fase 11 Task 12), dan mengimpornya langsung dari
+// modul ini akan membuat lib/api.ts dan lib/auth.ts saling mengimpor. Re-ekspor
+// di sini supaya pemanggil yang sudah ada (AppHeader, dll.) tidak perlu berubah.
+export { clearToken, getToken };
 
 /** Alias baca: menghapus token adalah seluruh pekerjaan "keluar" di sisi klien. */
 export function signOut(): void {

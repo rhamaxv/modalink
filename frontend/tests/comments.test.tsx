@@ -36,10 +36,10 @@ describe("comment form", () => {
       "/comments": () =>
         fakeResponse(201, {
           id: "c9",
-          author_name: "Budi",
+          proposal_id: "p1",
+          user_id: "u-saya",
           body: "Usahanya meyakinkan.",
           created_at: "2026-11-07T10:00:00Z",
-          is_mine: true,
         }),
     });
     render(<CommentForm proposalId="p1" onKirim={onKirim} />);
@@ -70,27 +70,33 @@ describe("comment list", () => {
 
   it("shows an empty state naming the cause and one action when there are no comments yet", async () => {
     stubFetchByUrl({
-      "/comments": () => fakeResponse(200, { items: [], vote_count: 0, voted_by_me: false }),
+      "/comments": () => fakeResponse(200, { items: [] }),
     });
     render(<CommentList proposalId="p1" />);
     expect(await screen.findByText(/belum ada yang berkomentar/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /tulis komentar/i })).toBeInTheDocument();
   });
 
-  it("shows the vote button as already pressed via aria-pressed, not colour alone", async () => {
+  // CommentListOut (backend/app/schemas/community.py) tidak mengirim
+  // vote_count atau voted_by_me sama sekali: ini bukan hipotesis, tapi
+  // bentuk persis skema di backend. Memuat halaman karenanya tidak pernah
+  // bisa tahu dari respons ini apakah pengguna sudah vote; satu-satunya
+  // sumber kebenaran untuk itu adalah respons POST /vote sendiri sesudah
+  // pengguna menekan tombolnya (lihat test "toggles the vote" di bawah).
+  it("never lies about the vote state on load: it starts unpressed with no fabricated count", async () => {
     stubFetchByUrl({
-      "/comments": () => fakeResponse(200, { items: [], vote_count: 5, voted_by_me: true }),
+      "/comments": () => fakeResponse(200, { items: [] }),
     });
     render(<CommentList proposalId="p1" />);
     const voteButton = await screen.findByRole("button", { name: /dukung/i });
-    expect(voteButton).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText(/5/)).toBeInTheDocument();
+    expect(voteButton).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(/belum tersedia/i)).toBeInTheDocument();
   });
 
   it("toggles the vote and updates the count when clicked", async () => {
     stubFetchByUrl({
       "/vote": () => fakeResponse(200, { voted: true, vote_count: 6 }),
-      "/comments": () => fakeResponse(200, { items: [], vote_count: 5, voted_by_me: false }),
+      "/comments": () => fakeResponse(200, { items: [] }),
     });
     render(<CommentList proposalId="p1" />);
     const voteButton = await screen.findByRole("button", { name: /dukung/i });
@@ -100,32 +106,32 @@ describe("comment list", () => {
     expect(screen.getByText(/6/)).toBeInTheDocument();
   });
 
-  it("shows the delete button only on the comment that belongs to the signed-in account", async () => {
+  it("shows the delete button only on the comment that belongs to the signed-in account, matched by user_id", async () => {
     stubFetchByUrl({
       "/comments": () =>
         fakeResponse(200, {
-          vote_count: 0,
-          voted_by_me: false,
           items: [
-            {
-              id: "c1",
-              author_name: "Budi",
-              body: "Komentar milik saya.",
-              created_at: "2026-11-07T10:00:00Z",
-              is_mine: true,
-            },
-            {
-              id: "c2",
-              author_name: "Siti",
-              body: "Komentar orang lain.",
-              created_at: "2026-11-07T11:00:00Z",
-              is_mine: false,
-            },
+            { id: "c1", proposal_id: "p1", user_id: "u-saya", body: "Komentar milik saya.", created_at: "2026-11-07T10:00:00Z" },
+            { id: "c2", proposal_id: "p1", user_id: "u-lain", body: "Komentar orang lain.", created_at: "2026-11-07T11:00:00Z" },
+          ],
+        }),
+    });
+    render(<CommentList proposalId="p1" currentUserId="u-saya" />);
+    await screen.findByText("Komentar milik saya.");
+    expect(screen.getAllByRole("button", { name: /hapus komentar/i })).toHaveLength(1);
+  });
+
+  it("shows no delete button at all for an anonymous visitor (no currentUserId)", async () => {
+    stubFetchByUrl({
+      "/comments": () =>
+        fakeResponse(200, {
+          items: [
+            { id: "c1", proposal_id: "p1", user_id: "u-saya", body: "Komentar siapa pun.", created_at: "2026-11-07T10:00:00Z" },
           ],
         }),
     });
     render(<CommentList proposalId="p1" />);
-    await screen.findByText("Komentar milik saya.");
-    expect(screen.getAllByRole("button", { name: /hapus komentar/i })).toHaveLength(1);
+    await screen.findByText("Komentar siapa pun.");
+    expect(screen.queryByRole("button", { name: /hapus komentar/i })).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { CommentForm } from "@/components/CommentForm";
 import { CommentList } from "@/components/CommentList";
 import { FundingBar } from "@/components/FundingBar";
@@ -10,7 +11,8 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Nominal } from "@/components/ui/Nominal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { ApiError, api } from "@/lib/api";
+import { ApiError, api, daftarDariRespons } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 
 type ProposalStatus =
   | "submitted"
@@ -92,7 +94,9 @@ type ProposalDetailViewProps = {
 export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
   const [proposal, setProposal] = useState<Keadaan<ProposalOut>>({ status: "loading" });
   const [score, setScore] = useState<Keadaan<ProposalScore> | { status: "forbidden" } | null>(null);
-  const [pledges, setPledges] = useState<Keadaan<PledgeOut[]>>({ status: "loading" });
+  const [pledges, setPledges] = useState<Keadaan<PledgeOut[]> | { status: "forbidden" }>({
+    status: "loading",
+  });
   const [milestones, setMilestones] = useState<Keadaan<MilestoneOut[]>>({ status: "loading" });
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [jumlahKomentarBaru, setJumlahKomentarBaru] = useState(0);
@@ -109,19 +113,33 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
 
   const muatPledges = useCallback(async () => {
     setPledges({ status: "loading" });
+    const jalur = `/proposals/${proposalId}/pledges`;
     try {
-      const data = await api.get<{ items: PledgeOut[] }>(`/proposals/${proposalId}/pledges`);
-      setPledges({ status: "done", data: data.items });
+      const items = daftarDariRespons<PledgeOut>(await api.get(jalur), jalur);
+      setPledges({ status: "done", data: items });
     } catch (error) {
-      setPledges({ status: "error", message: pesanGalat(error) });
+      // GET .../pledges (10-api-contract.md:67) hanya untuk investor atau
+      // pemilik proposal: pengunjung anonim (401, tidak ada token) dan
+      // komunitas (403, peran tidak berhak) selalu ditolak di sini, bukan
+      // kasus langka. Sebelumnya keduanya jatuh ke cabang "error" dan
+      // menampilkan pesan mentah server ("Token tidak ada.") tepat di
+      // tempat bilah funding seharusnya berada -- justru di halaman yang
+      // pertama dilihat pengunjung tanpa akun lewat /jelajah (laporan Fase
+      // 11 Task 12, ditemukan lewat e2e jalur anonim, bukan diasumsikan).
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        setPledges({ status: "forbidden" });
+      } else {
+        setPledges({ status: "error", message: pesanGalat(error) });
+      }
     }
   }, [proposalId]);
 
   const muatMilestones = useCallback(async () => {
     setMilestones({ status: "loading" });
+    const jalur = `/proposals/${proposalId}/milestones`;
     try {
-      const data = await api.get<{ items: MilestoneOut[] }>(`/proposals/${proposalId}/milestones`);
-      setMilestones({ status: "done", data: data.items });
+      const items = daftarDariRespons<MilestoneOut>(await api.get(jalur), jalur);
+      setMilestones({ status: "done", data: items });
     } catch (error) {
       setMilestones({ status: "error", message: pesanGalat(error) });
     }
@@ -139,13 +157,12 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
   // token) tidak memicu permintaan ini sama sekali: GET /proposals/{id}
   // publik untuk proposal listed ke atas (10-api-contract.md).
   useEffect(() => {
-    let token: string | null = null;
-    try {
-      token = localStorage.getItem("modalink_token");
-    } catch {
-      token = null;
-    }
-    if (!token) return;
+    // getToken() dari lib/auth.ts, bukan localStorage.getItem mentah: itu
+    // menolak token kosong dan literal "undefined" (lihat lib/token.ts).
+    // Sebelumnya baris ini membaca localStorage langsung, jadi token rusak
+    // yang mestinya berarti "anggap belum masuk" malah memicu permintaan
+    // /auth/me yang pasti gagal (laporan Fase 11 Task 12).
+    if (!getToken()) return;
     api
       .get<CurrentUser>("/auth/me")
       .then((user) => setCurrentUser(user))
@@ -170,7 +187,11 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
       })
       .catch((error) => {
         if (dibatalkan) return;
-        if (error instanceof ApiError && error.status === 403) {
+        // 401 (tidak ada token) diperlakukan sama dengan 403 (peran
+        // komunitas): keduanya berarti "akun ini tidak berhak melihat skor"
+        // (jaga_akses_scoring_milik_sendiri di backend), bukan galat server
+        // yang perlu ditampilkan mentah (laporan Fase 11 Task 12).
+        if (error instanceof ApiError && (error.status === 403 || error.status === 401)) {
           setScore({ status: "forbidden" });
         } else {
           setScore({ status: "error", message: pesanGalat(error) });
@@ -246,6 +267,12 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
           lebih padat (bilah + daftar), bukan hanya label berbeda. */}
       <section data-pola="bilah-lebar-penuh" className="flex flex-col gap-space-4 border-t border-line pt-space-4">
         {pledges.status === "loading" && <LoadingState label="Memuat progres funding" minHeight={120} />}
+        {pledges.status === "forbidden" && (
+          <p className="max-w-measure text-base leading-[1.6] text-muted">
+            Masuk sebagai investor, atau sebagai UMKM pemilik proposal ini, untuk melihat progres
+            pendanaan dan daftar pendana.
+          </p>
+        )}
         {pledges.status === "error" && <ErrorState message={pledges.message} onRetry={muatPledges} />}
         {pledges.status === "done" && (
           <>
@@ -355,6 +382,26 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
                   <div className="flex items-center gap-space-3">
                     <Nominal label="" nominal={milestone.amount} ukuran="sedang" />
                     <StatusBadge status={milestone.status} />
+                    {/* Satu-satunya jalan masuk di produk ini ke
+                        /umkm/milestone/[id]/lapor: halaman itu tidak punya
+                        endpoint untuk mengambil satu milestone lewat idnya
+                        sendiri, jadi ia bergantung pada query ?proposal=
+                        (lihat app/umkm/milestone/[id]/lapor/page.tsx).
+                        Sebelum tautan ini ada, halaman tersebut hanya bisa
+                        dicapai dengan mengetik URL manual -- ditemukan lewat
+                        e2e Fase 11 Task 12, bukan diasumsikan. Tahap 1 tidak
+                        pernah tampil di sini (BR-41: tidak perlu laporan). */}
+                    {currentUser?.id === data.umkm_id &&
+                      milestone.id === milestoneAktifId &&
+                      milestone.status === "pending" &&
+                      milestone.seq > 1 && (
+                        <Link
+                          href={`/umkm/milestone/${milestone.id}/lapor?proposal=${proposalId}`}
+                          className="text-base font-medium text-ink underline"
+                        >
+                          Lapor progres
+                        </Link>
+                      )}
                   </div>
                 </li>
               ))}
@@ -373,7 +420,11 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
             mengambil datanya sendiri), jadi ini satu-satunya titik
             penghubung di antara keduanya, dan letaknya di sini, bukan di
             dalam salah satu komponen itu. */}
-        <CommentList key={jumlahKomentarBaru} proposalId={proposalId} />
+        <CommentList
+          key={jumlahKomentarBaru}
+          proposalId={proposalId}
+          currentUserId={currentUser?.id ?? null}
+        />
         <div id="form-komentar">
           <CommentForm proposalId={proposalId} onKirim={() => setJumlahKomentarBaru((n) => n + 1)} />
         </div>

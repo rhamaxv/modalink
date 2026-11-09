@@ -57,6 +57,7 @@ type FetchMap = {
   scoring?: unknown;
   scoringStatus?: number;
   pledges?: unknown;
+  pledgesStatus?: number;
   milestones?: unknown;
   comments?: unknown;
   me?: unknown;
@@ -78,13 +79,16 @@ function stubEndpoints(map: FetchMap) {
       return fakeResponse(map.scoringStatus ?? 200, map.scoring ?? baseScore());
     }
     if (url.endsWith("/pledges")) {
-      return fakeResponse(200, map.pledges ?? { items: [] });
+      return fakeResponse(
+        map.pledgesStatus ?? 200,
+        map.pledges ?? { items: [] },
+      );
     }
     if (url.endsWith("/milestones")) {
       return fakeResponse(200, map.milestones ?? { items: [] });
     }
     if (url.endsWith("/comments")) {
-      return fakeResponse(200, map.comments ?? { items: [], vote_count: 0, voted_by_me: false });
+      return fakeResponse(200, map.comments ?? { items: [] });
     }
     if (url.includes(`/proposals/${PROPOSAL_ID}`)) {
       return fakeResponse(map.proposalStatus ?? 200, map.proposal ?? baseProposal());
@@ -160,6 +164,35 @@ describe("proposal detail page", () => {
     await screen.findByText("73");
     expect(screen.getByRole("button", { name: /danai/i })).toBeInTheDocument();
   });
+
+  // GET .../pledges dan GET .../scoring (10-api-contract.md:59,67) menolak
+  // pemanggil tanpa token dengan 401 "Token tidak ada." -- bukan kasus
+  // langka: ini persis apa yang terjadi saat seorang juri tanpa akun
+  // membuka /jelajah lalu mengklik satu proposal, jalur paling umum ke
+  // halaman ini. Sebelumnya pesan 401 mentah itu tampil persis di tempat
+  // bilah funding dan panel skor seharusnya berada (laporan Fase 11 Task
+  // 12, ditemukan lewat e2e jalur anonim karena tidak ada test unit yang
+  // pernah merender komponen ini tanpa token di localStorage sebelumnya).
+  it("never shows a raw 401 where the funding bar or score panel belong, for a visitor with no account", async () => {
+    stubEndpoints({
+      pledgesStatus: 401,
+      pledges: { error: { code: "tidak_terautentikasi", message: "Token tidak ada." } },
+      scoringStatus: 401,
+      scoring: { error: { code: "tidak_terautentikasi", message: "Token tidak ada." } },
+    });
+    // Sengaja tidak menyetel modalink_token: ini pengunjung anonim.
+    render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
+
+    await screen.findByRole("heading", { name: /kopi rakyat nusantara/i });
+    // findByText, bukan getByText: pledges dan scoring diambil lewat efek
+    // terpisah yang baru terpicu dan baru gagal (lalu memutuskan "forbidden")
+    // beberapa microtask setelah heading proposal sendiri sudah tampil, jadi
+    // memeriksa dengan getByText yang sinkron sempat flaky di sini.
+    await screen.findByText(/masuk sebagai investor, atau sebagai umkm pemilik proposal ini/i);
+    await screen.findByText(/panel skor hanya terlihat oleh investor/i);
+    expect(screen.queryByText(/token tidak ada/i)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });
 
 describe("composition rhythm (RHYTHM 3)", () => {
@@ -176,9 +209,7 @@ describe("composition rhythm (RHYTHM 3)", () => {
         ],
       },
       comments: {
-        items: [{ id: "c1", author_name: "Budi", body: "Mantap.", created_at: "2026-11-02T00:00:00Z", is_mine: false }],
-        vote_count: 2,
-        voted_by_me: false,
+        items: [{ id: "c1", proposal_id: PROPOSAL_ID, user_id: "u-lain", body: "Mantap.", created_at: "2026-11-02T00:00:00Z" }],
       },
     });
     localStorage.setItem("modalink_token", "token-palsu");

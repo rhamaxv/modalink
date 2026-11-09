@@ -26,12 +26,17 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// GET /proposals/{id}/milestones membungkus daftarnya dalam { items: [...] }
+// (backend/app/schemas/proposal.py: MilestoneListOut), bukan array mentah.
+// Mock-mock di berkas ini dulu memakai array mentah, yang lolos tsc dan test
+// unit tapi mengkonfirmasi bentuk yang salah: halaman sungguhan melempar
+// TypeError terhadap backend asli (laporan Fase 11 Task 12).
 describe("milestone report page", () => {
   it("shows no report form for seq 1 but a report form for seq 2", async () => {
     const tahap1 = { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "pending", last_report: null };
     const tahap2 = { id: "m2", seq: 2, title: "Tahap 2", amount: 5_000_000, status: "pending", last_report: null };
     const milestones = [tahap1, tahap2];
-    vi.mocked(api.get).mockImplementation(async () => milestones.map((m) => ({ ...m })));
+    vi.mocked(api.get).mockImplementation(async () => ({ items: milestones.map((m) => ({ ...m })) }));
 
     setRoute("m1");
     const seq1 = render(<MilestoneLapor />);
@@ -50,10 +55,12 @@ describe("milestone report page", () => {
   });
 
   it("names the unmet prerequisite and keeps the report form unreachable", async () => {
-    vi.mocked(api.get).mockResolvedValue([
-      { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "pending", last_report: null },
-      { id: "m2", seq: 2, title: "Tahap 2", amount: 5_000_000, status: "pending", last_report: null },
-    ]);
+    vi.mocked(api.get).mockResolvedValue({
+      items: [
+        { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "pending", last_report: null },
+        { id: "m2", seq: 2, title: "Tahap 2", amount: 5_000_000, status: "pending", last_report: null },
+      ],
+    });
     setRoute("m2");
     render(<MilestoneLapor />);
     expect(await screen.findByText(/tahap 1.*belum cair/i)).toBeInTheDocument();
@@ -61,17 +68,19 @@ describe("milestone report page", () => {
   });
 
   it("names the pending review status and refuses to resend an already submitted report", async () => {
-    vi.mocked(api.get).mockResolvedValue([
-      { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "disbursed", last_report: null },
-      {
-        id: "m2",
-        seq: 2,
-        title: "Tahap 2",
-        amount: 5_000_000,
-        status: "reported",
-        last_report: { id: "r1", narrative: "Progres bulan ini...", status: "pending_review", rejection_note: null },
-      },
-    ]);
+    vi.mocked(api.get).mockResolvedValue({
+      items: [
+        { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "disbursed", last_report: null },
+        {
+          id: "m2",
+          seq: 2,
+          title: "Tahap 2",
+          amount: 5_000_000,
+          status: "reported",
+          last_report: { id: "r1", narrative: "Progres bulan ini...", status: "pending_review", rejection_note: null },
+        },
+      ],
+    });
     setRoute("m2");
     render(<MilestoneLapor />);
     expect((await screen.findAllByText(/menunggu review/i)).length).toBeGreaterThan(0);

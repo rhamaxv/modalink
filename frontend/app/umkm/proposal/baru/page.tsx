@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState, ErrorState, Field, LoadingState } from "@/components/ui";
 import { ProposalForm, type ProposalSubmission } from "@/components/ProposalForm";
-import { ApiError, api } from "@/lib/api";
+import { ApiError, api, daftarDariRespons } from "@/lib/api";
 
 type Campaign = {
   id: string;
@@ -31,7 +31,16 @@ export default function ProposalBaru() {
   const muat = useCallback(async () => {
     setMuatan({ status: "loading" });
     try {
-      const campaigns = await api.get<Campaign[]>("/campaigns");
+      // GET /campaigns membungkus daftarnya dalam { items: [...] }
+      // (backend/app/schemas/campaign.py: CampaignListOut), bukan array
+      // mentah. Sebelumnya field ini dibaca seolah array langsung, yang di
+      // browser sungguhan melempar TypeError saat .find dipanggil pada objek
+      // di bawah (lihat laporan Fase 11 Task 12: ditemukan lewat e2e
+      // terhadap backend asli, bukan test unit yang pernah memock bentuk
+      // ini). daftarDariRespons melempar ApiError yang jelas kalau bentuknya
+      // pernah menyimpang lagi, bukan membiarkan .find di bawah ini gagal
+      // diam-diam beberapa baris kemudian.
+      const campaigns = daftarDariRespons<Campaign>(await api.get("/campaigns"), "/campaigns");
       setMuatan({ status: "siap", campaigns });
       const pertama = campaigns[0];
       if (pertama) setCampaignId((current) => current || pertama.id);

@@ -46,9 +46,14 @@ async function mockProposalLengkap(page: Page, status: "listed" | "funded" = "li
   };
   let voted = false;
   let voteCount = 5;
+  // Bentuk ini mengikuti CommentOut persis (backend/app/schemas/community.py):
+  // user_id, bukan author_name/is_mine. "/auth/me" di bawah mengembalikan
+  // id "u-investor-1", jadi komentar c2 (user_id sama) adalah "milik saya"
+  // bagi CommentList, bukan lewat field is_mine yang tidak pernah ada di
+  // backend sungguhan (laporan Fase 11 Task 12).
   const comments = [
-    { id: "c1", author_name: "Siti", body: "Usahanya meyakinkan.", created_at: "2026-11-02T00:00:00Z", is_mine: false },
-    { id: "c2", author_name: "Saya", body: "Komentar milik saya sendiri.", created_at: "2026-11-03T00:00:00Z", is_mine: true },
+    { id: "c1", proposal_id: PROPOSAL_ID, user_id: "u-investor-9", body: "Usahanya meyakinkan.", created_at: "2026-11-02T00:00:00Z" },
+    { id: "c2", proposal_id: PROPOSAL_ID, user_id: "u-investor-1", body: "Komentar milik saya sendiri.", created_at: "2026-11-03T00:00:00Z" },
   ];
 
   await page.route("**/api/v1/**", async (route) => {
@@ -84,9 +89,9 @@ async function mockProposalLengkap(page: Page, status: "listed" | "funded" = "li
       voteCount += voted ? 1 : -1;
       return json({ voted, vote_count: voteCount });
     }
-    if (url.endsWith("/comments") && method === "GET") return json({ items: comments, vote_count: voteCount, voted_by_me: voted });
+    if (url.endsWith("/comments") && method === "GET") return json({ items: comments });
     if (url.endsWith("/comments") && method === "POST") {
-      return json({ id: "c3", author_name: "Saya", body: "Komentar baru dari uji e2e.", created_at: "2026-11-09T00:00:00Z", is_mine: true }, 201);
+      return json({ id: "c3", proposal_id: PROPOSAL_ID, user_id: "u-investor-1", body: "Komentar baru dari uji e2e.", created_at: "2026-11-09T00:00:00Z" }, 201);
     }
     if (url.includes("/comments/") && method === "DELETE") return route.fulfill({ status: 204, body: "" });
     if (url.endsWith(`/proposals/${PROPOSAL_ID}`)) return json(proposal);
