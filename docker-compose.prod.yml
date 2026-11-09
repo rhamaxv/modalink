@@ -29,7 +29,9 @@ services:
       # yang menggantung tanpa penjelasan. Lebih baik compose menolak berjalan.
       SCORING_ENGINE: ${SCORING_ENGINE:?set gemini untuk produksi, mock hanya untuk pengembangan}
       GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY is required}
-      GEMINI_MODEL: ${GEMINI_MODEL}
+      # Default, bukan diteruskan kosong: variabel yang tidak diset tapi tetap
+      # diteruskan tiba sebagai string kosong dan menimpa default di config.py.
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     depends_on:
       db: { condition: service_healthy }
     restart: unless-stopped

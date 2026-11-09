@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Absolute, not relative: Makefile targets and CI steps invoke this process with
@@ -28,6 +29,23 @@ class Settings(BaseSettings):
     # and mock mode never does, so leaving it unset must not block startup.
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
+
+    @field_validator("gemini_model", "scoring_engine", mode="after")
+    @classmethod
+    def _tolak_string_kosong(cls, v: str, info: ValidationInfo) -> str:
+        """Variabel environment yang tidak diset tapi tetap diteruskan tiba
+        sebagai string kosong, bukan sebagai tidak-ada, sehingga ia menimpa
+        default di atas alih-alih membiarkannya. `GEMINI_MODEL: ${GEMINI_MODEL}`
+        di compose adalah jalur persisnya: hasilnya scoring memanggil model
+        bernama "" dan setiap proposal menggantung di scoring_status=failed
+        sementara container melaporkan dirinya sehat."""
+        if not v.strip():
+            raise ValueError(
+                f"{info.field_name} diset ke string kosong; biarkan variabelnya "
+                "tidak diset kalau ingin memakai default, jangan diteruskan kosong"
+            )
+        return v
+
     gemini_timeout_s: int = 60
     # Review keamanan Finding 2: tanpa batas ini, setiap proposal yang
     # diterima langsung memicu job scoring tanpa batas konkurensi apa pun

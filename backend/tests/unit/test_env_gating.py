@@ -40,3 +40,22 @@ def test_internal_terdaftar_di_dev(monkeypatch):
     monkeypatch.setattr("app.main.settings.env", "dev")
     paths = _paths(create_app())
     assert [p for p in paths if "/internal/" in p]
+
+
+def test_variabel_kosong_tidak_menimpa_default():
+    """Variabel environment yang tidak diset tapi tetap diteruskan tiba sebagai
+    string kosong. Tanpa penolakan ini, `GEMINI_MODEL: ${GEMINI_MODEL}` di
+    compose membuat scoring memanggil model bernama "" dan setiap proposal
+    menggantung di scoring_status=failed sementara container sehat."""
+    import pytest
+
+    from app.config import Settings
+
+    for medan in ("gemini_model", "scoring_engine"):
+        with pytest.raises(ValueError):
+            Settings(
+                _env_file=None,
+                database_url="postgresql+asyncpg://x/y",
+                jwt_secret="x" * 32,
+                **{medan: ""},
+            )
