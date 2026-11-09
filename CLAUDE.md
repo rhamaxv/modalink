@@ -50,14 +50,24 @@ menjebak:
 | Bagian | Bahasa |
 | --- | --- |
 | Identifier, nama tabel, nama kolom | Inggris |
+| Nama file sumber dan file test | Inggris |
+| Nama fungsi test | Inggris |
 | Pesan commit | Inggris |
 | **Komentar dan docstring** | **Indonesia** |
-| Nama fungsi test | Indonesia |
-| Pesan error yang dibaca pengguna | Indonesia |
+| Teks antarmuka dan pesan error yang dibaca pengguna | Indonesia |
+
+Pembagiannya satu garis: **apa pun yang dieksekusi berbahasa Inggris, apa pun yang dibaca
+manusia berbahasa Indonesia.** Nama fungsi, nama file, dan nama test dieksekusi. Komentar,
+docstring, dan pesan untuk pengguna dibaca.
 
 Komentar berbahasa Indonesia karena ia menjelaskan alasan aturan bisnis yang spec-nya juga
 berbahasa Indonesia. Menerjemahkannya menambah jarak antara kode dan dokumen tanpa menambah
 kejelasan bagi siapa pun yang membaca repositori ini.
+
+Nama test berbahasa Inggris meski ia nyaris sebuah kalimat, karena ia tetap identifier yang
+dipanggil pytest dan muncul di output CI. Rujukan ke nomor aturan tetap dipertahankan di
+awal nama (`test_br54_...`, `test_rf1_...`), dan nomor itulah jembatan ke spec, bukan
+bahasanya.
 
 ### Format pesan commit
 
