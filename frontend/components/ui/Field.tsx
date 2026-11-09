@@ -40,6 +40,8 @@ export function Field({
     <div className="flex flex-col gap-ruang-1">
       <label htmlFor={id} className="text-[0.8125rem] font-medium text-muted">
         {label}
+        {/* Tanda bintang hanya dekorasi visual; status wajib yang sungguh
+            terbaca pembaca layar datang dari atribut required di bawah. */}
         {required && <span aria-hidden="true"> *</span>}
       </label>
       {options ? (
@@ -47,6 +49,7 @@ export function Field({
           id={id}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           className="min-h-[44px] rounded-kecil border border-ink bg-paper px-ruang-3 py-ruang-2 text-base leading-[1.6] text-ink"
@@ -63,6 +66,7 @@ export function Field({
           type={type}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           autoComplete={autoComplete}
