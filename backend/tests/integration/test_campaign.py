@@ -48,12 +48,20 @@ async def test_apply_deadline_di_masa_lalu_ditolak(client, investor):
 
 
 async def test_br05_daftar_campaign_bisa_diakses_tanpa_token(client, investor):
-    await client.post(
+    dibuat = await client.post(
         "/api/v1/campaigns", headers=investor.headers, json=body_campaign()
     )
     res = await client.get("/api/v1/campaigns")
     assert res.status_code == 200
-    assert len(res.json()["items"]) == 1
+
+    # Dicari berdasarkan id, bukan dihitung jumlah seluruh baris. Beberapa test
+    # di suite ini sengaja commit baris sungguhan (test_pledge_concurrency,
+    # test_concurrent_approve) dan `python -m app.seed` menulis ke database yang
+    # sama, jadi hitungan global membuat test ini merah karena sebab yang tidak
+    # ada hubungannya dengan BR-05. Yang dijamin BR-05 adalah campaign bisa
+    # dibaca tanpa token, bukan bahwa ia satu-satunya di database.
+    ids = {item["id"] for item in res.json()["items"]}
+    assert dibuat.json()["id"] in ids
 
 
 async def test_daftar_campaign_urutannya_deterministik(client, investor):
