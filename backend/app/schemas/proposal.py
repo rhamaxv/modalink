@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.models.proposal import MilestoneStatus, ProposalStatus, ScoringStatus
+from app.schemas.milestone import MilestoneReportOut
 
 
 class MilestoneIn(BaseModel):
@@ -54,11 +55,17 @@ class ProposalListOut(BaseModel):
 class MilestoneOut(BaseModel):
     """GET /proposals/{id}/milestones (10-api-contract.md:73).
 
-    Tidak ada kolom laporan terakhir di sini: milestone_reports belum punya
-    model di backend ini (dibangun task lain yang berjalan bersamaan), dan
-    frontend yang sudah merge (components/ProposalDetailView.tsx) juga tidak
-    membaca kolom itu. Lihat laporan task ini untuk detail penyimpangan dari
-    10-api-contract.md baris 73."""
+    `latest_report` adalah laporan **terbaru berdasarkan waktu dibuat**, bukan
+    laporan terakhir yang bukan `rejected`: setelah sebuah laporan ditolak,
+    revisinya ditulis sebagai baris baru (BR-46, lihat
+    test_br46_rejected_report_kept_and_revision_is_new_row), dan baris lama
+    tetap tersimpan apa adanya. Menyaring `rejected` di sini akan membuat
+    pembaca endpoint ini melihat status basi -- laporan `pending` lama yang
+    sudah ditolak dan digantikan, atau `None` di tengah jendela antara
+    penolakan dan revisi berikutnya, padahal ada laporan `rejected` yang
+    sebenarnya nyata dan perlu ditindaklanjuti UMKM. Semantik ini sama
+    dengan `get_latest_report()` di services/milestone.py, yang dipakai
+    approve_milestone dan reject_milestone untuk alasan yang sama."""
 
     model_config = {"from_attributes": True}
 
@@ -68,6 +75,7 @@ class MilestoneOut(BaseModel):
     description: str
     amount: int
     status: MilestoneStatus
+    latest_report: MilestoneReportOut | None
 
 
 class MilestoneListOut(BaseModel):

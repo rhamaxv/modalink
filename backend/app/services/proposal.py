@@ -1,8 +1,10 @@
 """Orkestrasi proposal: submission dan aturan akses baca (BR-10 sampai BR-18)."""
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import desc
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
@@ -12,6 +14,7 @@ from app.domain.milestone_plan import MilestoneDraft, validate_milestone_plan
 from app.domain.money import format_rupiah
 from app.errors import ConflictError, UnprocessableError
 from app.models.campaign import Campaign, CampaignStatus
+from app.models.milestone_report import MilestoneReport
 from app.models.proposal import (
     Proposal,
     ProposalMilestone,
@@ -141,15 +144,62 @@ async def daftar_proposal_milik(session: AsyncSession, umkm_id: UUID) -> list[Pr
     return list(hasil)
 
 
+@dataclass
+class MilestoneDenganLaporanTerbaru:
+    """Milestone dibungkus laporan terbarunya, khusus bentuk balik
+    `daftar_milestone_proposal`. `ProposalMilestone` sengaja tidak boleh
+    dititipi atribut bebas seperti `.latest_report` langsung (SQLModel/
+    Pydantic v2 menolaknya), sama alasannya dengan `ProposalDenganSinyal`
+    di services/campaign.py."""
+
+    milestone: ProposalMilestone
+    latest_report: MilestoneReport | None
+
+    def __getattr__(self, name: str):
+        return getattr(self.milestone, name)
+
+
 async def daftar_milestone_proposal(
     session: AsyncSession, proposal_id: UUID
-) -> list[ProposalMilestone]:
+) -> list[MilestoneDenganLaporanTerbaru]:
     """GET /proposals/{id}/milestones (10-api-contract.md:73), diurutkan
     per tahap (seq), bukan per waktu dibuat: urutan tahap pendanaan memang
-    seq, bukan kapan baris itu ditulis ke database."""
-    hasil = await session.scalars(
-        select(ProposalMilestone)
-        .where(ProposalMilestone.proposal_id == proposal_id)
-        .order_by("seq")
+    seq, bukan kapan baris itu ditulis ke database.
+
+    Laporan terbaru per milestone diambil lewat satu query DISTINCT ON,
+    bukan satu query per milestone: pola yang sama dengan skor terbaru di
+    daftar_proposal_campaign (services/campaign.py). milestone_reports tidak
+    punya kolom proposal_id (hanya milestone_id), jadi join ke
+    proposal_milestones yang menyaring proposalnya.
+    """
+    milestones = list(
+        await session.scalars(
+            select(ProposalMilestone)
+            .where(ProposalMilestone.proposal_id == proposal_id)
+            .order_by("seq")
+        )
     )
-    return list(hasil)
+
+    laporan_terbaru = (
+        select(MilestoneReport)
+        .join(
+            ProposalMilestone,
+            col(MilestoneReport.milestone_id) == col(ProposalMilestone.id),
+        )
+        .where(ProposalMilestone.proposal_id == proposal_id)
+        .ext(distinct_on(col(MilestoneReport.milestone_id)))
+        .order_by(
+            col(MilestoneReport.milestone_id), desc(col(MilestoneReport.submitted_at))
+        )
+    )
+    oleh_milestone = {
+        laporan.milestone_id: laporan
+        for laporan in await session.scalars(laporan_terbaru)
+    }
+
+    return [
+        MilestoneDenganLaporanTerbaru(
+            milestone=m, latest_report=oleh_milestone.get(m.id)
+        )
+        for m in milestones
+    ]

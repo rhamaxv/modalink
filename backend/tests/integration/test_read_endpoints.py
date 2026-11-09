@@ -1,7 +1,5 @@
 """Empat endpoint baca yang dipakai frontend tapi tidak dimiliki task mana
-pun (10-api-contract.md baris 57, 67, 73, 96). Lihat laporan Fase 07 Task 6
-untuk penyimpangan dari baris 73 (tidak ada kolom laporan terakhir: belum
-ada model milestone_reports di backend ini)."""
+pun (10-api-contract.md baris 57, 67, 73, 96)."""
 
 from uuid import uuid4
 
@@ -137,6 +135,82 @@ async def test_milestones_visible_for_public_proposal_and_404_for_private_non_ow
     )
     assert res_pemilik.status_code == 200
     assert res_pemilik.json()["items"][0]["status"] == "pending"
+
+
+async def test_milestone_list_latest_report_is_none_before_any_report(
+    client, funded_proposal
+):
+    """m1 cair tanpa laporan (D-13): tidak ada baris milestone_reports untuk
+    milestone itu sama sekali, bukan hanya belum di-review."""
+    m1 = funded_proposal.milestones[0]
+    res = await client.get(f"/api/v1/proposals/{funded_proposal.id}/milestones")
+    items = {i["id"]: i for i in res.json()["items"]}
+    assert items[str(m1.id)]["latest_report"] is None
+
+
+async def test_milestone_list_includes_latest_report(client, milestone_reported):
+    """`milestone_reported` (conftest.py) sudah punya laporan `pending` untuk
+    m2: endpoint daftar milestone harus mengikutsertakannya, bukan hanya
+    status milestone-nya."""
+    res = await client.get(
+        f"/api/v1/proposals/{milestone_reported.proposal_id}/milestones"
+    )
+    items = {i["id"]: i for i in res.json()["items"]}
+    laporan = items[str(milestone_reported.id)]["latest_report"]
+    assert laporan is not None
+    assert laporan["review_status"] == "pending"
+
+
+async def test_br46_milestone_list_latest_report_is_newest_not_the_rejected_one(
+    client, db, umkm_lain, investor, funded_proposal
+):
+    """Setelah revisi, laporan terbaru (baris paling baru, BR-46) yang
+    dikembalikan, bukan laporan `rejected` yang digantikannya."""
+    m1, m2 = funded_proposal.milestones
+    await client.post(f"/api/v1/milestones/{m1.id}/approve", headers=investor.headers)
+
+    res_laporan_pertama = await client.post(
+        f"/api/v1/milestones/{m2.id}/reports",
+        headers=umkm_lain.headers,
+        json={"narrative": "x" * 60},
+    )
+    id_laporan_pertama = res_laporan_pertama.json()["id"]
+
+    res = await client.get(f"/api/v1/proposals/{funded_proposal.id}/milestones")
+    items = {i["id"]: i for i in res.json()["items"]}
+    assert items[str(m2.id)]["latest_report"]["id"] == id_laporan_pertama
+
+    await client.post(
+        f"/api/v1/milestones/{m2.id}/reject",
+        headers=investor.headers,
+        json={"note": "Bukti belum lengkap, perlu dilengkapi dahulu."},
+    )
+
+    res_setelah_tolak = await client.get(
+        f"/api/v1/proposals/{funded_proposal.id}/milestones"
+    )
+    laporan_setelah_tolak = {i["id"]: i for i in res_setelah_tolak.json()["items"]}[
+        str(m2.id)
+    ]["latest_report"]
+    assert laporan_setelah_tolak["id"] == id_laporan_pertama
+    assert laporan_setelah_tolak["review_status"] == "rejected"
+
+    res_revisi = await client.post(
+        f"/api/v1/milestones/{m2.id}/reports",
+        headers=umkm_lain.headers,
+        json={"narrative": "Revisi: bukti terlampir." + "x" * 40},
+    )
+    id_laporan_revisi = res_revisi.json()["id"]
+    assert id_laporan_revisi != id_laporan_pertama
+
+    res_setelah_revisi = await client.get(
+        f"/api/v1/proposals/{funded_proposal.id}/milestones"
+    )
+    laporan_terbaru = {i["id"]: i for i in res_setelah_revisi.json()["items"]}[
+        str(m2.id)
+    ]["latest_report"]
+    assert laporan_terbaru["id"] == id_laporan_revisi
+    assert laporan_terbaru["review_status"] == "pending"
 
 
 async def test_internal_ledger_balance_matches_manual_sum_of_returned_entries(
