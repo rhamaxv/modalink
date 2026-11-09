@@ -18,20 +18,11 @@ export const metadata: Metadata = {
 export default function ExplorePage() {
   return (
     <div className="flex flex-col">
-      <header className="mx-auto flex w-full max-w-[72rem] items-center justify-between gap-space-3 px-space-3 py-space-4">
-        <Link href="/" className="text-[0.8125rem] font-medium text-muted">
-          Modalink
-        </Link>
-        <nav className="flex items-center gap-space-4">
-          <Link href="/masuk" className="text-base font-medium text-ink underline">
-            Masuk
-          </Link>
-          <Link href="/daftar" className="text-base font-medium text-ink underline">
-            Daftar
-          </Link>
-        </nav>
-      </header>
-
+      {/*
+        Header dan nav Masuk/Daftar sebelumnya ditulis ulang di sini.
+        Sekarang disediakan sekali oleh AppHeader di app/layout.tsx (Fase
+        11, Task 11), jadi tidak diulang di tiap halaman.
+      */}
       <section data-pola="naratif-kiri" className="mx-auto w-full max-w-measure px-space-3 py-space-6">
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">
           Jelajahi proposal UMKM

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Field } from "@/components/ui/Field";
 import { ApiError, api } from "@/lib/api";
+import { tujuanAmanSetelahMasuk } from "@/lib/auth";
 
 type FieldErrors = {
   email?: string;
@@ -18,8 +19,24 @@ type LoginResponse = {
 // backend ditampilkan apa adanya (lihat .claude/prd/10-api-contract.md),
 // bukan diganti pesan generik. Token disimpan dengan kunci "modalink_token"
 // yang sama dengan yang dibaca lib/api.ts.
+//
+// Dibungkus Suspense di sini (bukan di app/(auth)/masuk/page.tsx) supaya
+// pemanggil tidak perlu tahu SignInForm sekarang membaca useSearchParams:
+// Next.js mewajibkan batas Suspense di sekitar useSearchParams saat halaman
+// dirender statis, dan menaruhnya di komponen terkecil yang membutuhkannya
+// mengikuti konvensi fase 10 ("use client" di komponen terkecil, bukan di
+// halaman).
 export function SignInForm() {
+  return (
+    <Suspense fallback={null}>
+      <SignInFormInner />
+    </Suspense>
+  );
+}
+
+function SignInFormInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -47,7 +64,11 @@ export function SignInForm() {
       } catch {
         // Tanpa localStorage, token tidak tersimpan tapi login tetap sukses secara server.
       }
-      router.push("/");
+      // Membawa pengguna kembali ke halaman yang semula dituju (query
+      // "next", ditulis RequireRole saat mengarahkan ke sini), bukan selalu
+      // ke "/". Membuang tujuan asal memaksa pengguna menavigasi ulang dari
+      // nol setelah berhasil masuk.
+      router.push(tujuanAmanSetelahMasuk(searchParams.get("next")));
     } catch (error) {
       setFormError(error instanceof ApiError ? error.message : "Terjadi kesalahan. Coba lagi sebentar lagi.");
     } finally {
