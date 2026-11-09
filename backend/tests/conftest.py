@@ -23,7 +23,17 @@ from app.services.scoring import jalankan_scoring
 async def db():
     async with engine.connect() as conn:
         trans = await conn.begin()
-        session = AsyncSession(bind=conn, expire_on_commit=False)
+        # join_transaction_mode="create_savepoint": get_session produksi
+        # sekarang memanggil session.commit() (H-1), dan tanpa mode ini
+        # SQLAlchemy jatuh ke "conditional_savepoint" yang berlaku sebagai
+        # "rollback_only" karena trans di atas bukan SAVEPOINT. Mode ini
+        # membuat commit/rollback sesi memakai SAVEPOINT yang menumpang di
+        # atas trans, jadi apa pun yang di-commit lewat sesi ini tetap ikut
+        # hilang saat trans.rollback() di bawah, bukan benar-benar menembus
+        # ke Postgres.
+        session = AsyncSession(
+            bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint"
+        )
         try:
             yield session
         finally:
