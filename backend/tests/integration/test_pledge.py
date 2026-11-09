@@ -3,6 +3,7 @@
 from sqlalchemy import select
 
 from app.models.ledger import EntryType, LedgerEntry
+from app.models.proposal import ProposalStatus
 
 
 async def test_br22_any_investor_may_fund(client, investor_lain, listed_proposal):
@@ -82,6 +83,29 @@ async def test_br26_cancellation_records_refund_not_delete(
     assert EntryType.PLEDGE_IN in tipe
     assert EntryType.REFUND_OUT in tipe
     assert len(entri) == 2  # entri pledge_in tidak dihapus
+
+
+async def test_t07_cancelling_last_pledge_returns_proposal_to_listed(
+    client, db, investor, listed_proposal
+):
+    """R2b, lewat T-07 (partially_funded -> listed saat pledge kosong):
+    pembatalan wajib memicu recompute_funding_status di transaksi yang sama,
+    bukan hanya mencatat refund_out. Tanpa itu, proposal tetap kelihatan
+    partially_funded padahal tidak ada satu pun pledge aktif lagi."""
+    buat = await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges",
+        headers=investor.headers,
+        json={"amount": 4_000_000},
+    )
+    await db.refresh(listed_proposal)
+    assert listed_proposal.status is ProposalStatus.PARTIALLY_FUNDED
+
+    res = await client.delete(
+        f"/api/v1/pledges/{buat.json()['id']}", headers=investor.headers
+    )
+    assert res.status_code == 200
+    await db.refresh(listed_proposal)
+    assert listed_proposal.status is ProposalStatus.LISTED
 
 
 async def test_br28_umkm_and_community_have_no_pledge_access(
