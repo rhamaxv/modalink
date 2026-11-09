@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #1A1917;
+  --paper: #FBF9F4;
+  --surface: #F3EFE6;
+  --muted: #5C574E;
+  --line: #DCD5C7;
+  --accent: #FFC94A;
+  --ok: #2F6B3A;
+  --warn: #A3561F;
+  --danger: #A32C1F;
+
+  --radius-kecil: 4px;   /* input, lencana */
+  --radius-kartu: 8px;
+  --radius-panel: 12px;
+
+  --ruang-1: 4px;  --ruang-2: 8px;  --ruang-3: 16px;
+  --ruang-4: 24px; --ruang-5: 40px; --ruang-6: 64px; --ruang-7: 96px;
+
+  --lebar-baca: 66ch;
+}
+
+[data-theme="dark"] {
+  --ink: #F2EEE6;
+  --paper: #141310;
+  --surface: #201E19;
+  --muted: #A8A196;
+  --line: #36332B;
+  --ok: #7FCB8C;
+  --warn: #E8A765;
+  --danger: #F08C7E;
+  /* --accent tetap #FFC94A di kedua tema; teks di atasnya selalu gelap. */
+}
+
+body { background: var(--paper); color: var(--ink); }
+
+/* Angka rupiah sejajar per digit di seluruh tabel. */
+.tabular { font-variant-numeric: tabular-nums; }
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
