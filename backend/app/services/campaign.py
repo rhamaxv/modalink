@@ -18,7 +18,7 @@ from app.models.scoring import ScoringResult
 from app.models.user import User
 from app.models.vote import Vote
 from app.schemas.campaign import CampaignIn, CampaignUpdateIn
-from app.services.expiry import evaluasi_kedaluwarsa
+from app.services.expiry import evaluasi_kedaluwarsa_banyak
 from app.services.status import advance_campaign
 
 # Status proposal yang dianggap publik: "listed ke atas" menurut
@@ -202,9 +202,11 @@ async def daftar_proposal_campaign(
     # D-06/BR-61: daftar proposal sebuah campaign juga "pembacaan proposal",
     # jadi kedaluwarsa dievaluasi di sini. Dijalankan setelah kueri, bukan
     # sebelumnya: objek yang dikembalikan adalah instance ORM yang sama, jadi
-    # perubahan status dari evaluasi langsung terbaca pemanggil.
-    for p, _, _ in baris:
-        await evaluasi_kedaluwarsa(session, p, clock)
+    # perubahan status dari evaluasi langsung terbaca pemanggil. Lewat fungsi
+    # _banyak, bukan loop dalam urutan tampil total_score DESC di atas: lihat
+    # docstring evaluasi_kedaluwarsa_banyak soal kenapa urutan tampil tidak
+    # aman dipakai mengunci baris lintas endpoint (review keamanan Finding 1).
+    await evaluasi_kedaluwarsa_banyak(session, [p for p, _, _ in baris], clock)
 
     return [
         ProposalDenganSinyal(proposal=p, total_score=skor, vote_count=vote)
