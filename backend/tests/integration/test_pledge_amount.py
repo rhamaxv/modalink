@@ -5,7 +5,19 @@ import pytest
 
 @pytest.mark.parametrize(
     "value",
-    ["1e9", 1_000_000.5, "5.000.000", -1, 0, 9_223_372_036_854_775_808],
+    [
+        "1e9",
+        1_000_000.5,
+        "5.000.000",
+        -1,
+        0,
+        9_223_372_036_854_775_808,
+        # Keduanya cuma ditolak gara-gara strict=True di PledgeIn.amount (lihat
+        # komentar di app/schemas/pledge.py): tanpa strict, Pydantic v2 lolos
+        # meluluskan desimal bulat dan string numerik ke kolom BIGINT (BR-50).
+        2_000_000.0,
+        "5000000",
+    ],
 )
 async def test_rf2_invalid_amount_rejected_with_422(
     client, investor, listed_proposal, value
