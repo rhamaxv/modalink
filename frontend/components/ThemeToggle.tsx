@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 const THEME_STORAGE_KEY = "theme";
 
@@ -9,7 +9,7 @@ const THEME_STORAGE_KEY = "theme";
 // localStorage, karena skrip itu sudah menggabungkan localStorage dengan
 // prefers-color-scheme. localStorage dipakai sebagai cadangan, misalnya saat
 // komponen ini dirender langsung di test tanpa skrip tersebut.
-function readInitialTheme(): "light" | "dark" {
+function readStoredTheme(): "light" | "dark" {
   try {
     if (document.documentElement.dataset.theme === "dark") return "dark";
   } catch {
@@ -27,9 +27,23 @@ function readInitialTheme(): "light" | "dark" {
 // terkini, dan elemen <button> memberi aktivasi keyboard (Enter/Space) tanpa
 // kode tambahan.
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<"light" | "dark">(readInitialTheme);
+  // State awal SELALU "light", sama persis dengan yang dirender server
+  // (document dan localStorage tidak ada di sana). Memanggil readStoredTheme
+  // langsung di initializer useState membuat render pertama di klien berbeda
+  // dari HTML yang dikirim server begitu skrip no-flash sudah menyalakan
+  // data-theme="dark" sebelum hidrasi, dan React menolak hasilnya (error
+  // #418), membuang seluruh HTML server lalu merender ulang dari nol. Nilai
+  // sungguhan baru dibaca di useEffect di bawah, setelah hidrasi selesai:
+  // warna halaman sudah benar sejak awal (skrip no-flash mengurusnya di
+  // <html>), yang menyusul belakangan hanya label dan aria-pressed tombol.
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  useLayoutEffect(() => {
+  useEffect(() => {
+    const stored = readStoredTheme();
+    if (stored === "dark") setTheme("dark");
+  }, []);
+
+  useEffect(() => {
     if (theme === "dark") {
       document.documentElement.setAttribute("data-theme", "dark");
     } else {

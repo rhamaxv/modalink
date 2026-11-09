@@ -24,7 +24,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={sansHumanis.variable}>
+    // suppressHydrationWarning: skrip no-flash di bawah menulis data-theme
+    // ke elemen ini sebelum React hidrasi, sengaja di luar siklus render
+    // React. Tanpa ini, React membandingkan atribut <html> yang sudah
+    // diubah skrip itu terhadap markup server (yang tidak mengenal
+    // data-theme sama sekali) dan melaporkannya sebagai hydration mismatch,
+    // walau atributnya memang benar-benar dikelola di luar React dengan
+    // sengaja.
+    <html lang="id" className={sansHumanis.variable} suppressHydrationWarning>
       <head>
         {/*
           Tema disetel sebelum cat pertama supaya tidak ada kedipan dari terang
