@@ -20,7 +20,7 @@ from app.schemas.campaign import (
     CampaignOut,
     CampaignUpdateIn,
 )
-from app.schemas.proposal import ProposalListOut
+from app.schemas.proposal import ProposalWithSignalsListOut
 from app.services.campaign import (
     ambil_campaign_detail,
     buat_campaign,
@@ -79,16 +79,16 @@ async def tutup_campaign_endpoint(
     return await tutup_campaign_manual(session, campaign)
 
 
-@router.get("/{campaign_id}/proposals", response_model=ProposalListOut)
+@router.get("/{campaign_id}/proposals", response_model=ProposalWithSignalsListOut)
 async def daftar_proposal_campaign_endpoint(
     campaign_id: UUID,
     user: User | None = Depends(pengguna_opsional),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
-) -> ProposalListOut:
+) -> ProposalWithSignalsListOut:
     campaign = await ambil_campaign_detail(session, campaign_id, clock)
     if campaign is None:
         raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")
     pemilik = user is not None and user.id == campaign.investor_id
     proposals = await daftar_proposal_campaign(session, campaign, pemilik)
-    return ProposalListOut(items=proposals)
+    return ProposalWithSignalsListOut(items=proposals)

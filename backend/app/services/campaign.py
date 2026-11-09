@@ -1,9 +1,11 @@
 """Orkestrasi campaign: validasi deadline, pembuatan, daftar, ubah, dan tutup
 (BR-64, BR-77, T-40, T-41)."""
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import desc, func
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
@@ -12,7 +14,9 @@ from app.domain.transitions import CampaignEvent, IllegalTransition
 from app.errors import ConflictError, UnprocessableError
 from app.models.campaign import Campaign, CampaignStatus
 from app.models.proposal import Proposal, ProposalStatus
+from app.models.scoring import ScoringResult
 from app.models.user import User
+from app.models.vote import Vote
 from app.schemas.campaign import CampaignIn, CampaignUpdateIn
 from app.services.status import advance_campaign
 
@@ -130,13 +134,70 @@ async def ubah_campaign(
     return campaign
 
 
+@dataclass
+class ProposalDenganSinyal:
+    """Proposal dibungkus skor AI terbaru dan jumlah vote, khusus bentuk
+    balik `daftar_proposal_campaign`. `ProposalWithSignalsOut` membacanya
+    lewat `from_attributes`, yang memanggil getattr apa adanya -- __getattr__
+    di sini meneruskan kolom Proposal asli, sama seperti ProposalWithPledge
+    di tests/conftest.py. Proposal tidak boleh dititipi atribut bebas secara
+    langsung (lihat docstring di sana): SQLModel/Pydantic v2 menolaknya."""
+
+    proposal: Proposal
+    total_score: int
+    vote_count: int
+
+    def __getattr__(self, name: str):
+        return getattr(self.proposal, name)
+
+
 async def daftar_proposal_campaign(
     session: AsyncSession, campaign: Campaign, pemilik: bool
-) -> list[Proposal]:
-    kueri = select(Proposal).where(Proposal.campaign_id == campaign.id)
+) -> list[ProposalDenganSinyal]:
+    """Skor lalu vote lalu waktu submit (10-api-contract.md). `created_at`
+    lalu `id` di akhir yang membuat urutan ini benar-benar deterministik:
+    tanpa itu, dua proposal yang identik di seluruh kolom pengurut bisa
+    bertukar posisi antar-request.
+
+    Skor yang dipakai adalah baris terbaru per proposal lewat `DISTINCT ON`,
+    bukan baris pertama atau penjumlahan semua baris -- scoring_results
+    append-only (BR-76), jadi satu proposal bisa punya banyak baris dari
+    rescore.
+    """
+    # col(...), bukan ScoringResult.proposal_id langsung: atribut kelas
+    # SQLModel diketik sebagai UUID/datetime biasa oleh mypy (tidak ada
+    # plugin sqlmodel), sehingga distinct_on/.desc()/group_by di atasnya
+    # dianggap tidak ada (sama seperti catatan desc("created_at") di
+    # daftar_campaign).
+    skor_terbaru = (
+        select(ScoringResult.proposal_id, ScoringResult.total_score)
+        .ext(distinct_on(col(ScoringResult.proposal_id)))
+        .order_by(col(ScoringResult.proposal_id), desc(col(ScoringResult.created_at)))
+    ).subquery("skor_terbaru")
+    jumlah_vote = (
+        select(Vote.proposal_id, func.count().label("n")).group_by(
+            col(Vote.proposal_id)
+        )
+    ).subquery("jumlah_vote")
+
+    kueri = (
+        select(
+            Proposal,
+            func.coalesce(skor_terbaru.c.total_score, 0).label("total_score"),
+            func.coalesce(jumlah_vote.c.n, 0).label("vote_count"),
+        )
+        .outerjoin(skor_terbaru, skor_terbaru.c.proposal_id == Proposal.id)
+        .outerjoin(jumlah_vote, jumlah_vote.c.proposal_id == Proposal.id)
+        .where(Proposal.campaign_id == campaign.id)
+    )
     if not pemilik:
         # Publik hanya melihat yang listed ke atas; submitted dan rejected
         # hanya boleh dilihat pembuat campaign (03-feature-investor.md).
         kueri = kueri.where(col(Proposal.status).in_(STATUS_PROPOSAL_PUBLIK))
-    hasil = await session.scalars(kueri.order_by(desc("created_at"), desc("id")))
-    return list(hasil)
+    kueri = kueri.order_by(desc("total_score"), desc("vote_count"), "created_at", "id")
+
+    baris = (await session.execute(kueri)).all()
+    return [
+        ProposalDenganSinyal(proposal=p, total_score=skor, vote_count=vote)
+        for p, skor, vote in baris
+    ]
