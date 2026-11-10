@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ExploreTabs } from "@/components/ExploreTabs";
+import { ButtonLink } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: "Jelajahi - Modalink",
@@ -34,22 +35,86 @@ export default function ExplorePage() {
         Sekarang disediakan sekali oleh AppHeader di app/layout.tsx (Fase
         11, Task 11), jadi tidak diulang di tiap halaman.
       */}
-      <section data-pola="naratif-kiri" className="mx-auto w-full max-w-measure px-space-3 py-space-6">
-        <h1 className="text-page font-display text-ink">Jelajahi peluang di Modalink</h1>
-        <p className="mt-space-3 text-body text-muted">
-          Dua pintu masuk ke pasar yang sama. Baca proposal UMKM yang sudah lolos penilaian AI
-          dan terbuka untuk didanai, atau lihat{" "}
-          <span className="rounded-sm bg-accent-2 px-1 text-on-accent">campaign yang terbuka</span>{" "}
-          untuk menerima proposal baru, lalu putuskan langkah Anda selanjutnya.
-        </p>
+      {/*
+        Dua kolom tak setara, bukan satu kolom terpusat. Versi sebelumnya
+        menaruh judul di kolom selebar measure di tengah layar hitam kosong
+        tanpa satu pun jangkar, dan pemilik project menyebutnya polos. Kolom
+        kanan diisi dua pintu masuk pasar ini sebagai kartu yang bisa diklik,
+        bukan gambar yang dikarang.
+
+        H1 tidak lagi memuat "Modalink": nama produk sudah ada di header, dan
+        DESIGN.md melarang nama merek menjadi judul halaman.
+      */}
+      <section
+        data-pola="dua-kolom-asimetris"
+        className="mx-auto flex w-full max-w-[72rem] items-center px-space-3 py-space-6 md:min-h-[62vh]"
+      >
+        <div className="grid w-full gap-space-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-center">
+          <div className="flex max-w-measure flex-col gap-space-4">
+            <h1 className="text-page font-display text-ink">
+              Dua pintu masuk ke pasar yang sama.
+            </h1>
+            <p className="text-body text-muted">
+              Investor membaca proposal UMKM yang sudah lolos penilaian AI dan terbuka untuk
+              didanai. UMKM melihat{" "}
+              <span className="rounded-sm bg-accent-2 px-1 text-on-accent">campaign terbuka</span>{" "}
+              yang sedang menerima proposal baru. Pilih pintu Anda di bawah.
+            </p>
+            <div className="flex flex-wrap gap-space-3">
+              <ButtonLink href="#daftar-peluang">Lihat yang terbuka sekarang</ButtonLink>
+              <ButtonLink href="/daftar" varian="secondary">
+                Daftar
+              </ButtonLink>
+            </div>
+          </div>
+
+          <ul className="flex flex-col gap-space-3">
+            <li>
+              <Link
+                href="#daftar-peluang"
+                className="flex flex-col gap-space-1 rounded-panel border border-line bg-panel p-space-4 transition-colors hover:border-line-strong"
+              >
+                <span className="text-label font-semibold uppercase tracking-wide text-accent-text">
+                  Untuk investor
+                </span>
+                <span className="text-card-title font-semibold text-ink">
+                  Proposal yang mencari dana
+                </span>
+                <span className="text-label text-muted">
+                  Sudah dinilai AI, lengkap dengan rencana milestone-nya.
+                </span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#daftar-peluang"
+                className="flex flex-col gap-space-1 rounded-panel border border-line bg-panel p-space-4 transition-colors hover:border-line-strong"
+              >
+                <span className="text-label font-semibold uppercase tracking-wide text-accent-2-text">
+                  Untuk UMKM
+                </span>
+                <span className="text-card-title font-semibold text-ink">
+                  Campaign yang menerima proposal
+                </span>
+                <span className="text-label text-muted">
+                  Beserta tenggat pengajuan dan tenggat pendanaannya.
+                </span>
+              </Link>
+            </li>
+          </ul>
+        </div>
       </section>
 
-      <section data-pola="daftar-bernomor" className="w-full bg-panel px-space-3 py-space-6">
+      <section
+        id="daftar-peluang"
+        data-pola="daftar-bernomor"
+        className="w-full bg-panel px-space-3 py-space-6"
+      >
         <div className="mx-auto w-full max-w-[72rem]">
-          <p className="inline-block rounded-sm bg-accent-2 px-space-2 py-space-1 text-label font-medium uppercase tracking-wide text-on-accent">
-            Jelajahi
-          </p>
-          <h2 className="mt-space-2 text-section font-display text-ink">
+          {/* Chip eyebrow di atas judul dibuang: antislop menolak pil kecil
+              yang hanya mengulang apa yang judulnya sudah katakan, dan pagar
+              composition.test.tsx menangkapnya di halaman depan. */}
+          <h2 className="text-section font-display text-ink">
             Proposal dan campaign yang terbuka
           </h2>
           <div className="mt-space-4">
@@ -97,12 +162,9 @@ export default function ExplorePage() {
             Daftar sebagai UMKM untuk mengajukan proposal, atau sebagai investor untuk mulai
             mendanai usaha lokal.
           </p>
-          <Link
-            href="/daftar"
-            className="inline-flex min-h-[44px] items-center rounded-pill bg-accent px-space-5 py-space-2 text-body font-semibold text-on-accent"
-          >
+          <ButtonLink href="/daftar" varian="secondary">
             Daftar sekarang
-          </Link>
+          </ButtonLink>
         </div>
       </section>
     </div>

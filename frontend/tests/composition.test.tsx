@@ -234,10 +234,13 @@ function expectPageIsNotColourless(container: HTMLElement) {
 }
 
 describe("RHYTHM 3 patterns match what is actually rendered, not just their label", () => {
-  it("naratif-kiri on the explore page is really a single column with no grid", async () => {
+  it("the explore hero is really an asymmetric two-column, not a centred single column", async () => {
+    // Dulu naratif-kiri: satu kolom selebar measure di tengah layar kosong,
+    // yang pemilik project sebut polos. Sekarang dua kolom tak setara dengan
+    // dua pintu masuk pasar di kolom kanan.
     stubEmptyFetch();
     const { container } = render(<ExplorePage />);
-    expectSingleColumnNarrative(findSectionByPola(container, "naratif-kiri"));
+    expectAsymmetricTwoColumn(findSectionByPola(container, "dua-kolom-asimetris"));
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
   });
 
@@ -548,8 +551,12 @@ describe("accent-2 as a bare text colour fails AA in light mode (a gap DESIGN.md
       // className=\"...text-accent-2...\" di luar pasangan bg-accent-2 (yang
       // aman, lihat komentar di atas) berarti accent-2 dipakai sebagai warna
       // teks lepas, persis bug yang pernah ada di sini.
+      // Negative lookahead atas "-text": `text-accent-2-text` adalah token
+      // yang BENAR untuk aksen sebagai teks (6.14:1 di tema terang) dan baru
+      // ada setelah pagar ini ditulis; tanpa pengecualian ini pagarnya menolak
+      // satu-satunya cara yang aman.
       expect(source, `${berkas} memakai text-accent-2 sebagai warna teks lepas`).not.toMatch(
-        /\btext-accent-2\b/,
+        /\btext-accent-2(?!-text)\b/,
       );
     }
   });
