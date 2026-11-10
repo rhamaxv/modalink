@@ -30,6 +30,18 @@ describe("comment form", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("links the textarea to its error message via aria-describedby, so a screen reader hears why it is invalid", async () => {
+    // Sebelumnya elemen galat tidak punya id dan textarea tidak punya
+    // aria-describedby, jadi pembaca layar diberi tahu field ini salah
+    // tanpa pernah diberi tahu alasannya (laporan tinjauan minggu ini).
+    render(<CommentForm proposalId="p1" />);
+    await userEvent.click(screen.getByRole("button", { name: /kirim/i }));
+    const galat = await screen.findByRole("alert");
+    const textarea = screen.getByLabelText(/komentar/i);
+    expect(galat).toHaveAttribute("id");
+    expect(textarea).toHaveAttribute("aria-describedby", galat.id);
+  });
+
   it("sends a filled comment and notifies the parent through onKirim", async () => {
     const onKirim = vi.fn();
     stubFetchByUrl({

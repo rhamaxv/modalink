@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProposalDetailView } from "@/components/ProposalDetailView";
@@ -7,6 +7,22 @@ const PROPOSAL_ID = "p1";
 
 function fakeResponse(status: number, body: unknown) {
   return Promise.resolve(new Response(JSON.stringify(body), { status }));
+}
+
+// Mengambil elemen yang memakai --accent lewat kelas Tailwind apa pun
+// (bg-accent, text-accent, border-l-accent, dst), bukan hanya "bg-accent":
+// versi awal pagar ini hanya menggeledah "bg-accent" dan melewatkan
+// border-l-accent sama sekali (terbukti saat border itu sempat dikembalikan
+// untuk membuktikan pagar lain bisa merah). "accent-2" dan "on-accent"
+// sengaja TIDAK cocok: keduanya token berbeda, bukan kemunculan --accent.
+const KELAS_ACCENT = /^(?:bg|text|border|border-[trblxy])-accent$/;
+function elemenBerakenAccent(container: HTMLElement): Element[] {
+  return Array.from(container.querySelectorAll("*")).filter((el) =>
+    el.className
+      .toString()
+      .split(/\s+/)
+      .some((kelas) => KELAS_ACCENT.test(kelas)),
+  );
 }
 
 function baseProposal(overrides: Partial<Record<string, unknown>> = {}) {
@@ -19,6 +35,11 @@ function baseProposal(overrides: Partial<Record<string, unknown>> = {}) {
     fund_usage_plan: "60% mesin roasting, 40% kemasan dan distribusi ke tiga kota baru.",
     business_projection: "Omzet diproyeksikan naik dua kali lipat dalam satu tahun.",
     requested_amount: 10_000_000,
+    // GET /proposals/{id} sungguhan mengirim ini publik dan sudah terhitung
+    // di server (dikonfirmasi lewat verifikasi browser terhadap backend
+    // sungguhan); ProposalDetailView membaca field ini langsung, bukan
+    // menjumlahkan pledges.data sendiri lagi.
+    collected_amount: 0,
     status: "listed",
     scoring_status: "done",
     lead_investor_id: null,
@@ -119,7 +140,7 @@ describe("proposal detail page", () => {
   });
 
   it("hides the pledge form entirely for a proposal that is already funded, and names the reason", async () => {
-    stubEndpoints({ proposal: baseProposal({ status: "funded" }) });
+    stubEndpoints({ proposal: baseProposal({ status: "funded", collected_amount: 10_000_000 }) });
     localStorage.setItem("modalink_token", "token-palsu");
     render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
 
@@ -193,14 +214,197 @@ describe("proposal detail page", () => {
     expect(screen.queryByText(/token tidak ada/i)).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("shows real funding progress to a visitor with no account, even though the per-funder list stays gated", async () => {
+    // GET /proposals/{id} sungguhan (dibuktikan lewat permintaan langsung ke
+    // backend saat verifikasi browser) mengirim collected_amount publik,
+    // tanpa token, untuk proposal listed ke atas. Sebelumnya seluruh bilah
+    // funding dihitung dari pledges.data (yang butuh login), jadi pengunjung
+    // tanpa akun tidak pernah melihat progres dananya sama sekali, padahal
+    // kartu proposal di /jelajah sudah menampilkannya ke publik.
+    stubEndpoints({
+      proposal: baseProposal({ status: "listed", collected_amount: 4_000_000 }),
+      pledgesStatus: 401,
+      pledges: { error: { code: "tidak_terautentikasi", message: "Token tidak ada." } },
+      scoringStatus: 401,
+      scoring: { error: { code: "tidak_terautentikasi", message: "Token tidak ada." } },
+    });
+    render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
+
+    await screen.findByText("Rp4.000.000");
+    expect(screen.getByText(/dari Rp10.000.000/)).toBeInTheDocument();
+    // Jumlah pendana tetap tidak tampil: itu satu-satunya bagian yang
+    // sungguh butuh GET .../pledges yang digerbang login.
+    expect(screen.queryByText(/investor$/i)).toBeNull();
+    await screen.findByText(/masuk sebagai investor, atau sebagai umkm pemilik proposal ini/i);
+  });
+
+  it("renders the funder list without crashing when the backend anonymises investor_id to null", async () => {
+    // GET .../pledges sungguhan (dibuktikan lewat permintaan langsung ke
+    // backend saat verifikasi browser, bukan ditaksir dari dokumen) mengirim
+    // investor_id: null untuk menganonimkan pemberi dana lain, dan
+    // is_lead_investor sebagai gantinya. Kode lama memanggil
+    // pledge.investor_id.slice(-4) langsung dan meledak dengan "Cannot read
+    // properties of null (reading 'slice')" persis saat investor sungguhan
+    // membuka proposal berpendana.
+    stubEndpoints({
+      proposal: baseProposal({ status: "partially_funded", collected_amount: 4_000_000 }),
+      pledges: {
+        items: [
+          { id: "pl1", proposal_id: PROPOSAL_ID, investor_id: null, amount: 4_000_000, status: "active", created_at: "2026-11-01T00:00:00Z", is_lead_investor: true },
+        ],
+      },
+    });
+    localStorage.setItem("modalink_token", "token-palsu");
+    render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
+
+    expect(await screen.findByText(/pendana ke-1/i)).toBeInTheDocument();
+    expect(screen.getByText(/investor utama/i)).toBeInTheDocument();
+  });
+
+  it("never shows the score loading spinner at the same time as the waiting-for-score panel: one live region, not two", async () => {
+    // Sebelumnya "score === null" berarti dua hal sekaligus: "belum diminta
+    // ke server" dan "sengaja tidak ada yang diminta karena scoring_status
+    // belum done". Kedua guard memeriksa literal yang sama, jadi LoadingState
+    // dan ScorePanel keadaan menunggu/gagal dua-duanya ikut lolos dan
+    // merender berdampingan, masing-masing aria-live mengumumkan sesuatu
+    // yang berbeda (tinjauan minggu ini). Discriminated union ScoreState
+    // memisahkan "loading" dari "idle" supaya hanya satu cabang yang benar.
+    stubEndpoints({
+      proposal: baseProposal({ status: "submitted", scoring_status: "processing" }),
+    });
+    localStorage.setItem("modalink_token", "token-palsu");
+    render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
+
+    await screen.findByText(/sedang dinilai/i);
+    expect(screen.queryByText(/memuat hasil penilaian/i)).toBeNull();
+  });
+
+  it("updates the pledge form's remaining amount after a successful pledge, without needing a failed attempt first", async () => {
+    // PledgeForm menyimpan sisa lewat useState(sisa) sekali di mount dan
+    // sebelumnya tidak pernah disinkron ulang, dan ProposalDetailView tidak
+    // memasang key apa pun padanya. Satu-satunya jalan form tahu sisa yang
+    // benar adalah lewat gagal dulu (409 membawa remaining_amount). key={sisa}
+    // memaksa form remount dengan sisa terbaru begitu pledges berhasil
+    // dimuat ulang setelah pledge SUKSES, bukan hanya setelah gagal.
+    let pledgesSoFar: unknown[] = [];
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url.endsWith("/auth/me")) {
+        return fakeResponse(200, { id: "u-investor-1", name: "Investor", role: "investor" });
+      }
+      if (url.endsWith("/scoring")) return fakeResponse(200, baseScore());
+      if (method === "POST" && url.endsWith("/pledges")) {
+        // investor_id null + is_lead_investor: bentuk persis respons POST
+        // .../pledges sungguhan (dikonfirmasi lewat verifikasi browser),
+        // bukan string investor_id yang dulu diasumsikan tipe lama.
+        const pledge = {
+          id: "pl9",
+          proposal_id: PROPOSAL_ID,
+          investor_id: null,
+          amount: 4_000_000,
+          status: "active",
+          created_at: "2026-11-07T12:00:00Z",
+          is_lead_investor: true,
+        };
+        pledgesSoFar = [...pledgesSoFar, pledge];
+        return fakeResponse(201, pledge);
+      }
+      if (url.endsWith("/pledges")) return fakeResponse(200, { items: pledgesSoFar });
+      if (url.endsWith("/milestones")) return fakeResponse(200, { items: [] });
+      if (url.endsWith("/comments")) return fakeResponse(200, { items: [] });
+      if (url.includes(`/proposals/${PROPOSAL_ID}`)) {
+        // collected_amount dihitung dari pledgesSoFar supaya proposal yang
+        // dimuat ulang (muatProposal() di dalam onSukses) benar-benar
+        // mencerminkan pledge yang baru dikirim, persis seperti backend
+        // sungguhan yang menghitungnya di server.
+        const terkumpulSoFar = (pledgesSoFar as { amount: number }[]).reduce(
+          (total, p) => total + p.amount,
+          0,
+        );
+        return fakeResponse(200, baseProposal({ status: "listed", collected_amount: terkumpulSoFar }));
+      }
+      throw new Error(`permintaan fetch tak terduga ke ${url} (${method})`);
+    });
+
+    localStorage.setItem("modalink_token", "token-palsu");
+    render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
+
+    const nominal = await screen.findByLabelText(/nominal/i);
+    expect(screen.getByText(/maksimal Rp10.000.000/i)).toBeInTheDocument();
+    await userEvent.type(nominal, "4000000");
+    await userEvent.click(screen.getByRole("button", { name: /danai/i }));
+
+    await waitFor(() => expect(screen.getByText(/maksimal Rp6.000.000/i)).toBeInTheDocument());
+    expect(screen.getByLabelText(/nominal/i)).toHaveValue("");
+  });
+
+  it("marks the active milestone with the accent badge only, never also an accent-coloured border", async () => {
+    // Versi sebelumnya memasang border-l-4 border-l-accent DAN badge aksen
+    // pada tahap yang sama, menghabiskan dua dari tiga jatah --accent untuk
+    // satu ide, dan DESIGN.md mengecualikan aksen dari border kartu secara
+    // eksplisit.
+    stubEndpoints({
+      proposal: baseProposal({ status: "partially_funded" }),
+      milestones: {
+        items: [
+          { id: "m1", seq: 1, title: "Pembelian mesin", description: "x", amount: 5_000_000, status: "pending" },
+        ],
+      },
+    });
+    localStorage.setItem("modalink_token", "token-palsu");
+    render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
+
+    const badge = await screen.findByText(/tahap aktif/i);
+    expect(badge.className).toMatch(/bg-accent/);
+    const baris = badge.closest("li");
+    expect(baris?.className ?? "").not.toMatch(/border-l-accent/);
+  });
+
+  it("spends the accent colour on at most three elements, counted with the pledge button in its real enabled state after typing", async () => {
+    // DESIGN.md membatasi tiga kemunculan --accent per layar: bilah funding,
+    // tombol aksi utama, penanda milestone aktif. Audit browser sebelumnya
+    // menghitung empat setelah nominal diketik, karena tombol disabled
+    // tampil sebagai bg-panel (lewat variant disabled: CSS, bukan lewat DOM)
+    // sehingga hitungan saat idle menyesatkan. Test ini menghitung di kedua
+    // keadaan: idle (tombol benar-benar disabled, tidak dihitung) dan
+    // setelah nominal valid diketik (tombol benar-benar enabled, dihitung).
+    stubEndpoints({
+      proposal: baseProposal({ status: "partially_funded", collected_amount: 4_000_000 }),
+      pledges: {
+        items: [
+          { id: "pl1", proposal_id: PROPOSAL_ID, investor_id: null, amount: 4_000_000, status: "active", created_at: "2026-11-01T00:00:00Z", is_lead_investor: true },
+        ],
+      },
+      milestones: {
+        items: [
+          { id: "m1", seq: 1, title: "Pembelian mesin", description: "x", amount: 5_000_000, status: "pending" },
+        ],
+      },
+    });
+    localStorage.setItem("modalink_token", "token-palsu");
+    const { container } = render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
+
+    await screen.findByText(/tahap aktif/i);
+    const nominal = await screen.findByLabelText(/nominal/i);
+    const tombolDanai = screen.getByRole("button", { name: /danai/i });
+
+    expect(tombolDanai).toBeDisabled();
+    const kandidatIdle = elemenBerakenAccent(container).filter((el) => el !== tombolDanai);
+    expect(kandidatIdle).toHaveLength(2); // bilah funding + badge tahap aktif
+
+    await userEvent.type(nominal, "1000000");
+    await waitFor(() => expect(tombolDanai).toBeEnabled());
+    expect(elemenBerakenAccent(container)).toHaveLength(3); // + tombol yang sekarang sungguh lime
+  });
 });
 
 describe("composition rhythm (RHYTHM 3)", () => {
   it("never repeats the same section pattern on two consecutive sections", async () => {
     stubEndpoints({
-      proposal: baseProposal({ status: "partially_funded" }),
+      proposal: baseProposal({ status: "partially_funded", collected_amount: 4_000_000 }),
       pledges: {
-        items: [{ id: "pl1", proposal_id: PROPOSAL_ID, investor_id: "u-investor-9", amount: 4_000_000, status: "active", created_at: "2026-11-01T00:00:00Z" }],
+        items: [{ id: "pl1", proposal_id: PROPOSAL_ID, investor_id: null, amount: 4_000_000, status: "active", created_at: "2026-11-01T00:00:00Z", is_lead_investor: true }],
       },
       milestones: {
         items: [
@@ -226,5 +430,26 @@ describe("composition rhythm (RHYTHM 3)", () => {
     for (let i = 1; i < pola.length; i += 1) {
       expect(pola[i]).not.toBe(pola[i - 1]);
     }
+  });
+
+  it("never gives two differently-labelled sections the exact same computed class, and keeps 'dua-kolom-asimetris' a real two-column grid", async () => {
+    // Audit browser sebelumnya menemukan section berlabel "dua-kolom-asimetris"
+    // yang class komputasinya "flex flex-col gap-space-3", satu kolom biasa,
+    // dan section lain (daftar-bernomor) berlabel berbeda dengan class yang
+    // persis sama. Label hanya jujur kalau class-nya memang berbeda DAN kalau
+    // "dua kolom asimetris" sungguh grid dua kolom, bukan sekadar nama.
+    stubEndpoints({ proposal: baseProposal({ status: "partially_funded" }) });
+    localStorage.setItem("modalink_token", "token-palsu");
+    render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
+
+    await screen.findByText("73");
+    const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-pola]"));
+    const classPerLabel = sections.map((el) => [el.getAttribute("data-pola"), el.className] as const);
+    const classSet = new Set(classPerLabel.map(([, className]) => className));
+    expect(classSet.size).toBe(classPerLabel.length);
+
+    const duaKolom = sections.find((el) => el.getAttribute("data-pola") === "dua-kolom-asimetris");
+    expect(duaKolom?.className).toMatch(/\bgrid\b/);
+    expect(duaKolom?.className).toMatch(/grid-cols-\[2fr_1fr\]/);
   });
 });

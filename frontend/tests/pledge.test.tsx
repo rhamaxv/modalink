@@ -36,6 +36,16 @@ describe("funding bar", () => {
     expect(bar).toHaveAttribute("aria-valuenow", "40");
     expect(bar).toHaveAttribute("aria-valuetext", "Rp4.000.000 dari Rp10.000.000");
   });
+
+  it("still shows raised and target to a visitor with no account, hiding only the funder count it does not know", () => {
+    // terkumpul dan target datang dari GET /proposals/{id} yang publik;
+    // jumlah pendana datang dari GET .../pledges yang butuh login. Keduanya
+    // tidak harus gagal bersamaan: pengunjung tanpa akun tetap melihat
+    // progres dananya, hanya tidak melihat berapa investor di baliknya.
+    render(<FundingBar terkumpul={4_000_000} target={10_000_000} pendana={undefined} />);
+    expect(screen.getByText("Rp4.000.000")).toBeInTheDocument();
+    expect(screen.queryByText(/investor/i)).toBeNull();
+  });
 });
 
 describe("pledge form", () => {

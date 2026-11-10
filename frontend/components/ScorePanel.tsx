@@ -115,10 +115,20 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
     );
   }
 
+  // brief.strengths dan brief.risks sampai laporan Fase 11 Task 12 hanya
+  // dideklarasikan di tipe ScoreBrief, tidak pernah dirender: hanya
+  // recommendation yang mencapai layar, padahal halaman jelajah menjanjikan
+  // investor bisa membaca brief AI (R-26, R-38). Keduanya ditaruh di balik
+  // <details> native (bukan state React): tombol "Nilai ulang" dan verdict
+  // sudah memberi keputusan cepat, strengths/risks adalah detail pendukung
+  // yang layak dibuka sendiri, dan <details>/<summary> sudah bisa dibuka
+  // lewat keyboard (Enter/Space) tanpa kode tambahan (R-32).
+  const adaBrief = score.brief.strengths.length > 0 || score.brief.risks.length > 0;
+
   return (
     <div className="flex flex-col gap-space-4 rounded-panel border border-line bg-panel px-space-4 py-space-5">
       <div className="flex flex-wrap items-baseline justify-between gap-space-2">
-        <p className="text-[1.75rem] font-semibold text-ink">
+        <p className="text-amount-sm font-display text-ink">
           <span className="tabular">{score.total_score}</span>
           <span className="text-label font-medium text-muted"> dari 100</span>
         </p>
@@ -131,7 +141,7 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
         {KOMPONEN.map((komponen) => (
           <div key={komponen.key} className="flex flex-col gap-space-1">
             <dt className="text-label font-medium text-muted">{komponen.label}</dt>
-            <dd className="tabular text-[1.125rem] font-semibold text-ink">
+            <dd className="tabular text-card-title font-semibold text-ink">
               {score[komponen.key]}
               <span className="text-label font-medium text-muted"> dari {komponen.maksimum}</span>
             </dd>
@@ -155,6 +165,40 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
             ))}
           </ul>
         </div>
+      )}
+
+      {adaBrief && (
+        <details className="border-t border-line pt-space-3">
+          <summary className="min-h-[44px] cursor-pointer py-space-1 text-body font-semibold text-ink">
+            Lihat kekuatan dan risiko menurut AI
+          </summary>
+          <div className="mt-space-3 grid gap-space-4 sm:grid-cols-2">
+            {score.brief.strengths.length > 0 && (
+              <div className="flex flex-col gap-space-2">
+                <p className="text-label font-medium text-muted">Kekuatan</p>
+                <ul className="flex flex-col gap-space-1">
+                  {score.brief.strengths.map((item) => (
+                    <li key={item} className="text-body text-ink">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {score.brief.risks.length > 0 && (
+              <div className="flex flex-col gap-space-2">
+                <p className="text-label font-medium text-muted">Risiko</p>
+                <ul className="flex flex-col gap-space-1">
+                  {score.brief.risks.map((item) => (
+                    <li key={item} className="text-body text-ink">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </details>
       )}
 
       <div className="flex flex-col gap-space-2 border-t border-line pt-space-3">
