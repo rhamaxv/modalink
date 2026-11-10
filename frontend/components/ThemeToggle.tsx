@@ -67,11 +67,21 @@ export function ThemeToggle() {
       type="button"
       onClick={toggleTheme}
       aria-pressed={theme === "dark"}
-      // border-ink, bukan border-line: border-line hanya 1.27:1 terhadap
-      // bg-panel/paper, gagal ambang 3:1 untuk batas elemen interaktif.
-      className="inline-flex min-h-[44px] items-center gap-space-2 rounded-sm border border-ink px-space-3 py-space-2 text-body font-medium text-ink"
+      // Nama aksesibilitas tetap menyebut "Tema" walau teks yang terlihat
+      // tinggal satu kata: tanpa kata itu, tombol ini terbaca di pembaca
+      // layar hanya sebagai "Gelap", yang tidak menjelaskan apa yang
+      // diubahnya. Kata yang terlihat ("Gelap") tetap menjadi bagian dari
+      // nama ini, sesuai WCAG 2.5.3 Label in Name.
+      aria-label={theme === "dark" ? "Tema gelap" : "Tema terang"}
+      // border-line-strong (3.94:1), bukan border-line (1.46:1) yang gagal
+      // ambang 3:1 untuk batas elemen interaktif, dan bukan lagi border-ink
+      // yang dipakai sebelumnya. border-ink adalah putih penuh di tema
+      // gelap: ia membuat kontrol paling tidak penting di header menjadi
+      // benda dengan kontras tertinggi di sana, lebih berat dari nama
+      // produknya sendiri. Kontrol utilitas, digambar tenang.
+      className="inline-flex min-h-[44px] items-center rounded-pill border border-line-strong px-space-3 text-body font-medium text-muted transition-colors hover:bg-panel hover:text-ink"
     >
-      {theme === "dark" ? "Tema: gelap" : "Tema: terang"}
+      {theme === "dark" ? "Gelap" : "Terang"}
     </button>
   );
 }

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { NavRole, NAV_LINK_CLASS } from "@/components/NavRole";
+import { NavRole, NavLink } from "@/components/NavRole";
 import { clearToken, fetchCurrentUser, getToken, type CurrentUser } from "@/lib/auth";
 
 type AuthState =
@@ -38,6 +38,7 @@ type AuthState =
 // ada di klien.
 export function AppHeader() {
   const router = useRouter();
+  const pathname = usePathname() ?? undefined;
   const [auth, setAuth] = useState<AuthState>({ status: "checking" });
   // Panel nav tertutup secara default di semua lebar layar, termasuk
   // desktop: di atas breakpoint md kelas `md:flex` pada <nav> yang menimpa
@@ -88,7 +89,18 @@ export function AppHeader() {
         default (tertutup, di bawah md) tetap satu baris.
       */}
       <div className="mx-auto flex w-full max-w-[72rem] flex-wrap items-center justify-between gap-space-3 px-space-3 py-space-2">
-        <Link href="/" className="text-label font-semibold text-ink" onClick={tutupMenu}>
+        {/*
+          font-display dan setingkat card-title, bukan text-label: sebelum
+          ini nama produk dipasang pada ukuran teks TERKECIL di seluruh
+          sistem, lebih kecil dari tautan nav di sebelahnya, sehingga
+          hierarki header terbalik dan benda paling berat di baris itu
+          justru tombol tema.
+        */}
+        <Link
+          href="/"
+          className="font-display text-card-title font-bold tracking-tight text-ink"
+          onClick={tutupMenu}
+        >
           Modalink
         </Link>
         <button
@@ -104,16 +116,26 @@ export function AppHeader() {
           id="nav-utama"
           className={`${menuOpen ? "flex" : "hidden"} w-full flex-col items-start gap-space-3 border-t border-line pt-space-3 md:flex md:w-auto md:flex-row md:items-center md:gap-space-4 md:border-t-0 md:pt-0`}
         >
-          <Link href="/jelajah" className={NAV_LINK_CLASS} onClick={tutupMenu}>
-            Jelajahi
-          </Link>
-          {auth.status === "signed-in" && <NavRole role={auth.user.role} />}
+          <NavLink href="/jelajah" label="Jelajahi" pathname={pathname} onClick={tutupMenu} />
+          {auth.status === "signed-in" && <NavRole role={auth.user.role} pathname={pathname} />}
           {auth.status === "guest" && (
             <>
-              <Link href="/masuk" className={NAV_LINK_CLASS} onClick={tutupMenu}>
-                Masuk
-              </Link>
-              <Link href="/daftar" className={NAV_LINK_CLASS} onClick={tutupMenu}>
+              <NavLink href="/masuk" label="Masuk" pathname={pathname} onClick={tutupMenu} />
+              {/*
+                Satu-satunya tautan nav yang digambar sebagai tombol.
+                Sebelum ini Masuk dan Daftar tampil identik, jadi header
+                tidak menyatakan apa pun tentang mana yang dituju pengunjung
+                baru. Beroutline, bukan berlatar --accent: header ikut
+                dirender di SETIAP halaman, jadi satu tombol aksen di sini
+                akan memakai jatah "satu aksi berlatar aksen per layar"
+                (DESIGN.md) di semua rute sekaligus dan menyisakan nol untuk
+                aksi utama halamannya sendiri.
+              */}
+              <Link
+                href="/daftar"
+                onClick={tutupMenu}
+                className="inline-flex min-h-[44px] items-center rounded-pill border border-line-strong px-space-3 text-body font-semibold text-ink transition-colors hover:bg-panel"
+              >
                 Daftar
               </Link>
             </>
@@ -122,7 +144,7 @@ export function AppHeader() {
             <button
               type="button"
               onClick={keluar}
-              className="inline-flex min-h-[44px] items-center rounded-sm border border-ink px-space-3 py-space-2 text-body font-medium text-ink"
+              className="inline-flex min-h-[44px] items-center rounded-pill border border-line-strong px-space-3 text-body font-medium text-muted transition-colors hover:bg-panel hover:text-ink"
             >
               Keluar
             </button>
