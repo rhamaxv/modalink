@@ -19,7 +19,12 @@ const VARIAN: Record<Varian, string> = {
   // border-line-strong, bukan border-line: yang kedua mengukur 1.46:1 dan
   // hanya sah sebagai pemisah dekoratif, bukan sebagai batas kontrol.
   secondary: "border border-line-strong text-ink hover:bg-panel",
-  ghost: "text-ink underline underline-offset-4 hover:text-accent",
+  // text-accent-text pada hover, bukan text-accent polos: token terakhir itu
+  // adalah warna LATAR, 1,09:1 saat dipakai sebagai teks di atas --paper
+  // terang (DESIGN.md). text-accent-text berbalik ikut tema karena ia duduk
+  // di atas --paper yang juga berbalik, persis pasangan yang sudah diukur
+  // lolos 6,21:1 gelap dan 6,21:1/5,70:1 terang.
+  ghost: "text-ink underline underline-offset-4 hover:text-accent-text",
 };
 
 const DASAR =

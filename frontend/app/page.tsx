@@ -125,15 +125,22 @@ export default function Beranda() {
           <h2 className="mt-space-2 text-section font-display text-ink">
             Bagaimana dananya bergerak
           </h2>
-          <ol className="mt-space-5 flex flex-col gap-space-5">
+          {/*
+            Daftar ini adalah satu-satunya tempat di produk yang menunjukkan
+            keempat tahap alur dana sekaligus, jadi ia digambar sebagai jalur
+            bertahap (bulatan bernomor beraksen-2 dihubungkan garis vertikal),
+            bukan empat baris datar: geometri yang sama, dalam bentuk lebih
+            kecil, yang dipakai MilestoneTimeline untuk tahap milestone
+            sungguhan. "Real geometry... the product's own data given form"
+            (brief), bukan dekorasi lepas: garis dan bulatan ini memang
+            mengikuti urutan nyata proses, bukan ditambahkan untuk estetika.
+          */}
+          <ol className="relative mt-space-6 flex flex-col gap-space-6 border-l-2 border-line pl-space-5 md:pl-space-6">
             {LANGKAH.map((langkah) => (
-              <li
-                key={langkah.nomor}
-                className="flex list-none gap-space-4 border-t border-line pt-space-4 first:border-t-0 first:pt-0"
-              >
+              <li key={langkah.nomor} className="relative flex list-none flex-col gap-space-1">
                 <span
                   aria-hidden="true"
-                  className="tabular shrink-0 text-amount-sm font-display leading-none text-muted"
+                  className="tabular absolute -left-[2.85rem] top-0 flex h-9 w-9 items-center justify-center rounded-full bg-accent-2 text-label font-display font-bold text-on-accent md:-left-[3.35rem]"
                 >
                   {langkah.nomor}
                 </span>
@@ -154,9 +161,21 @@ export default function Beranda() {
         <p className="inline-block rounded-sm bg-accent-2 px-space-2 py-space-1 text-label font-medium uppercase tracking-wide text-on-accent">
           Untuk siapa
         </p>
+        {/*
+          Dua kolom selebar sama (grid-cols-2, pagar RHYTHM mengunci ini),
+          tapi bukan dua kotak kembar: kolom investor dibungkus panel
+          terangkat (rounded-feature, salah satu dari satu-atau-dua blok
+          sorotan yang DESIGN.md izinkan per halaman) sementara kolom UMKM
+          tetap teks polos. "Varied cell sizes... so a list is not N
+          identical rectangles" (brief), diterapkan lewat bobot visual, bukan
+          lewat lebar kolom yang pagar pagarnya sendiri menuntut setara.
+        */}
         <div className="mt-space-3 grid gap-space-6 md:grid-cols-2">
-          <div className="flex flex-col gap-space-2">
-            <h2 className="text-section font-display text-ink">Untuk investor</h2>
+          <div className="flex flex-col gap-space-3 rounded-feature border border-line bg-panel-raised px-space-5 py-space-6">
+            <p className="inline-block w-fit rounded-sm bg-accent-2 px-space-2 py-space-1 text-label font-medium uppercase tracking-wide text-on-accent">
+              Investor
+            </p>
+            <h2 className="text-section font-display text-ink">Mendanai patungan</h2>
             <p className="max-w-measure text-body text-muted">
               Baca brief AI dan bukan hanya skornya, ikut patungan mendanai proposal yang Anda
               percayai, dan setujui pencairan tiap milestone berdasarkan laporan kemajuan nyata.
@@ -165,8 +184,11 @@ export default function Beranda() {
               Lihat proposal yang terbuka untuk didanai
             </Link>
           </div>
-          <div className="flex flex-col gap-space-2 border-t border-line pt-space-5 md:border-t-0 md:border-l md:pl-space-6 md:pt-0">
-            <h2 className="text-section font-display text-ink">Untuk UMKM</h2>
+          <div className="flex flex-col gap-space-3 border-t border-line pt-space-5 md:border-t-0 md:pl-space-2 md:pt-space-6">
+            <p className="inline-block w-fit rounded-sm bg-accent-2 px-space-2 py-space-1 text-label font-medium uppercase tracking-wide text-on-accent">
+              UMKM
+            </p>
+            <h2 className="text-section font-display text-ink">Mengajukan proposal</h2>
             <p className="max-w-measure text-body text-muted">
               Ajukan proposal lengkap dengan rencana milestone, lalu laporkan kemajuan usaha
               Anda setiap tahap selesai untuk mencairkan dana ke tahap berikutnya.
@@ -178,19 +200,34 @@ export default function Beranda() {
         </div>
       </section>
 
+      {/*
+        Satu-satunya permukaan berlatar --accent penuh di halaman ini: sebuah
+        SURFACE, bukan AKSI (brief ini sendiri yang membedakannya, dan
+        anggaran "satu aksi berlatar aksen" DESIGN.md menghitung aksi, bukan
+        latar). Tautannya di bawah sengaja memakai text-on-accent bergaris
+        bawah, bukan ButtonLink varian apa pun: varian "secondary" memakai
+        border-line-strong dan text-ink, dan text-ink BERBALIK ikut tema
+        sementara latar --accent di sini TIDAK, jadi di tema gelap teks itu
+        akan jadi putih di atas lime (1,14:1, dilarang DESIGN.md). Hanya
+        warna on-accent (tidak pernah berbalik) yang aman dipasangkan dengan
+        latar ini di kedua tema.
+      */}
       <section
         data-pola="lebar-penuh-cta"
-        className="w-full border-t border-line bg-panel px-space-3 py-space-7"
+        className="w-full border-t border-line bg-accent px-space-3 py-space-7"
       >
         <div className="mx-auto flex max-w-measure flex-col items-start gap-space-3">
-          <h2 className="text-section font-display text-ink">Siap mulai?</h2>
-          <p className="text-body text-muted">
+          <h2 className="text-section font-display text-on-accent">Siap mulai?</h2>
+          <p className="text-body text-on-accent">
             Daftar sebagai investor untuk mulai mendanai, atau sebagai UMKM untuk mengajukan
             proposal usaha Anda.
           </p>
-          <ButtonLink href="/daftar" varian="secondary">
+          <Link
+            href="/daftar"
+            className="mt-space-1 inline-flex min-h-[44px] items-center text-body font-semibold text-on-accent underline underline-offset-2"
+          >
             Daftar sekarang
-          </ButtonLink>
+          </Link>
         </div>
       </section>
     </div>

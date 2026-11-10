@@ -359,10 +359,17 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
               .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
               .map((pledge, index) => (
                 <li key={pledge.id} className="flex items-center justify-between gap-space-3 text-body text-ink">
-                  <span>
+                  <span className="flex items-center gap-space-2">
                     Pendana ke-{index + 1}
                     {pledge.is_lead_investor && (
-                      <span className="ml-space-2 text-label font-medium text-muted">(investor utama)</span>
+                      // accent-2 sebagai penanda (DESIGN.md: "label kategori,
+                      // sorotan angka pendukung"), bukan aksi: investor utama
+                      // adalah satu-satunya pemberi dana dengan hak menyetujui
+                      // pencairan milestone (BR-44), jadi sorotan ini menandai
+                      // keputusan nyata, bukan dekorasi.
+                      <span className="rounded-sm bg-accent-2 px-space-2 py-space-1 text-label font-semibold text-on-accent">
+                        investor utama
+                      </span>
                     )}
                   </span>
                   <Amount label="" amount={pledge.amount} size="medium" />

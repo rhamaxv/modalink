@@ -39,14 +39,27 @@ type ProposalCardProps = {
 
 export function ProposalCard({ proposal, featured = false, index }: ProposalCardProps) {
   return (
-    // Satu set kelas untuk kartu biasa maupun unggulan, bukan dua: DESIGN.md
-    // membatasi batas kartu pada --line, bukan penekanan warna, jadi
-    // hierarkinya datang dari ukuran nominal dan cuplikan cerita (di bawah),
-    // bukan dari border atau latar yang berbeda. bg-panel-raised, bukan
-    // bg-panel: kartu ini dipakai di atas section berlatar bg-panel (halaman
-    // jelajah) maupun di atas bg-paper (panel manajemen campaign), dan
-    // panel-raised tetap terlihat sebagai permukaan terangkat di kedua latar.
-    <article className="flex flex-col gap-space-3 rounded-card border border-line bg-panel-raised px-space-4 py-space-4">
+    // Satu set kelas dasar untuk kartu biasa maupun unggulan, bukan dua:
+    // DESIGN.md membatasi batas kartu pada --line, bukan penekanan warna,
+    // jadi hierarkinya datang dari ukuran nominal dan cuplikan cerita (di
+    // bawah), bukan dari border atau latar yang berbeda. bg-panel-raised,
+    // bukan bg-panel: kartu ini dipakai di atas section berlatar bg-panel
+    // (halaman jelajah) maupun di atas bg-paper (panel manajemen campaign),
+    // dan panel-raised tetap terlihat sebagai permukaan terangkat di kedua
+    // latar.
+    //
+    // Kartu unggulan mendapat satu tambahan jujur: tepi kiri beraksen-2 dan
+    // radius feature, bukan radius card biasa. Bukan label teks yang
+    // mengklaim arti ("unggulan", "pilihan"), karena arti "featured" berbeda
+    // di tiap pemanggil (proposal pertama di daftar publik di sini, proposal
+    // live/funded di CampaignManagePanel): sinyal visual murni, menandai
+    // kartu mana yang berbeda tanpa menulis klaim yang bisa salah di salah
+    // satu konteks itu.
+    <article
+      className={`flex flex-col gap-space-3 border border-line bg-panel-raised px-space-4 py-space-4 ${
+        featured ? "rounded-feature border-l-4 border-l-accent-2 md:px-space-5" : "rounded-card"
+      }`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-space-2">
         <div className="flex items-baseline gap-space-2">
           {index !== undefined && (
@@ -156,6 +169,17 @@ export function FeaturedProposalHighlight() {
   const { proposal } = state;
   return (
     <div className="flex flex-col gap-space-3 rounded-feature border border-line bg-panel-raised px-space-5 py-space-6">
+      {/*
+        "Terbuka untuk pendanaan" bukan klaim dikarang: GET /proposals hanya
+        pernah mengirim proposal berstatus listed ke atas (lihat komentar
+        ProposalList di bawah), jadi baris ini benar untuk setiap proposal
+        yang bisa muncul di sini. bg-accent-2 + text-on-accent: pasangan yang
+        sama persis dengan yang DESIGN.md ukur lolos 9,59:1 dan tidak
+        berbalik warna di kedua tema.
+      */}
+      <p className="inline-block w-fit rounded-sm bg-accent-2 px-space-2 py-space-1 text-label font-medium uppercase tracking-wide text-on-accent">
+        Terbuka untuk pendanaan
+      </p>
       <p className="text-label font-medium uppercase tracking-wide text-muted">
         {proposal.business_name}
       </p>

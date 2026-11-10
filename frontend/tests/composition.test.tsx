@@ -445,12 +445,21 @@ describe("landing page is free of default AI-slop shapes", () => {
     });
   });
 
+  // Versi sebelumnya menghitung SETIAP elemen `.bg-accent` di halaman,
+  // termasuk permukaan section CTA berlatar aksen penuh yang bukan sebuah
+  // aksi sama sekali. Itu persis kesalahan yang DESIGN.md sebut sebagai
+  // sumber kedataran: pagar yang menggeledah kata "bg-accent" alih-alih
+  // membedakan AKSI dari LATAR. Diperbaiki memakai pemeriksa yang sama
+  // dengan "spends exactly one accent action..." di bawah, bukan dihapus:
+  // anggaran satu aksi berlatar aksen tetap berlaku, cuma dihitung benar.
   it("uses the accent colour on at most one primary action on this screen", async () => {
     stubEmptyFetch();
     const { container } = render(<Beranda />);
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
-    const akzen = container.querySelectorAll(".bg-accent");
-    expect(akzen.length).toBeLessThanOrEqual(1);
+    const aksi = [...container.querySelectorAll("a[href], button")].filter((el) =>
+      el.className.split(" ").includes("bg-accent"),
+    );
+    expect(aksi.length).toBeLessThanOrEqual(1);
   });
 });
 

@@ -31,7 +31,15 @@ export function Amount({ label, amount, size = "large", tone = "default" }: Amou
       <p className="text-label font-medium uppercase tracking-wide text-muted">{label}</p>
       <p
         className={`tabular ${UKURAN[size]} ${
-          tone === "accent" ? "text-accent" : "text-ink"
+          // text-accent-text, bukan text-accent polos: text-accent adalah
+          // token LATAR, dan dipakai sebagai warna teks ia mengukur 1,09:1 di
+          // atas --paper terang (DESIGN.md, "Never bare text-accent"). Bug ini
+          // sungguh terkirim lewat MilestoneApprovalFeed (nominal "hero" di
+          // tema terang nyaris tidak terbaca) sebelum diukur di sini.
+          // text-accent-text berbalik ikut tema karena ia duduk di atas
+          // --paper yang juga berbalik, dan sudah diukur lolos 6,21:1 gelap,
+          // 6,21:1/5,70:1 terang.
+          tone === "accent" ? "text-accent-text" : "text-ink"
         }`}
       >
         {formatRupiah(amount)}
