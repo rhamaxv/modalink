@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import { Field } from "@/components/ui/Field";
 import { formatRupiah } from "@/lib/money";
 
@@ -85,6 +85,42 @@ export function MilestonePlan({ requestedAmount, milestones, onChange }: Milesto
   );
 }
 
+type MoneyFieldProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+};
+
+// Field (fase 10) tidak boleh diubah di sini dan type="number" bawaannya
+// tidak cocok untuk rupiah (mengizinkan "e"/"+"/"-"/"." lalu membulatkan
+// diam-diam), sementara filter digit di handleAmountChange butuh <input>
+// bertipe teks sungguhan. inputMode="numeric" tetap memunculkan keypad angka
+// di ponsel tanpa kehilangan filter itu (laporan review: nominal milestone
+// dan nominal proposal dulu sama-sama tidak punya inputMode, padahal
+// CampaignForm sudah type="number" untuk nominal sejenis).
+function MoneyField({ label, value, onChange, required }: MoneyFieldProps) {
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-space-1">
+      <label htmlFor={id} className="text-label font-medium text-muted">
+        {label}
+        {required && <span aria-hidden="true"> *</span>}
+      </label>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required={required}
+        className="min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
+      />
+    </div>
+  );
+}
+
 type MilestoneRowProps = {
   index: number;
   milestone: MilestoneDraft;
@@ -135,7 +171,7 @@ function MilestoneRow({ index, milestone, onChange, onRemove }: MilestoneRowProp
         onChange={(value) => onChange({ description: value })}
         required
       />
-      <Field
+      <MoneyField
         label={`Nominal tahap ${index + 1}`}
         value={milestone.amount}
         onChange={handleAmountChange}
@@ -145,7 +181,11 @@ function MilestoneRow({ index, milestone, onChange, onRemove }: MilestoneRowProp
         <button
           type="button"
           onClick={onRemove}
-          className="min-h-[44px] self-start rounded-sm border border-line px-space-3 py-space-2 text-body font-medium text-muted"
+          // border-line-strong, bukan border-line: border-line mengukur
+          // 1.27:1 di atas bg-panel, gagal ambang 3:1 untuk batas kontrol
+          // interaktif (laporan review, satu-satunya tombol yang terlewat
+          // saat batas interaktif lain di aplikasi ini sudah dipindahkan).
+          className="min-h-[44px] self-start rounded-sm border border-line-strong px-space-3 py-space-2 text-body font-medium text-muted"
         >
           Hapus tahap {index + 1}
         </button>
