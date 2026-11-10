@@ -12,7 +12,13 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: ["node_modules/**", ".next/**", "coverage/**"],
+    // next-env.d.ts dihasilkan ulang oleh `next build` dan berkasnya sendiri
+    // menulis "This file should not be edited". Sejak Next menambahkan baris
+    // referensi ke .next/types/routes.d.ts di sana, aturan
+    // @typescript-eslint/triple-slash-reference menolaknya, sehingga
+    // `make check` gagal setiap kali build dijalankan lebih dulu, atas
+    // berkas yang tidak boleh diperbaiki siapa pun.
+    ignores: ["node_modules/**", ".next/**", "coverage/**", "next-env.d.ts"],
   },
 ];
 
