@@ -72,6 +72,23 @@ describe("score panel", () => {
     expect(screen.queryByText(/ditolak/i)).toBeNull();
   });
 
+  it("renders the AI brief's strengths and risks, not only the recommendation", () => {
+    // Sebelumnya brief.strengths dan brief.risks hanya dideklarasikan di tipe
+    // ScoreBrief, tidak pernah mencapai layar: hanya recommendation yang
+    // dirender, padahal halaman jelajah menjanjikan investor bisa membaca
+    // brief AI (laporan tinjauan minggu ini, R-26/R-38).
+    render(<ScorePanel score={score} />);
+    expect(screen.getByText(/usaha berjalan 3 tahun/i)).toBeInTheDocument();
+    expect(screen.getByText(/proyeksi agresif/i)).toBeInTheDocument();
+  });
+
+  it("keeps strengths and risks behind a closed disclosure until opened, operable without JavaScript event wiring", () => {
+    render(<ScorePanel score={score} />);
+    const rincian = screen.getByText(/lihat kekuatan dan risiko/i).closest("details");
+    expect(rincian).not.toBeNull();
+    expect(rincian).not.toHaveAttribute("open");
+  });
+
   it("does not use the accent colour, which this screen reserves for funding and pledging", () => {
     // PanelSkor adalah informasi, bukan aksi: DESIGN.md menyimpan aksen untuk
     // bilah funding, tombol pledge, dan penanda milestone aktif.

@@ -32,6 +32,15 @@ type ProposalOut = {
   fund_usage_plan: string;
   business_projection: string;
   requested_amount: number;
+  // GET /proposals/{id} (10-api-contract.md) sudah menghitung ini di server
+  // dan mengirimkannya publik, untuk proposal listed ke atas, tanpa token.
+  // Dikonfirmasi lewat permintaan sungguhan ke backend saat verifikasi
+  // browser: menjumlahkan ulang dari daftar pledge di klien (cara lama)
+  // hanya berhasil untuk investor/pemilik yang bisa melihat daftar itu, dan
+  // membuat bilah funding ikut tersembunyi di balik gerbang login untuk
+  // SETIAP pengunjung tanpa akun -- padahal kartu proposal di /jelajah
+  // sudah menampilkan progres funding ke publik (05-feature-komunitas.md).
+  collected_amount: number;
   status: ProposalStatus;
   scoring_status: ScoringStatus;
   lead_investor_id: string | null;
@@ -42,10 +51,19 @@ type ProposalOut = {
 type PledgeOut = {
   id: string;
   proposal_id: string;
-  investor_id: string;
+  // null, bukan string: dikonfirmasi lewat permintaan sungguhan ke backend
+  // saat verifikasi browser (GET .../pledges yang sebenarnya, bukan
+  // ditaksir dari dokumen). Backend menganonimkan investor_id pemberi dana
+  // lain demi privasi dan mengirim is_lead_investor sebagai gantinya.
+  // Sebelumnya tipe ini memakai `string` tanpa null dan kode di bawah
+  // memanggil investor_id.slice(-4) langsung, yang meledak dengan
+  // "Cannot read properties of null (reading 'slice')" persis di
+  // permintaan pertama investor sungguhan membuka proposal berpendana.
+  investor_id: string | null;
   amount: number;
   status: string;
   created_at: string;
+  is_lead_investor: boolean;
 };
 
 type MilestoneOut = {
@@ -73,6 +91,22 @@ type Keadaan<T> =
   | { status: "error"; message: string }
   | { status: "done"; data: T };
 
+// Skor punya satu keadaan lagi di luar Keadaan<T> biasa: "idle", yaitu
+// "tidak ada yang perlu diambil karena scoring_status belum done". Sebelum
+// ini, keadaan itu disandikan sebagai literal `null` yang sama persis dengan
+// "belum diketahui/baru mulai memuat", jadi dua guard yang sama-sama
+// memeriksa `score === null` ikut benar bersamaan dan merender LoadingState
+// DAN ScorePanel sekaligus, dua live region yang mengumumkan dua hal
+// berlawanan di saat yang sama (laporan tinjauan minggu ini). Discriminated
+// union ini membuat setiap keadaan punya satu cabang render, bukan dua
+// kondisi independen yang bisa kebetulan sama-sama benar.
+type ScoreState =
+  | { status: "loading" }
+  | { status: "idle" }
+  | { status: "forbidden" }
+  | { status: "error"; message: string }
+  | { status: "done"; data: ProposalScore };
+
 function pesanGalat(error: unknown): string {
   return error instanceof ApiError ? error.message : "Terjadi kesalahan. Coba lagi sebentar lagi.";
 }
@@ -93,7 +127,7 @@ type ProposalDetailViewProps = {
 // RHYTHM 3 di DESIGN.md: tidak ada dua section berurutan berpola sama.
 export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
   const [proposal, setProposal] = useState<Keadaan<ProposalOut>>({ status: "loading" });
-  const [score, setScore] = useState<Keadaan<ProposalScore> | { status: "forbidden" } | null>(null);
+  const [score, setScore] = useState<ScoreState>({ status: "loading" });
   const [pledges, setPledges] = useState<Keadaan<PledgeOut[]> | { status: "forbidden" }>({
     status: "loading",
   });
@@ -176,9 +210,14 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
   useEffect(() => {
     if (proposal.status !== "done") return;
     if (proposal.data.scoring_status !== "done") {
-      setScore(null);
+      // "idle": tidak ada skor untuk diminta, bukan "belum selesai memuat".
+      // ScorePanel sendiri yang menampilkan keadaan menunggu/gagalnya lewat
+      // prop scoringStatus di bawah, jadi cabang ini tidak ikut merender
+      // LoadingState apa pun.
+      setScore({ status: "idle" });
       return;
     }
+    setScore({ status: "loading" });
     let dibatalkan = false;
     api
       .get<ProposalScore>(`/proposals/${proposalId}/scoring`)
@@ -220,9 +259,14 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
   }
 
   const data = proposal.data;
-  const terkumpul =
-    pledges.status === "done" ? pledges.data.reduce((total, p) => total + p.amount, 0) : 0;
-  const pendana = pledges.status === "done" ? pledges.data.length : 0;
+  // data.collected_amount, bukan menjumlahkan pledges.data sendiri: lihat
+  // komentar pada tipe ProposalOut. pendana (jumlah pendana) tetap hanya
+  // diketahui setelah daftar pledge per-investor berhasil dimuat, karena
+  // endpoint itu sendiri yang butuh login; undefined (bukan 0) saat belum
+  // diketahui, supaya FundingBar tahu membedakan "belum diketahui" dari
+  // "diketahui nol".
+  const terkumpul = data.collected_amount;
+  const pendana = pledges.status === "done" ? pledges.data.length : undefined;
   const sisa = Math.max(data.requested_amount - terkumpul, 0);
 
   const bisaDidanai = STATUS_BISA_DIDANAI.includes(data.status);
@@ -245,104 +289,169 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
       ? [...milestones.data].sort((a, b) => a.seq - b.seq).find((m) => m.status === "pending")?.id
       : undefined;
 
+  // Begitu dana tercapai, tidak ada lagi keputusan untuk diambil di layar
+  // ini: kerangka "dana yang diminta" (masih mengumpulkan) tidak jujur lagi
+  // terhadap keadaan sungguhan. Nominal yang memimpin halaman berganti ke
+  // total yang terkumpul, yang selalu tersedia begitu proposal sendiri
+  // termuat (data.collected_amount publik), tidak perlu menunggu pledges.
+  const sudahTuntas = data.status === "funded" || data.status === "completed";
+  const tampilkanTotalTerkumpul = sudahTuntas;
+
   return (
     <div className="mx-auto flex max-w-[76rem] flex-col gap-space-6 px-space-3 py-space-5">
       <header className="flex flex-wrap items-center justify-between gap-space-2 border-b border-line pb-space-3">
-        <h1 className="text-[clamp(1.75rem,4vw,2.5rem)] font-semibold leading-tight text-ink">
-          {data.business_name}
-        </h1>
+        <h1 className="text-page font-display text-ink">{data.business_name}</h1>
         <StatusBadge status={data.status} />
       </header>
 
-      {/* 1. Nominal diminta: motif identitas DESIGN.md. Lebar penuh, rata kiri,
-          satu kolom, tanpa rule. Ini yang dibaca lebih dulu: produk ini
-          tentang uang yang berpindah. */}
-      <section data-pola="sorotan-nominal" className="flex flex-col gap-space-1">
-        <Amount label="Dana yang diminta" amount={data.requested_amount} size="large" />
+      {/* 1. Nominal utama: motif identitas DESIGN.md, satu-satunya pemakaian
+          size="hero" di halaman ini. Lebar penuh, rata kiri, satu kolom,
+          tanpa rule. Ini yang dibaca lebih dulu: produk ini tentang uang
+          yang berpindah. Begitu dana tuntas, nominal yang memimpin berganti
+          dari "diminta" menjadi "terkumpul" karena tidak ada lagi keputusan
+          pendanaan yang bisa diambil di sini. */}
+      <section data-pola="sorotan-nominal" className="flex flex-col gap-space-1 break-words">
+        {/* break-words (overflow-wrap: break-word, diwariskan ke elemen
+            Amount di dalamnya): di 320px, "Rp20.000.000" pada ukuran hero
+            (clamp 3rem-5rem, dasarnya terkunci di 3rem/48px pada layar
+            sesempit ini) adalah satu "kata" rupiah tanpa spasi yang lebih
+            lebar daripada layarnya, dan tanpa ini meluber ke kanan (terbukti
+            lewat pengukuran scrollWidth > clientWidth di browser). Ini
+            properti yang diwariskan, bukan menyentuh Amount.tsx yang bukan
+            milik berkas ini. */}
+        {tampilkanTotalTerkumpul ? (
+          <Amount label="Total terkumpul, pendanaan tercapai" amount={terkumpul} size="hero" />
+        ) : (
+          <Amount label="Dana yang diminta" amount={data.requested_amount} size="hero" />
+        )}
       </section>
 
       {/* 2. Bilah funding dan daftar pemberi dana. Lebar penuh, rata kiri,
           satu kolom, DENGAN rule horizontal memisahkan bilah dari daftar
           pendana. Beda dari section 1 lewat kehadiran rule dan isi yang
-          lebih padat (bilah + daftar), bukan hanya label berbeda. */}
+          lebih padat (bilah + daftar), bukan hanya label berbeda.
+          FundingBar sendiri dirender tanpa syarat: terkumpul dan target
+          datang dari proposal yang publik. Yang tetap digerbang login hanya
+          daftar pendana satu per satu, karena GET .../pledges itulah yang
+          butuh token (bukti lewat verifikasi browser terhadap backend
+          sungguhan, bukan ditaksir dari dokumen). */}
       <section data-pola="bilah-lebar-penuh" className="flex flex-col gap-space-4 border-t border-line pt-space-4">
-        {pledges.status === "loading" && <LoadingState label="Memuat progres funding" minHeight={120} />}
+        <h2 className="text-section font-display text-ink">Progres pendanaan</h2>
+        <FundingBar terkumpul={terkumpul} target={data.requested_amount} pendana={pendana} />
+        {pledges.status === "loading" && <LoadingState label="Memuat daftar pendana" minHeight={80} />}
         {pledges.status === "forbidden" && (
-          <p className="max-w-measure text-body text-muted">
-            Masuk sebagai investor, atau sebagai UMKM pemilik proposal ini, untuk melihat progres
-            pendanaan dan daftar pendana.
+          <p className="max-w-measure border-t border-line pt-space-3 text-body text-muted">
+            Masuk sebagai investor, atau sebagai UMKM pemilik proposal ini, untuk melihat daftar
+            pendana satu per satu.
           </p>
         )}
         {pledges.status === "error" && <ErrorState message={pledges.message} onRetry={muatPledges} />}
-        {pledges.status === "done" && (
-          <>
-            <FundingBar terkumpul={terkumpul} target={data.requested_amount} pendana={pendana} />
-            {pledges.data.length > 0 && (
-              <ul className="flex flex-col gap-space-2 border-t border-line pt-space-3">
-                {pledges.data.map((pledge) => (
-                  <li key={pledge.id} className="flex items-center justify-between gap-space-3 text-body text-ink">
-                    <span>
-                      Investor &hellip;{pledge.investor_id.slice(-4)}
-                      {pledge.investor_id === data.lead_investor_id && (
-                        <span className="ml-space-2 text-label font-medium text-muted">(investor utama)</span>
-                      )}
-                    </span>
-                    <Amount label="" amount={pledge.amount} size="medium" />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
+        {pledges.status === "done" && pledges.data.length > 0 && (
+          <ul className="flex flex-col gap-space-2 border-t border-line pt-space-3">
+            {/* Pendana ke-N berdasarkan urutan waktu, bukan investor_id: GET
+                .../pledges (dikonfirmasi lewat permintaan sungguhan ke
+                backend) mengirim investor_id = null untuk menganonimkan
+                pemberi dana lain, dan is_lead_investor sebagai gantinya
+                untuk menandai investor utama. Tidak ada field lagi yang bisa
+                dipakai membedakan satu pendana dari pendana lain selain
+                urutan ini. */}
+            {[...pledges.data]
+              .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+              .map((pledge, index) => (
+                <li key={pledge.id} className="flex items-center justify-between gap-space-3 text-body text-ink">
+                  <span>
+                    Pendana ke-{index + 1}
+                    {pledge.is_lead_investor && (
+                      <span className="ml-space-2 text-label font-medium text-muted">(investor utama)</span>
+                    )}
+                  </span>
+                  <Amount label="" amount={pledge.amount} size="medium" />
+                </li>
+              ))}
+          </ul>
         )}
       </section>
 
       {/* 3. Cerita usaha dan rencana dana: teks naratif, lebar dibatasi
           max-w-measure, rata kiri, satu kolom, tanpa rule. Beda dari
-          section 2 lewat lebar (terbatas, bukan penuh). */}
+          section 2 lewat lebar (terbatas, bukan penuh). Satu judul section
+          (text-section) membuka bagian ini; ketiga sub-bagian di dalamnya
+          memakai ukuran judul kartu (text-card-title), bukan judul section
+          lagi, supaya tiga judul raksasa tidak berbaris tanpa jeda. */}
       <section data-pola="naratif-kiri" className="flex max-w-measure flex-col gap-space-4">
+        <h2 className="text-section font-display text-ink">Cerita usaha</h2>
         <div className="flex flex-col gap-space-1">
-          <h2 className="text-[1.75rem] font-semibold text-ink">Profil usaha</h2>
+          <h3 className="text-card-title font-semibold text-ink">Profil usaha</h3>
           <p className="text-body text-ink">{data.business_profile}</p>
         </div>
         <div className="flex flex-col gap-space-1">
-          <h2 className="text-[1.75rem] font-semibold text-ink">Rencana pemakaian dana</h2>
+          <h3 className="text-card-title font-semibold text-ink">Rencana pemakaian dana</h3>
           <p className="text-body text-ink">{data.fund_usage_plan}</p>
         </div>
         <div className="flex flex-col gap-space-1">
-          <h2 className="text-[1.75rem] font-semibold text-ink">Proyeksi usaha</h2>
+          <h3 className="text-card-title font-semibold text-ink">Proyeksi usaha</h3>
           <p className="text-body text-ink">{data.business_projection}</p>
         </div>
       </section>
 
-      {/* 4. Panel skor AI: lebar penuh, dua kolom asimetris (panel skor di
-          kiri lebih lebar, keterangan singkat di kanan tidak ada di sini
-          karena ScorePanel sendiri sudah menata brief di dalamnya; variasi
-          nyata dari section 3 datang dari lebar penuh vs terbatas, dan dari
-          grid 3 kolom komponen skor vs satu kolom paragraf). */}
-      <section data-pola="dua-kolom-asimetris" className="flex flex-col gap-space-3">
-        <h2 className="text-[1.75rem] font-semibold text-ink">Penilaian AI</h2>
-        {score === null && <LoadingState label="Memuat hasil penilaian" minHeight={160} />}
-        {score?.status === "forbidden" && (
-          <p className="max-w-measure text-body text-muted">
-            Panel skor hanya terlihat oleh investor dan pemilik proposal.
-          </p>
-        )}
-        {score?.status === "error" && <ErrorState message={score.message} onRetry={muatProposal} />}
-        {score?.status === "done" && <ScorePanel score={score.data} />}
-        {score === null && proposal.status === "done" && data.scoring_status !== "done" && (
-          <ScorePanel score={null} scoringStatus={data.scoring_status} onRescore={nilaiUlang} />
-        )}
+      {/* 4. Panel skor AI: lebar penuh, dua kolom asimetris SUNGGUHAN lewat
+          grid (panel skor 2fr di kiri, catatan "yang dinilai AI" 1fr di
+          kanan yang menyatu jadi satu kolom di mobile). Review browser
+          sebelumnya menemukan label ini terpasang di atas flex-col satu
+          kolom biasa, dengan class yang identik dengan section 6
+          (daftar-bernomor): keduanya "flex flex-col gap-space-3". Grid di
+          sini membuat labelnya jujur, dan membedakannya nyata dari section
+          3 (lebar terbatas, satu kolom) maupun section 6 (flex, bukan
+          grid). */}
+      <section
+        data-pola="dua-kolom-asimetris"
+        className="grid grid-cols-1 gap-space-4 border-t border-line pt-space-4 lg:grid-cols-[2fr_1fr]"
+      >
+        <div className="flex flex-col gap-space-3">
+          <h2 className="text-section font-display text-ink">Penilaian AI</h2>
+          {score.status === "loading" && <LoadingState label="Memuat hasil penilaian" minHeight={160} />}
+          {score.status === "forbidden" && (
+            <p className="max-w-measure text-body text-muted">
+              Panel skor hanya terlihat oleh investor dan pemilik proposal.
+            </p>
+          )}
+          {score.status === "error" && <ErrorState message={score.message} onRetry={muatProposal} />}
+          {score.status === "done" && <ScorePanel score={score.data} />}
+          {score.status === "idle" && (
+            <ScorePanel score={null} scoringStatus={data.scoring_status} onRescore={nilaiUlang} />
+          )}
+        </div>
+        <aside className="flex flex-col gap-space-2 border-t border-line pt-space-4 lg:border-l lg:border-t-0 lg:pl-space-4 lg:pt-0">
+          <p className="text-label font-medium text-muted">Yang dinilai AI</p>
+          <ul className="flex flex-col gap-space-2 text-body text-ink">
+            <li>Kecocokan sektor dan kebutuhan dana dengan kriteria campaign.</li>
+            <li>Kelengkapan dan konsistensi isian proposal.</li>
+            <li>Potensi dampak dibanding skala usaha yang diajukan.</li>
+          </ul>
+        </aside>
       </section>
 
       {/* 5. Form pledge: lebar dibatasi, rata TENGAH, satu kolom, tanpa
           rule, dibungkus kartu. Beda dari section 4 lewat lebar (terbatas)
-          dan rata tengah (section 4 rata kiri). */}
+          dan rata tengah (section 4 rata kiri). key={sisa} pada PledgeForm:
+          tanpa key, form menyimpan sisa dana lewat useState(sisa) sekali di
+          mount dan tidak pernah sinkron lagi, jadi setelah pledge sukses
+          (sisa yang sungguhan mengecil) form tetap menunjukkan sisa lama dan
+          membiarkan pengguna mengirim nominal yang pasti ditolak server;
+          satu-satunya jalan form tahu sisa yang benar sebelumnya adalah lewat
+          GAGAL dulu (409). key yang berubah memaksa PledgeForm remount
+          dengan sisa terbaru begitu pledges/proposal selesai dimuat ulang. */}
       <section data-pola="kartu-tengah" className="flex flex-col items-center">
         <div className="w-full max-w-[28rem] rounded-panel border border-line bg-panel px-space-4 py-space-5 text-center">
-          <h2 className="text-[1.125rem] font-semibold text-ink">Danai proposal ini</h2>
+          <h2 className="text-card-title font-semibold text-ink">Danai proposal ini</h2>
           {tampilkanFormPledge ? (
             <div className="mt-space-3 text-left">
-              <PledgeForm proposalId={proposalId} sisa={sisa} onSukses={() => { muatPledges(); muatProposal(); }} />
+              <PledgeForm
+                key={sisa}
+                proposalId={proposalId}
+                sisa={sisa}
+                onSukses={() => { muatPledges(); muatProposal(); }}
+              />
             </div>
           ) : (
             <p className="mt-space-2 text-body text-muted">{alasanPledgeDisembunyikan}</p>
@@ -354,7 +463,7 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
           daftar bernomor DENGAN rule horizontal antar tahap. Beda dari
           section 5 lewat lebar (penuh) dan rata kiri (section 5 tengah). */}
       <section data-pola="daftar-bernomor" className="flex flex-col gap-space-3">
-        <h2 className="text-[1.75rem] font-semibold text-ink">Milestone yang direncanakan</h2>
+        <h2 className="text-section font-display text-ink">Milestone yang direncanakan</h2>
         {milestones.status === "loading" && <LoadingState label="Memuat milestone" minHeight={160} />}
         {milestones.status === "error" && <ErrorState message={milestones.message} onRetry={muatMilestones} />}
         {milestones.status === "done" && (
@@ -364,9 +473,14 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
               .map((milestone, index) => (
                 <li
                   key={milestone.id}
-                  className={`flex flex-wrap items-baseline justify-between gap-space-2 border-t border-line py-space-3 first:border-t-0 first:pt-0 ${
-                    milestone.id === milestoneAktifId ? "border-l-4 border-l-accent pl-space-3" : ""
-                  }`}
+                  // Penanda tahap aktif cukup lewat badge "Tahap aktif" di
+                  // bawah, bukan ditambah border kiri --accent juga. Versi
+                  // sebelumnya memasang keduanya sekaligus (border-l-4
+                  // border-l-accent DAN badge aksen), menghabiskan dua dari
+                  // tiga jatah --accent di layar ini untuk satu ide yang
+                  // sama, dan DESIGN.md sudah mengecualikan aksen dari
+                  // border kartu secara eksplisit. Pilih satu: badge.
+                  className="flex flex-wrap items-baseline justify-between gap-space-2 border-t border-line py-space-3 first:border-t-0 first:pt-0"
                 >
                   <div className="flex items-baseline gap-space-2">
                     <span className="tabular text-label font-medium text-muted">
@@ -411,9 +525,13 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
 
       {/* 7. Komentar dan vote: lebar dibatasi max-w-measure, rata kiri,
           satu kolom, tanpa rule. Beda dari section 6 lewat lebar
-          (terbatas vs penuh) dan tanpa rule (section 6 pakai rule). */}
-      <section data-pola="utas-komentar" className="flex max-w-measure flex-col gap-space-4">
-        <h2 className="text-[1.75rem] font-semibold text-ink">Komentar</h2>
+          (terbatas vs penuh) dan tanpa rule (section 6 pakai rule). gap-space-3,
+          bukan gap-space-4 seperti section 3: CommentList dan CommentForm
+          sudah membawa jarak internalnya sendiri, dan class wrapper yang
+          identik dengan section 3 ("naratif-kiri") persis pola yang
+          ditemukan audit browser minggu ini di dua label berbeda. */}
+      <section data-pola="utas-komentar" className="flex max-w-measure flex-col gap-space-3">
+        <h2 className="text-section font-display text-ink">Komentar</h2>
         {/* key berubah memaksa CommentList remount lalu memuat ulang
             dirinya sendiri setelah komentar baru terkirim. CommentForm dan
             CommentList sengaja tetap dua komponen independen (masing-masing

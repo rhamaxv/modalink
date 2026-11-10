@@ -1,9 +1,15 @@
 import { formatRupiah, persenProgres } from "@/lib/money";
+import { Amount } from "@/components/ui/Amount";
 
 type FundingBarProps = {
   terkumpul: number;
   target: number;
-  pendana: number;
+  /** undefined saat jumlah pendana belum diketahui (pengunjung tanpa akun:
+   * GET .../pledges yang menghitungnya butuh login, sementara terkumpul dan
+   * target sendiri datang dari GET /proposals/{id} yang publik). Baris
+   * "Didanai oleh N investor" disembunyikan, bukan ditampilkan sebagai 0:
+   * nol adalah jumlah yang sah, undefined bukan. */
+  pendana?: number;
 };
 
 // Bilah funding: salah satu dari tepat tiga tempat --accent dipakai di layar
@@ -19,10 +25,11 @@ export function FundingBar({ terkumpul, target, pendana }: FundingBarProps) {
   return (
     <div className="flex flex-col gap-space-3">
       <div className="flex flex-wrap items-baseline justify-between gap-space-2">
-        <div className="text-left">
-          <p className="text-label font-medium text-muted">Terkumpul</p>
-          <p className="tabular text-[1.75rem] font-semibold text-ink">{formatRupiah(terkumpul)}</p>
-        </div>
+        {/* "Terkumpul" lewat komponen Amount, bukan ukuran yang diketik tangan:
+            DESIGN.md menetapkan nominal pendukung di 1,75rem/700/leading 1,10
+            (token "amount-sm"), dan setiap nominal rupiah pakai satu komponen
+            ini supaya tabular-nums dan ukurannya tidak menyimpang sendiri. */}
+        <Amount label="Terkumpul" amount={terkumpul} size="large" />
         <p className="tabular text-body text-muted">dari {formatRupiah(target)}</p>
       </div>
 
@@ -39,7 +46,7 @@ export function FundingBar({ terkumpul, target, pendana }: FundingBarProps) {
 
       <div className="flex flex-wrap items-baseline justify-between gap-space-2 text-label font-medium text-muted">
         <p className="tabular">sisa {formatRupiah(sisa)}</p>
-        <p className="tabular">Didanai oleh {pendana} investor</p>
+        {pendana !== undefined && <p className="tabular">Didanai oleh {pendana} investor</p>}
       </div>
     </div>
   );
