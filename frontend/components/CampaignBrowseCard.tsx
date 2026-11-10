@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Amount, EmptyState, ErrorState, LoadingState } from "@/components/ui";
+import {
+  Amount,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Pagination,
+  ResultCount,
+  Select,
+} from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ApiError, api } from "@/lib/api";
+import { formatRupiah } from "@/lib/money";
 
 // Bentuk ini mengikuti CampaignOut persis (backend/app/schemas/campaign.py):
 // dua deadline terpisah (BR-64/D-16), bukan satu, dan tidak ada field
@@ -39,6 +48,13 @@ export const SECTOR_LABEL: Record<string, string> = {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
+// Bentuk pendek khusus baris daftar: "15 Nov 2026". Dua tenggat berdampingan
+// di satu kolom sempit tidak muat dalam bentuk panjang, dan memotongnya di
+// tengah lebih buruk daripada menyingkat bulannya.
+function formatDateShort(iso: string): string {
+  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
 type CampaignBrowseCardProps = {
@@ -118,65 +134,200 @@ export function CampaignBrowseCard({ campaign, featured = false, index }: Campai
 type CampaignBrowseListState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; items: PublicCampaign[] };
+  | { status: "ready"; items: PublicCampaign[]; total: number };
+
+const SEMUA_SEKTOR = "";
+
+const SECTOR_OPTIONS = [
+  { value: SEMUA_SEKTOR, label: "Semua sektor" },
+  ...Object.entries(SECTOR_LABEL).map(([value, label]) => ({ value, label })),
+];
+
+const PAGE_SIZE = 20;
+
+function sisaHari(iso: string, sekarang: Date): number {
+  const selisih = new Date(iso).getTime() - sekarang.getTime();
+  return Math.ceil(selisih / (1000 * 60 * 60 * 24));
+}
+
+// Satu baris daftar, sepadan dengan ProposalRow di sisi investor.
+// CampaignBrowseCard di atas tetap dipakai di tempat lain yang memang
+// menampilkan sedikit campaign sekaligus.
+//
+// Kolom yang dipilih adalah kolom yang dipakai UMKM memutuskan: sektornya
+// cocok atau tidak, dananya sepadan atau tidak, dan masih sempat diajukan
+// atau tidak. Tenggat pendanaan tidak ikut ke baris ini karena ia tidak
+// mengikat keputusan mengajukan; ia ada di halaman detail campaign.
+function CampaignBrowseRow({
+  campaign,
+  index,
+  sekarang,
+}: {
+  campaign: PublicCampaign;
+  index: number;
+  sekarang: Date;
+}) {
+  const hari = sisaHari(campaign.apply_deadline, sekarang);
+  // Tujuh hari, bukan angka yang dipilih supaya ada yang berwarna: itu
+  // kira-kira batas di mana UMKM masih sempat menyusun proposal lengkap
+  // dengan rencana milestone sebelum tenggatnya lewat.
+  const mendesak = hari <= 7;
+  return (
+    <Link
+      href={`/jelajah/campaign/${campaign.id}`}
+      className="group flex flex-col gap-space-2 border-b border-line px-space-2 py-space-3 transition-colors hover:bg-panel-raised md:grid md:grid-cols-[2.5rem_minmax(0,1fr)_9rem_12rem_11rem] md:items-center md:gap-space-4"
+    >
+      <span aria-hidden="true" className="tabular text-label font-medium text-muted">
+        {String(index + 1).padStart(2, "0")}
+      </span>
+
+      <span className="flex min-w-0 flex-col gap-space-1">
+        <span className="truncate text-card-title font-semibold text-ink group-hover:underline">
+          {campaign.title}
+        </span>
+        <span className="line-clamp-1 text-label text-muted">{campaign.description}</span>
+      </span>
+
+      <span className="text-label text-muted">
+        {SECTOR_LABEL[campaign.sector] ?? campaign.sector}
+      </span>
+
+      <span className="flex flex-col gap-space-1 md:items-end">
+        <span className="tabular text-amount-sm text-ink">
+          {formatRupiah(campaign.target_amount)}
+        </span>
+        <span className="text-label text-muted">dana target</span>
+      </span>
+
+      {/* D-16: dua tenggat, label berbeda, tidak pernah hanya satu. Satu
+          mengikat pengajuan proposal, satu mengikat pendanaannya, dan
+          menampilkan salah satunya saja mengundang UMKM menyangka ia masih
+          punya waktu sampai tanggal yang sebenarnya milik tenggat yang lain.
+          Tetap berlaku di baris daftar yang sempit, bukan cuma di kartu. */}
+      <dl className="flex flex-col gap-space-1 text-label">
+        <div className="flex flex-wrap items-baseline gap-space-2">
+          <dt className="text-muted">Tenggat pengajuan</dt>
+          {/* --accent-text (berbalik ikut tema, duduk di atas --paper/--panel),
+              bukan --accent yang tidak pernah berbalik: ini teks, bukan latar.
+              Warnanya menandai tenggat yang sungguh tinggal sedikit, bukan
+              baris pertama yang kebetulan di atas. */}
+          <dd
+            className={`tabular ${mendesak ? "font-semibold text-accent-text" : "text-ink"}`}
+          >
+            {formatDateShort(campaign.apply_deadline)}
+            {mendesak && hari >= 0 ? ` (${hari} hari lagi)` : ""}
+          </dd>
+        </div>
+        <div className="flex flex-wrap items-baseline gap-space-2">
+          <dt className="text-muted">Tenggat pendanaan</dt>
+          <dd className="tabular text-muted">{formatDateShort(campaign.funding_deadline)}</dd>
+        </div>
+      </dl>
+    </Link>
+  );
+}
 
 // Daftar campaign publik di halaman jelajah, sisi UMKM dari layar yang sama
 // tempat ProposalList (ProposalCard.tsx) melayani sisi investor.
 //
-// GAP BACKEND YANG DIKETAHUI: GET /campaigns (backend/app/services/campaign.py,
-// list_campaigns) tidak memfilter status sama sekali, jadi campaign yang
-// sudah "closed" ikut terkirim meski 10-api-contract.md menyiratkan daftar
-// publik ini hanya yang open. Disaring di sini sebagai perbaikan sementara
-// di sisi klien, BUKAN dianggap sudah beres: pemilik project akan menutup
-// lubang ini di backend, dan filter klien ini boleh dibuang begitu itu terjadi.
-export function CampaignBrowseList() {
+// Penyaring sektor dan paginasi dikerjakan server lewat query string
+// (10-api-contract.md:44). Sebelum ini endpoint-nya tidak punya paginasi sama
+// sekali, jadi setiap pengunjung mengunduh seluruh campaign terbuka yang ada.
+//
+// Penyaring status "open" di bawah tetap dipertahankan walau daftar publik di
+// backend sudah menyaringnya: ia murah, dan ia yang menjamin campaign
+// tertutup tidak pernah sampai ke layar seandainya jalur publik dan jalur
+// "mine" tertukar di kemudian hari. Testnya di tests/campaign-browse.test.tsx
+// memverifikasi layar, bukan endpoint.
+export function CampaignBrowseList({
+  onTotalChange,
+}: {
+  onTotalChange?: (total: number) => void;
+}) {
   const [state, setState] = useState<CampaignBrowseListState>({ status: "loading" });
+  const [sector, setSector] = useState(SEMUA_SEKTOR);
+  const [page, setPage] = useState(1);
 
-  async function load() {
+  const load = useCallback(async () => {
     setState({ status: "loading" });
+    const query = new URLSearchParams({
+      page: String(page),
+      page_size: String(PAGE_SIZE),
+    });
+    if (sector !== SEMUA_SEKTOR) query.set("sector", sector);
     try {
-      const result = await api.get<{ items: PublicCampaign[] }>("/campaigns");
+      const result = await api.get<{ items: PublicCampaign[]; total: number }>(
+        `/campaigns?${query.toString()}`,
+      );
       const open = result.items.filter((campaign) => campaign.status === "open");
-      setState({ status: "ready", items: open });
+      setState({ status: "ready", items: open, total: result.total ?? open.length });
+      onTotalChange?.(result.total ?? open.length);
     } catch (error) {
       setState({
         status: "error",
-        message: error instanceof ApiError ? error.message : "Terjadi kesalahan. Coba lagi sebentar lagi.",
+        message:
+          error instanceof ApiError ? error.message : "Terjadi kesalahan. Coba lagi sebentar lagi.",
       });
     }
-  }
+  }, [page, sector, onTotalChange]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
-  if (state.status === "loading") {
-    return <LoadingState label="Memuat daftar campaign" minHeight={240} />;
-  }
-  if (state.status === "error") {
-    return <ErrorState message={state.message} onRetry={load} />;
-  }
-  if (state.items.length === 0) {
-    return (
-      <EmptyState reason="Belum ada campaign yang terbuka untuk menerima proposal saat ini." />
-    );
+  function gantiSektor(nilai: string) {
+    setSector(nilai);
+    setPage(1);
   }
 
-  // Campaign dengan tenggat pengajuan paling dekat paling perlu diperhatikan
-  // UMKM sekarang, jadi itulah yang mendapat perlakuan menonjol: hierarki
-  // nyata dari data, sama seperti CampaignList di dashboard investor,
-  // bukan urutan acak atau urutan mentah dari server.
-  const urgentId = state.items.reduce((a, b) =>
-    new Date(a.apply_deadline) < new Date(b.apply_deadline) ? a : b,
-  ).id;
+  const total = state.status === "ready" ? state.total : 0;
+  // Dihitung sekali per render, bukan di dalam tiap baris: dua puluh baris
+  // yang masing-masing memanggil new Date() bisa jatuh di sisi berbeda dari
+  // pergantian hari.
+  const sekarang = new Date();
 
   return (
-    <ol className="flex flex-col gap-space-3">
-      {state.items.map((campaign, index) => (
-        <li key={campaign.id} className="list-none">
-          <CampaignBrowseCard campaign={campaign} featured={campaign.id === urgentId} index={index} />
-        </li>
-      ))}
-    </ol>
+    <div className="flex flex-col gap-space-4">
+      <div className="flex flex-wrap items-center justify-between gap-space-3">
+        <Select label="Sektor" value={sector} options={SECTOR_OPTIONS} onChange={gantiSektor} />
+        <ResultCount page={page} pageSize={PAGE_SIZE} total={total} noun="campaign" />
+      </div>
+
+      {state.status === "loading" && (
+        <LoadingState label="Memuat daftar campaign" minHeight={240} />
+      )}
+      {state.status === "error" && <ErrorState message={state.message} onRetry={load} />}
+      {state.status === "ready" && state.items.length === 0 && (
+        <EmptyState
+          reason={
+            sector === SEMUA_SEKTOR
+              ? "Belum ada campaign yang terbuka untuk menerima proposal saat ini."
+              : "Tidak ada campaign terbuka di sektor itu. Coba sektor lain, atau pilih semua sektor."
+          }
+        />
+      )}
+      {state.status === "ready" && state.items.length > 0 && (
+        <>
+          <ol className="flex flex-col">
+            {state.items.map((campaign, index) => (
+              <li key={campaign.id} className="list-none">
+                <CampaignBrowseRow
+                  campaign={campaign}
+                  index={(page - 1) * PAGE_SIZE + index}
+                  sekarang={sekarang}
+                />
+              </li>
+            ))}
+          </ol>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={state.total}
+            onPageChange={setPage}
+            label="Halaman daftar campaign"
+          />
+        </>
+      )}
+    </div>
   );
 }

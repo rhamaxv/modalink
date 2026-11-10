@@ -23,6 +23,10 @@ type ProposalMasuk = {
   business_name: string;
   business_profile: string;
   requested_amount: number;
+  // ProposalWithSignalsOut mewarisi ProposalOut, jadi field ini memang ikut
+  // terkirim oleh GET /campaigns/{id}/proposals; sebelumnya cuma tidak
+  // pernah dideklarasikan di sini.
+  collected_amount: number;
   status: string;
   scoring_status: string;
   created_at: string;
@@ -46,6 +50,7 @@ function petakeProposal(p: ProposalMasuk): Proposal {
     business_name: p.business_name,
     business_profile_excerpt: cuplikan,
     requested_amount: p.requested_amount,
+    collected_amount: p.collected_amount,
     status: p.status,
     scoring_status: p.scoring_status,
     created_at: p.created_at,

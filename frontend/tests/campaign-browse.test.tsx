@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ExplorePage from "@/app/jelajah/page";
 import { ExploreTabs } from "@/components/ExploreTabs";
-import { CampaignBrowseList } from "@/components/CampaignBrowseCard";
+import { CampaignBrowseCard, CampaignBrowseList } from "@/components/CampaignBrowseCard";
 import { CampaignDetailPanel } from "@/components/CampaignDetailPanel";
 
 // Jelajah sekarang punya dua niat (investor cari proposal, UMKM cari
@@ -124,45 +124,65 @@ describe("CampaignBrowseList: three states, same discipline as ProposalList", ()
     expect(screen.queryByText("Dana Lama Yang Sudah Tutup")).not.toBeInTheDocument();
   });
 
-  it("renders every open campaign as a real link to its own detail route", async () => {
+  it("makes the whole row a link to the campaign, named by the campaign it belongs to", async () => {
+    // Satu tautan per baris, bukan tautan "Lihat campaign ini" terpisah: di
+    // daftar dua puluh baris, dua puluh tautan bernama sama persis tidak
+    // bisa dinavigasi pembaca layar.
     stubEndpoints({ campaigns: [OPEN_CAMPAIGN] });
     render(<CampaignBrowseList />);
-    const link = await screen.findByRole("link", { name: /lihat campaign ini/i });
-    expect(link.getAttribute("href")).toBe("/jelajah/campaign/c-open-1");
+    await screen.findByText("Dana Kuliner Lokal");
+    const link = screen
+      .getAllByRole("link")
+      .find((a) => a.getAttribute("href") === "/jelajah/campaign/c-open-1");
+    expect(link).toBeDefined();
+    expect(link?.textContent).toContain("Dana Kuliner Lokal");
   });
 
-  it("gives the campaign with the nearest apply deadline the larger nominal and an accent-text deadline", async () => {
+  it("marks only the apply deadline that is genuinely close, and leaves the others plain", async () => {
+    // Pagar ini dulu juga menuntut campaign dengan tenggat terdekat
+    // bernominal LEBIH BESAR dari yang lain. Tuntutan itu dicabut bersama
+    // perombakan halaman jelajah menjadi halaman indeks: nominal yang
+    // sejajar adalah yang membuat daftar panjang bisa dipindai, dan satu
+    // baris yang dibesarkan justru merusak kolomnya. Yang tetap dijaga
+    // adalah penanda warnanya, karena ia yang membawa informasi.
     stubEndpoints({ campaigns: [OPEN_CAMPAIGN, OPEN_CAMPAIGN_URGENT] });
     render(<CampaignBrowseList />);
     await screen.findByText("Dana Kerajinan Desa");
 
-    const urutan = ["text-amount", "text-amount-sm", "text-card-title"];
-    const tingkat = (el: HTMLElement) => urutan.findIndex((k) => el.className.split(" ").includes(k));
-    const urgentAmount = tingkat(screen.getByText("Rp50.000.000"));
-    const biasaAmount = tingkat(screen.getByText("Rp100.000.000"));
-    expect(urgentAmount).toBeGreaterThanOrEqual(0);
-    expect(urgentAmount, "kartu dengan tenggat terdekat harus lebih besar, bukan sama").toBeLessThan(biasaAmount);
-
-    expect(screen.getByText("Tenggat pengajuan paling dekat")).toBeInTheDocument();
-    const deadlineValues = screen.getAllByText(/november|desember/i);
-    const accented = deadlineValues.find((el) => el.className.includes("text-accent-text"));
-    expect(accented).toBeDefined();
+    const beraksen = screen
+      .getAllByText(/\d{1,2} \w+ 20\d\d/)
+      .filter((el) => el.className.split(" ").includes("text-accent-text"));
+    // Tepat satu: hanya OPEN_CAMPAIGN_URGENT yang tenggatnya dalam tujuh
+    // hari. Kalau keduanya ikut berwarna, warnanya berhenti berarti.
+    expect(beraksen).toHaveLength(1);
+    expect(beraksen[0]?.textContent).toMatch(/hari lagi/);
   });
 
-  it("shows the sector label as a chip, never as bare coloured text (accent-2 text fails AA in light mode)", async () => {
+  it("never renders the sector as bare accent-coloured text, in a row or in a chip", async () => {
+    // accent-2 sebagai warna TEKS polos mengukur 1,90:1 di tema terang dan
+    // dilarang DESIGN.md. Ada dua bentuk sektor di produk ini dan keduanya
+    // harus aman: teks biasa di baris daftar, dan chip di kartu.
     stubEndpoints({ campaigns: [OPEN_CAMPAIGN] });
-    render(<CampaignBrowseList />);
-    const chip = await screen.findByText("Kuliner");
+    const { unmount } = render(<CampaignBrowseList />);
+    const diBaris = await screen.findByText("Kuliner");
+    expect(diBaris.className).not.toMatch(/\btext-accent-2\b/);
+    expect(diBaris.className).not.toMatch(/\btext-accent\b/);
+    unmount();
+
+    const { getByText } = render(<CampaignBrowseCard campaign={OPEN_CAMPAIGN} />);
+    const chip = getByText("Kuliner");
     expect(chip.className).toContain("bg-accent-2");
     expect(chip.className).toContain("text-on-accent");
-    expect(chip.className).not.toContain("text-accent-2");
+    expect(chip.className).not.toMatch(/\btext-accent-2\b/);
   });
 
-  it("shows both deadlines with labels that tell them apart", async () => {
+  it("shows both deadlines with labels that tell them apart, even in the dense row (D-16)", async () => {
+    // Satu tenggat saja mengundang UMKM menyangka ia punya waktu sampai
+    // tanggal yang sebenarnya milik tenggat yang lain.
     stubEndpoints({ campaigns: [OPEN_CAMPAIGN] });
     render(<CampaignBrowseList />);
     await screen.findByText("Dana Kuliner Lokal");
-    expect(screen.getByText("Tenggat pengajuan proposal")).toBeInTheDocument();
+    expect(screen.getByText("Tenggat pengajuan")).toBeInTheDocument();
     expect(screen.getByText("Tenggat pendanaan")).toBeInTheDocument();
   });
 });

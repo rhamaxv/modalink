@@ -11,10 +11,22 @@ import Beranda from "@/app/page";
 // di bawah ("matches what is actually rendered") memeriksa struktur yang
 // sungguh dirender, karena audit desain pernah menemukan satu section
 // berlabel "dua-kolom-asimetris" yang sebenarnya satu kolom.
-function checkPolaBerurutanBerbeda(sourcePath: string) {
+// `minimalSection` adalah parameter, bukan 4 yang dipatok untuk semua
+// halaman, dan itu memperbaiki pagar yang salah.
+//
+// RHYTHM 3 di DESIGN.md melarang dua pola komposisi berurutan yang sama. Ia
+// tidak pernah menuntut jumlah section minimum. Angka 4 di sini ditulis
+// untuk halaman landing lalu diterapkan apa adanya ke halaman jelajah, dan
+// di sanalah ia merugikan: halaman INDEKS tidak punya empat gagasan
+// komposisi untuk diceritakan, ia punya satu daftar. Memaksanya tetap
+// berjumlah empat adalah alasan halaman itu sempat punya hero setinggi
+// 62vh, dua kartu pintu masuk, dan esai alur dana sebelum baris pertama
+// datanya. Dua tetap jadi batas bawah yang masuk akal: dengan satu pola,
+// aturan "tidak boleh sama dengan tetangganya" tidak menguji apa pun.
+function checkPolaBerurutanBerbeda(sourcePath: string, minimalSection = 2) {
   const source = readFileSync(sourcePath, "utf8");
   const patterns = [...source.matchAll(/data-pola="([a-z-]+)"/g)].map((m) => m[1]);
-  expect(patterns.length).toBeGreaterThanOrEqual(4);
+  expect(patterns.length).toBeGreaterThanOrEqual(minimalSection);
   patterns.forEach((pattern, i) => {
     if (i > 0) expect(pattern).not.toBe(patterns[i - 1]);
   });
@@ -35,7 +47,13 @@ function checkSetiapSectionBerpola(sourcePath: string) {
 function stubEmptyFetch() {
   vi.stubGlobal(
     "fetch",
-    vi.fn(() => Promise.resolve(new Response(JSON.stringify({ items: [] }), { status: 200 }))),
+    vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ items: [], total: 0, page: 1, page_size: 20 }), {
+          status: 200,
+        }),
+      ),
+    ),
   );
 }
 
@@ -46,6 +64,9 @@ function stubFetchWithProposals() {
       Promise.resolve(
         new Response(
           JSON.stringify({
+            total: 2,
+            page: 1,
+            page_size: 20,
             items: [
               {
                 id: "p1",
@@ -55,6 +76,7 @@ function stubFetchWithProposals() {
                 business_profile_excerpt:
                   "Usaha kopi rumahan yang sudah berjalan tiga tahun dan ingin memperluas kapasitas produksi.",
                 requested_amount: 25_000_000,
+                collected_amount: 5_000_000,
                 status: "listed",
                 scoring_status: "done",
                 lead_investor_id: null,
@@ -68,6 +90,7 @@ function stubFetchWithProposals() {
                 business_name: "Batik Lereng",
                 business_profile_excerpt: "Usaha batik tulis.",
                 requested_amount: 15_000_000,
+                collected_amount: 9_000_000,
                 status: "partially_funded",
                 scoring_status: "done",
                 lead_investor_id: "inv1",
@@ -99,7 +122,7 @@ describe("RHYTHM 3 on the explore page", () => {
 
 describe("RHYTHM 3 on the landing page", () => {
   it("has no two consecutive sections sharing the same composition pattern", () => {
-    checkPolaBerurutanBerbeda("app/page.tsx");
+    checkPolaBerurutanBerbeda("app/page.tsx", 4);
   });
 
   it("gives every section an explicit pattern attribute", () => {
@@ -234,13 +257,18 @@ function expectPageIsNotColourless(container: HTMLElement) {
 }
 
 describe("RHYTHM 3 patterns match what is actually rendered, not just their label", () => {
-  it("the explore hero is really an asymmetric two-column, not a centred single column", async () => {
-    // Dulu naratif-kiri: satu kolom selebar measure di tengah layar kosong,
-    // yang pemilik project sebut polos. Sekarang dua kolom tak setara dengan
-    // dua pintu masuk pasar di kolom kanan.
+  it("the explore page leads with a compact heading, not a composition that delays the list", async () => {
+    // Halaman indeks: judulnya satu kolom tanpa grid, dan tidak memesan
+    // tinggi layar. Pagar ini menggantikan pagar lama yang menuntut hero
+    // dua kolom asimetris di sini, dan hero itulah yang membuat daftar
+    // datanya mulai di bawah lipatan.
     stubEmptyFetch();
     const { container } = render(<ExplorePage />);
-    expectAsymmetricTwoColumn(findSectionByPola(container, "dua-kolom-asimetris"));
+    const judul = findSectionByPola(container, "judul-dan-kendali");
+    expectSingleColumnNarrative(judul);
+    expect(judul.className, "judul halaman indeks tidak boleh memesan tinggi layar").not.toMatch(
+      /min-h-\[/,
+    );
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
   });
 
@@ -251,11 +279,17 @@ describe("RHYTHM 3 patterns match what is actually rendered, not just their labe
     expectRealNumberedList(findSectionByPola(document.body, "daftar-bernomor"));
   });
 
-  it("dua-kolom-asimetris on the explore page truly renders two unequal columns", async () => {
+  it("puts the list above the closing bar, not below it", async () => {
+    // Urutan ini yang membedakan halaman indeks dari halaman pendaratan:
+    // ajakan mendaftar datang SETELAH pengunjung melihat ada sesuatu yang
+    // layak, bukan sebelum daftarnya sempat terbaca.
     stubEmptyFetch();
     const { container } = render(<ExplorePage />);
-    expectAsymmetricTwoColumn(findSectionByPola(container, "dua-kolom-asimetris"));
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
+    const pola = [...container.querySelectorAll("[data-pola]")].map((el) =>
+      el.getAttribute("data-pola"),
+    );
+    expect(pola.indexOf("daftar-bernomor")).toBeLessThan(pola.indexOf("lebar-penuh-cta"));
   });
 
   it("lebar-penuh-cta on the explore page bleeds full width with exactly one action", async () => {
@@ -467,34 +501,51 @@ describe("landing page is free of default AI-slop shapes", () => {
 });
 
 describe("public proposal list on the explore page", () => {
-  it("renders every proposal as a link to its detail page", async () => {
+  it("makes the whole row a link to the proposal, named by the business it belongs to", async () => {
+    // Satu tautan per baris, bukan tautan "Baca proposal" terpisah di dalam
+    // kartu. Di daftar dua puluh baris, dua puluh tautan yang namanya sama
+    // persis adalah daftar yang tidak bisa dinavigasi pembaca layar: nama
+    // tautannya harus menyebut proposal mana yang dituju.
     stubFetchWithProposals();
     render(<ExplorePage />);
     expect(await screen.findByText("Kopi Senja")).toBeInTheDocument();
-    expect(screen.getByText("Batik Lereng")).toBeInTheDocument();
-    const links = screen.getAllByRole("link", { name: /baca proposal$/i });
+    const links = screen
+      .getAllByRole("link")
+      .filter((a) => a.getAttribute("href")?.startsWith("/proposal/"));
     expect(links).toHaveLength(2);
-    links.forEach((a) => expect(a.getAttribute("href")).toMatch(/^\/proposal\//));
+    expect(links[0]?.textContent).toContain("Kopi Senja");
+    expect(links[1]?.textContent).toContain("Batik Lereng");
   });
 
-  it("gives the first proposal a larger nominal than the following ones", async () => {
-    // Versi sebelumnya mengassert kartu biasa TIDAK memakai 1.75rem, yang
-    // mengunci pelanggaran DESIGN.md: dokumen itu menetapkan 1.75rem sebagai
-    // batas BAWAH nominal di setiap kartu, bukan sebagai hak istimewa kartu
-    // pertama. Yang dijamin di sini adalah hierarkinya, bukan satu nilai rem
-    // tertentu, sehingga skala boleh berubah tanpa test ini ikut berbohong.
+  it("gives every row the same nominal scale, so the amounts line up as a column", async () => {
+    // Kebalikan dari pagar sebelumnya, dan itu disengaja. Dulu baris pertama
+    // wajib bernominal lebih besar dari sisanya. Aturan itu masuk akal di
+    // halaman yang memang punya satu kartu unggulan, dan menyesatkan di
+    // halaman indeks yang urutannya dipilih pengunjung: begitu daftar
+    // diurutkan dari nominal terkecil, baris pertama tidak lagi istimewa
+    // dalam arti apa pun, ia cuma kebetulan di atas. Yang membuat daftar
+    // panjang bisa dipindai adalah nominal yang sejajar, bukan satu baris
+    // yang dibesarkan.
     stubFetchWithProposals();
     render(<ExplorePage />);
     await screen.findByText("Kopi Senja");
-    const urutan = ["text-amount", "text-amount-sm", "text-card-title"];
-    const tingkat = (el: HTMLElement) =>
-      urutan.findIndex((k) => el.className.split(" ").includes(k));
+    const kelas = (teks: string) => screen.getByText(teks).className.split(" ");
+    expect(kelas("Rp25.000.000")).toContain("text-amount-sm");
+    expect(kelas("Rp15.000.000")).toContain("text-amount-sm");
+    // Angka tabular: tanpa ini, digit berlebar berbeda membuat kolom nominal
+    // bergoyang dan dua baris tidak bisa dibandingkan sekilas.
+    expect(kelas("Rp25.000.000")).toContain("tabular");
+  });
 
-    const utama = tingkat(screen.getByText("Rp25.000.000"));
-    const biasa = tingkat(screen.getByText("Rp15.000.000"));
-    expect(utama, "nominal kartu pertama tidak memakai token skala").toBeGreaterThanOrEqual(0);
-    expect(biasa, "nominal kartu kedua tidak memakai token skala").toBeGreaterThanOrEqual(0);
-    expect(utama, "kartu pertama harus lebih besar, bukan sama").toBeLessThan(biasa);
+  it("shows how much of each requested amount has actually been collected", async () => {
+    // collected_amount sudah ada di ProposalOut sejak lama tapi daftar ini
+    // tidak pernah membacanya, jadi setiap baris menyebut dana yang diminta
+    // tanpa satu pun petunjuk seberapa jauh ia sudah terkumpul.
+    stubFetchWithProposals();
+    render(<ExplorePage />);
+    await screen.findByText("Kopi Senja");
+    expect(screen.getByText("Rp5.000.000 terkumpul")).toBeInTheDocument();
+    expect(screen.getByText("Rp9.000.000 terkumpul")).toBeInTheDocument();
   });
 
   it("renders the list as a real ordered list, not a div that only looks numbered", async () => {

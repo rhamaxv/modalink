@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ProposalList } from "@/components/ProposalCard";
 import { CampaignBrowseList } from "@/components/CampaignBrowseCard";
 import { fetchCurrentUser } from "@/lib/auth";
@@ -22,6 +22,12 @@ type Tab = "proposal" | "campaign";
 export function ExploreTabs() {
   const [roleDefault, setRoleDefault] = useState<Tab>("proposal");
   const [tab, setTab] = useState<Tab | null>(null);
+  // Jumlah di label tab datang dari `total` milik kedua endpoint, bukan dari
+  // panjang array yang sedang tampil: dengan paginasi, panjang array adalah
+  // jumlah baris di halaman ini saja, dan menuliskannya sebagai "Proposal
+  // (20)" pada daftar berisi lima puluh adalah angka yang salah.
+  const [totalProposal, setTotalProposal] = useState<number | null>(null);
+  const [totalCampaign, setTotalCampaign] = useState<number | null>(null);
 
   useEffect(() => {
     fetchCurrentUser().then((user) => {
@@ -29,16 +35,42 @@ export function ExploreTabs() {
     });
   }, []);
 
+  // useCallback: kedua daftar memakai callback ini di dalam dependency
+  // useEffect-nya. Fungsi baru di tiap render akan membuat effect itu jalan
+  // lagi setiap kali state apa pun di sini berubah, dan karena effect itu
+  // sendiri memanggil setTotal..., hasilnya fetch yang memanggil dirinya
+  // sendiri tanpa henti.
+  const catatTotalProposal = useCallback((total: number) => setTotalProposal(total), []);
+  const catatTotalCampaign = useCallback((total: number) => setTotalCampaign(total), []);
+
   const aktif = tab ?? roleDefault;
 
-  // Bukan bg-accent: tab adalah sakelar tampilan, bukan aksi utama halaman,
-  // dan anggaran satu aksi berlatar aksen di layar ini sudah dipegang CTA
-  // "Daftar sekarang" di section penutup. Tab aktif ditandai border-ink,
-  // bukan warna, sama seperti pola tab yang sudah ada di tempat lain.
+  // Tab aktif ditandai garis --accent, bukan border-ink seperti sebelumnya.
+  // Ia penanda, bukan aksi: DESIGN.md menjatah aksi BERLATAR aksen (tepat
+  // satu per layar, dipegang tautan daftar di bawah), sementara aksen
+  // sebagai penanda dijatah sampai tiga kemunculan, dan menandai "daftar
+  // mana yang sedang Anda lihat" adalah penggunaan penanda yang paling
+  // langsung di halaman ini.
   function kelasTab(terpilih: boolean): string {
-    return `inline-flex min-h-[44px] items-center border-b-2 px-space-3 text-body font-semibold transition-colors ${
-      terpilih ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
+    return `inline-flex min-h-[44px] items-center gap-space-2 border-b-2 px-space-3 text-body font-semibold transition-colors ${
+      terpilih ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"
     }`;
+  }
+
+  function jumlah(total: number | null) {
+    // null berarti daftarnya belum selesai dimuat. Menulis "(0)" di sana
+    // akan menyatakan "tidak ada apa-apa di sini" selama satu detik pertama,
+    // yang justru kebalikan dari keadaan sebenarnya pada daftar yang penuh.
+    if (total === null) return null;
+    // aria-hidden: tanpa ini nama tab yang dibacakan menjadi "Campaign 2",
+    // yang menggantung tanpa satuan. Angkanya tetap sampai ke pembaca layar
+    // lewat ResultCount di dalam panelnya ("Menampilkan 1-20 dari 57
+    // campaign"), kalimat lengkap yang memang menyebut satuannya.
+    return (
+      <span aria-hidden="true" className="tabular text-label font-medium text-muted">
+        {total}
+      </span>
+    );
   }
 
   return (
@@ -58,6 +90,7 @@ export function ExploreTabs() {
           onClick={() => setTab("proposal")}
         >
           Proposal
+          {jumlah(totalProposal)}
         </button>
         <button
           type="button"
@@ -69,6 +102,7 @@ export function ExploreTabs() {
           onClick={() => setTab("campaign")}
         >
           Campaign
+          {jumlah(totalCampaign)}
         </button>
       </div>
       {/* hidden, bukan unmount bersyarat: kedua panel tetap dimuat sekali di
@@ -78,10 +112,10 @@ export function ExploreTabs() {
           pemeriksaan DOM (role query mengecualikan elemen hidden, sesuai
           pohon aksesibilitas yang sungguh dilihat pembaca layar). */}
       <div role="tabpanel" id="panel-proposal" aria-labelledby="tab-proposal" hidden={aktif !== "proposal"}>
-        <ProposalList />
+        <ProposalList onTotalChange={catatTotalProposal} />
       </div>
       <div role="tabpanel" id="panel-campaign" aria-labelledby="tab-campaign" hidden={aktif !== "campaign"}>
-        <CampaignBrowseList />
+        <CampaignBrowseList onTotalChange={catatTotalCampaign} />
       </div>
     </div>
   );
