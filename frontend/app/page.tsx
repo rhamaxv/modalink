@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ButtonLink } from "@/components/ui";
 import { FeaturedProposalHighlight } from "@/components/ProposalCard";
 
 const LANGKAH = [
@@ -58,11 +59,17 @@ const TAUTAN_TEKS =
 export default function Beranda() {
   return (
     <div className="flex flex-col">
+      {/*
+        min-h: hero sempat setinggi 98px di viewport 722px, yaitu 14 persen
+        layar, dan itu alasan utama halaman terasa terlalu sederhana.
+        Referensi yang ditunjuk pemilik project mengisi hampir seluruh layar
+        pertama.
+      */}
       <section
         data-pola="kiri-sorotan-nominal"
-        className="mx-auto w-full max-w-[72rem] px-space-3 py-space-7"
+        className="mx-auto flex w-full max-w-[72rem] items-center px-space-3 py-space-7 md:min-h-[78vh]"
       >
-        <div className="grid gap-space-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start">
+        <div className="grid w-full gap-space-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-center">
           <div className="flex max-w-measure flex-col gap-space-4">
             <h1 className="text-page font-display text-ink">
               Usaha lokal didanai bersama, dicairkan selangkah demi selangkah.
@@ -87,13 +94,20 @@ export default function Beranda() {
               <span className="rounded-sm bg-accent-2 px-1 text-on-accent">cair bertahap</span>{" "}
               setelah tiap milestone disetujui.
             </p>
-            <div className="flex flex-wrap gap-space-4">
-              <Link href="/jelajah" className={TAUTAN_TEKS}>
-                Jelajahi proposal yang terbuka
-              </Link>
-              <Link href="/daftar" className={TAUTAN_TEKS}>
+            {/*
+              Tombol berlatar aksen, bukan tautan teks. Versi sebelumnya
+              menjadikan keduanya tautan dengan alasan anggaran tiga aksen
+              sudah habis untuk CTA di section terakhir. Pembacaannya sah,
+              pertukarannya terbalik: aksi utama di hero adalah momen aksen
+              paling penting di halaman, dan menghabiskannya di bawah lipatan
+              membuat layar pertama tidak punya satu pun warna. CTA penutup
+              yang turun jadi sekunder.
+            */}
+            <div className="flex flex-wrap gap-space-3">
+              <ButtonLink href="/jelajah">Jelajahi proposal yang terbuka</ButtonLink>
+              <ButtonLink href="/daftar" varian="secondary">
                 Daftar
-              </Link>
+              </ButtonLink>
             </div>
           </div>
           <FeaturedProposalHighlight />
@@ -174,12 +188,9 @@ export default function Beranda() {
             Daftar sebagai investor untuk mulai mendanai, atau sebagai UMKM untuk mengajukan
             proposal usaha Anda.
           </p>
-          <Link
-            href="/daftar"
-            className="inline-flex min-h-[44px] items-center rounded-pill bg-accent px-space-5 py-space-2 text-body font-semibold text-on-accent"
-          >
+          <ButtonLink href="/daftar" varian="secondary">
             Daftar sekarang
-          </Link>
+          </ButtonLink>
         </div>
       </section>
     </div>

@@ -184,12 +184,28 @@ function expectRealNumberedList(section: HTMLElement) {
   expect(ol!.querySelectorAll("li").length).toBeGreaterThanOrEqual(2);
 }
 
-function expectFullBleedWithOneAccentAction(section: HTMLElement) {
+function expectFullBleedWithOneAction(section: HTMLElement) {
   expect(
     section.className,
     "pola lebar-penuh-cta tidak boleh dibatasi max-w pada <section> itu sendiri: itu artinya latarnya tidak menembus tepi",
   ).not.toMatch(/\bmax-w-/);
-  expect(section.querySelectorAll(".bg-accent").length).toBe(1);
+  // Satu ajakan bertindak, apa pun variannya. Versi sebelumnya menuntut satu
+  // aksi BERAKSEN di section ini, dan itu menempatkan satu-satunya momen aksen
+  // halaman di bawah lipatan sementara layar pertama tidak punya warna sama
+  // sekali. Anggaran aksen diperiksa di tingkat halaman, bukan di sini.
+  expect(section.querySelectorAll("a[href], button").length).toBe(1);
+}
+
+// DESIGN.md menjatah aksen per LAYAR, bukan per section, jadi inilah tempat
+// yang benar untuk memeriksanya. Satu aksi berlatar aksen di seluruh halaman:
+// lebih dari satu dan ia berhenti menandai mana keputusan utamanya, nol dan
+// halaman tidak punya warna sama sekali, yang justru keluhan pemilik project.
+function expectExactlyOneAccentAction(container: HTMLElement) {
+  const beraksen = container.querySelectorAll(".bg-accent");
+  expect(
+    beraksen.length,
+    `halaman ini punya ${beraksen.length} aksi berlatar aksen; DESIGN.md menghendaki tepat satu`,
+  ).toBe(1);
 }
 
 describe("RHYTHM 3 patterns match what is actually rendered, not just their label", () => {
@@ -214,10 +230,10 @@ describe("RHYTHM 3 patterns match what is actually rendered, not just their labe
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
   });
 
-  it("lebar-penuh-cta on the explore page bleeds full width with exactly one accent action", async () => {
+  it("lebar-penuh-cta on the explore page bleeds full width with exactly one action", async () => {
     stubEmptyFetch();
     const { container } = render(<ExplorePage />);
-    expectFullBleedWithOneAccentAction(findSectionByPola(container, "lebar-penuh-cta"));
+    expectFullBleedWithOneAction(findSectionByPola(container, "lebar-penuh-cta"));
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
   });
 
@@ -249,11 +265,23 @@ describe("RHYTHM 3 patterns match what is actually rendered, not just their labe
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
   });
 
-  it("lebar-penuh-cta on the landing page bleeds full width with exactly one accent action", async () => {
+  it("lebar-penuh-cta on the landing page bleeds full width with exactly one action", async () => {
     stubEmptyFetch();
     const { container } = render(<Beranda />);
-    expectFullBleedWithOneAccentAction(findSectionByPola(container, "lebar-penuh-cta"));
+    expectFullBleedWithOneAction(findSectionByPola(container, "lebar-penuh-cta"));
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
+  });
+
+  it("spends exactly one accent action across the whole landing page, and spends it above the fold", async () => {
+    stubEmptyFetch();
+    const { container } = render(<Beranda />);
+    await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
+    expectExactlyOneAccentAction(container);
+
+    // Dan ia ada di section pertama. Aksen yang dibelanjakan di bawah lipatan
+    // membuat layar pertama tanpa warna, keluhan yang memicu perubahan ini.
+    const pertama = container.querySelector("section");
+    expect(pertama?.querySelectorAll(".bg-accent").length).toBe(1);
   });
 });
 
@@ -292,13 +320,13 @@ describe("the rendered-structure guard can actually fail, proven on fabricated m
     const palsu = document.createElement("section");
     palsu.className = "max-w-measure";
     palsu.innerHTML = '<button class="bg-accent">x</button>';
-    expect(() => expectFullBleedWithOneAccentAction(palsu)).toThrow();
+    expect(() => expectFullBleedWithOneAction(palsu)).toThrow();
   });
 
   it("fails a section labelled lebar-penuh-cta when it has more than one accent action", () => {
     const palsu = document.createElement("section");
     palsu.innerHTML = '<button class="bg-accent">x</button><button class="bg-accent">y</button>';
-    expect(() => expectFullBleedWithOneAccentAction(palsu)).toThrow();
+    expect(() => expectFullBleedWithOneAction(palsu)).toThrow();
   });
 });
 
