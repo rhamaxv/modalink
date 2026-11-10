@@ -33,6 +33,10 @@ dependencies = [
   # tidak pernah ketangkap lokal; baru muncul sebagai ModuleNotFoundError
   # saat clean Docker build.
   "greenlet>=3.1",
+  # Unggahan multipart (UploadFile di api/v1/covers.py). FastAPI hanya
+  # mendeklarasikannya sebagai extra opsional, jadi tanpa baris ini endpoint
+  # unggah gagal dengan RuntimeError saat dipanggil, bukan saat instalasi.
+  "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]

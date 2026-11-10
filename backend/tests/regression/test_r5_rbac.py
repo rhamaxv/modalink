@@ -192,6 +192,40 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # 422 -- 200 di sini membuktikan endpointnya memang jalan tanpa token,
     # bukan ditolak diam-diam oleh pagar yang tidak ada.
     ("POST", "/api/v1/internal/seed", None, 200),
+    # Foto sampul. Yang dijaga di sini bukan cuma "peran mana yang boleh",
+    # tapi juga BENTUK penolakannya, dan keduanya sengaja berbeda antara
+    # proposal dan campaign:
+    #
+    # - Proposal milik orang lain dibalas 404, bukan 403. Proposal berstatus
+    #   submitted hanya boleh dilihat pemiliknya dan pemilik campaign, jadi
+    #   membalas 403 akan mengonfirmasi keberadaannya kepada UMKM lain.
+    # - Campaign milik orang lain dibalas 403. Daftar campaign memang publik
+    #   (10-api-contract.md:44), keberadaannya bukan rahasia, dan 404 di sana
+    #   justru menyesatkan pemiliknya sendiri.
+    ("PUT", "/api/v1/proposals/{proposal_id}/cover", None, 401),
+    ("PUT", "/api/v1/proposals/{proposal_id}/cover", "investor", 403),  # peran salah
+    ("PUT", "/api/v1/proposals/{proposal_id}/cover", "community", 403),  # peran salah
+    # 422, bukan 404: harness ini hanya mensubstitusi {campaign_id} dengan id
+    # sungguhan (lihat komentar di atas matriks), jadi {proposal_id} dikirim
+    # apa adanya dan gagal diurai sebagai UUID SESUDAH pagar peran lolos.
+    # Angka 422 di sini justru buktinya: UMKM memang melewati pagar peran.
+    # Kepemilikan proposal yang sesungguhnya diuji di
+    # tests/integration/test_cover.py, yang memakai proposal nyata.
+    ("PUT", "/api/v1/proposals/{proposal_id}/cover", "umkm", 422),
+    ("DELETE", "/api/v1/proposals/{proposal_id}/cover", None, 401),
+    ("DELETE", "/api/v1/proposals/{proposal_id}/cover", "investor", 403),
+    ("DELETE", "/api/v1/proposals/{proposal_id}/cover", "umkm", 422),
+    # 422 karena alasan yang sama dengan baris /comments di atas: path
+    # parameternya tidak disubstitusi harness ini. Yang dibuktikan di sini
+    # adalah endpointnya memang terbuka tanpa token, bukan 401.
+    ("GET", "/api/v1/proposals/{proposal_id}/cover", None, 422),
+    ("PUT", "/api/v1/campaigns/{campaign_id}/cover", None, 401),
+    ("PUT", "/api/v1/campaigns/{campaign_id}/cover", "umkm", 403),  # peran salah
+    ("PUT", "/api/v1/campaigns/{campaign_id}/cover", "investor_lain", 403),  # bukan pemilik
+    ("DELETE", "/api/v1/campaigns/{campaign_id}/cover", None, 401),
+    ("DELETE", "/api/v1/campaigns/{campaign_id}/cover", "umkm", 403),
+    ("DELETE", "/api/v1/campaigns/{campaign_id}/cover", "investor_lain", 403),
+    ("GET", "/api/v1/campaigns/{campaign_id}/cover", None, 404),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

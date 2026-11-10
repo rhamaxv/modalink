@@ -103,6 +103,10 @@ class ProposalOut(BaseModel):
     scoring_status: ScoringStatus
     lead_investor_id: UUID | None
     funded_at: datetime | None
+    # None berarti proposal ini belum punya foto sampul. Bukan boolean
+    # "punya sampul": waktunya sekaligus menjadi kunci cache pada URL gambar,
+    # sehingga sampul yang diganti tidak tertutup versi lama di browser.
+    cover_updated_at: datetime | None = None
     created_at: datetime
 
     @model_validator(mode="after")
@@ -137,6 +141,10 @@ class ProposalListItemOut(BaseModel):
     scoring_status: ScoringStatus
     lead_investor_id: UUID | None
     funded_at: datetime | None
+    # None berarti proposal ini belum punya foto sampul. Bukan boolean
+    # "punya sampul": waktunya sekaligus menjadi kunci cache pada URL gambar,
+    # sehingga sampul yang diganti tidak tertutup versi lama di browser.
+    cover_updated_at: datetime | None = None
     created_at: datetime
 
     @model_validator(mode="after")

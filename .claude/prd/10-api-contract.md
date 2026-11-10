@@ -46,6 +46,9 @@ Setiap error mengembalikan bentuk yang sama, sehingga frontend hanya perlu satu 
 | `PATCH /campaigns/{id}` | pemilik | Hanya `title`, `description`, dan `score_threshold`. `score_threshold` ditolak `409` bila sudah ada proposal masuk ([BR-77](07-business-rules.md)). |
 | `POST /campaigns/{id}/close` | pemilik | Status menjadi `closed`. |
 | `GET /campaigns/{id}/proposals` | pemilik | Semua proposal termasuk `rejected`, terurut skor lalu vote lalu waktu submit. |
+| `PUT /campaigns/{id}/cover` | pemilik | Foto sampul, multipart field `file`. Menimpa sampul lama. `422` bila byte-nya bukan JPG/PNG/WebP atau melebihi 1,5 MB. |
+| `DELETE /campaigns/{id}/cover` | pemilik | Menghapus foto sampul. |
+| `GET /campaigns/{id}/cover` | publik | Byte gambarnya. `404` bila belum ada sampul. |
 
 ## Proposal
 
@@ -57,6 +60,9 @@ Setiap error mengembalikan bentuk yang sama, sehingga frontend hanya perlu satu 
 | `GET /proposals/mine` | umkm | Proposal milik pengguna saat ini beserta statusnya. |
 | `POST /proposals/{id}/rescore` | pemilik proposal, pemilik campaign | Hanya bila `scoring_status = failed`, selain itu `409`. |
 | `GET /proposals/{id}/scoring` | pemilik proposal, investor | Hasil scoring terbaru lengkap dengan komponen, red flag, dan brief. `403` untuk peran komunitas ([BR-35](07-business-rules.md)). |
+| `PUT /proposals/{id}/cover` | pemilik proposal | Foto sampul, multipart field `file`. Menimpa sampul lama. `422` bila byte-nya bukan JPG/PNG/WebP atau melebihi 1,5 MB. |
+| `DELETE /proposals/{id}/cover` | pemilik proposal | Menghapus foto sampul. |
+| `GET /proposals/{id}/cover` | kondisional | Byte gambarnya, mengikuti aturan keterlihatan proposalnya sendiri. `404` bila belum ada sampul. |
 
 ## Pledge
 

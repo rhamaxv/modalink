@@ -24,6 +24,7 @@ from app.schemas.proposal import ProposalWithSignalsListOut
 from app.services.campaign import (
     CAMPAIGN_PAGE_SIZE_DEFAULT,
     CAMPAIGN_PAGE_SIZE_MAX,
+    CampaignWithCover,
     close_campaign_manually,
     create_campaign,
     get_campaign_detail,
@@ -31,6 +32,7 @@ from app.services.campaign import (
     list_campaigns,
     update_campaign,
 )
+from app.services.cover import ambil_cover, cover_versions
 
 router = APIRouter(prefix="/api/v1/campaigns", tags=["campaigns"])
 
@@ -73,7 +75,11 @@ async def list_campaigns_endpoint(
         items, total = await list_campaigns(
             session, sector=sector, page=page, page_size=page_size
         )
-    return CampaignListOut(items=items, total=total, page=page, page_size=page_size)
+    versi = await cover_versions(session, campaign_ids=[c.id for c in items])
+    berisi = [
+        CampaignWithCover(campaign=c, cover_updated_at=versi.get(c.id)) for c in items
+    ]
+    return CampaignListOut(items=berisi, total=total, page=page, page_size=page_size)
 
 
 @router.get("/{campaign_id}", response_model=CampaignOut)
@@ -81,11 +87,14 @@ async def get_campaign_endpoint(
     campaign_id: UUID,
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
-) -> Campaign:
+) -> CampaignWithCover:
     campaign = await get_campaign_detail(session, campaign_id, clock)
     if campaign is None:
         raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")
-    return campaign
+    cover = await ambil_cover(session, campaign_id=campaign_id)
+    return CampaignWithCover(
+        campaign=campaign, cover_updated_at=None if cover is None else cover.updated_at
+    )
 
 
 @router.patch("/{campaign_id}", response_model=CampaignOut)

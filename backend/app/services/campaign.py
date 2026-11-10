@@ -2,6 +2,7 @@
 (BR-64, BR-77, T-40, T-41)."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import desc, func
@@ -72,6 +73,22 @@ async def create_campaign(
 # yang ada ke setiap pengunjung.
 CAMPAIGN_PAGE_SIZE_DEFAULT = 20
 CAMPAIGN_PAGE_SIZE_MAX = 50
+
+
+@dataclass
+class CampaignWithCover:
+    """Campaign dibungkus waktu pembaruan sampulnya.
+
+    Pola yang sama dengan ProposalWithCollectedAmount di services/proposal.py,
+    dan alasannya sama: Campaign adalah model SQLModel/Pydantic v2 yang
+    menolak dititipi atribut bebas.
+    """
+
+    campaign: Campaign
+    cover_updated_at: datetime | None = None
+
+    def __getattr__(self, name: str):
+        return getattr(self.campaign, name)
 
 
 async def list_campaigns(

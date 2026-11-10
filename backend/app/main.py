@@ -4,6 +4,7 @@ from app.api.v1 import (
     auth,
     campaigns,
     community,
+    covers,
     health,
     internal,
     milestones,
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     app.include_router(pledges.router)
     app.include_router(milestones.router)
     app.include_router(community.router)
+    app.include_router(covers.router)
     if settings.env == "dev":
         # Router internal tidak pernah ada di produksi, bukan sekadar menolak
         # request-nya (BR-63): include_router di luar blok ini berarti ia

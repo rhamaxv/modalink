@@ -41,6 +41,8 @@ class CampaignOut(BaseModel):
     funding_deadline: datetime
     score_threshold: int
     status: CampaignStatus
+    # Sama seperti ProposalOut.cover_updated_at.
+    cover_updated_at: datetime | None = None
     created_at: datetime
 
 

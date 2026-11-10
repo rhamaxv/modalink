@@ -2,6 +2,7 @@
 
 from app.models.campaign import Campaign, CampaignStatus, Sector
 from app.models.comment import Comment
+from app.models.cover import CoverImage
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.milestone_report import MilestoneReport
 from app.models.milestone_report import ReportStatus as MilestoneReportStatus
@@ -22,6 +23,7 @@ __all__ = [
     "Campaign",
     "CampaignStatus",
     "Comment",
+    "CoverImage",
     "EntryType",
     "LedgerEntry",
     "MilestoneReport",

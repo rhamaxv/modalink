@@ -1,6 +1,7 @@
 """Orkestrasi proposal: submission dan aturan akses baca (BR-10 sampai BR-18)."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import desc, func
@@ -48,6 +49,10 @@ class ProposalWithCollectedAmount:
 
     proposal: Proposal
     collected_amount: int
+    # None berarti belum ada sampul. Nilainya dipakai dua hal sekaligus di
+    # klien: menentukan apakah gambar dirender sama sekali, dan menjadi kunci
+    # cache pada URL gambarnya (lihat services/cover.py versi_cache).
+    cover_updated_at: datetime | None = None
 
     def __getattr__(self, name: str):
         return getattr(self.proposal, name)

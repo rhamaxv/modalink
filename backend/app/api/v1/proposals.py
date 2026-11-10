@@ -36,6 +36,7 @@ from app.schemas.proposal import (
 )
 from app.schemas.scoring import ScoringResultOut
 from app.services.campaign import get_campaign
+from app.services.cover import ambil_cover, cover_versions
 from app.services.expiry import evaluate_expiry
 from app.services.ledger import collected_amount_for_proposal
 from app.services.proposal import (
@@ -115,6 +116,10 @@ async def list_proposals_endpoint(
         campaign_id=campaign_id,
         sort=sort,
     )
+    # Satu query untuk seluruh halaman, bukan satu per proposal.
+    versi = await cover_versions(session, proposal_ids=[p.id for p in items])
+    for item in items:
+        item.cover_updated_at = versi.get(item.id)
     return ProposalListOut(items=items, total=total, page=page, page_size=page_size)
 
 
@@ -127,7 +132,11 @@ async def list_my_proposals_endpoint(
     # satu segmen setelah /proposals, dan FastAPI mencocokkan route sesuai
     # urutan pendaftaran, jadi "mine" harus menang lebih dulu atau akan
     # ditelan oleh {proposal_id} sebagai literal string yang gagal UUID.
-    return await list_own_proposals(session, umkm.id)
+    milik = await list_own_proposals(session, umkm.id)
+    versi = await cover_versions(session, proposal_ids=[p.id for p in milik])
+    for item in milik:
+        item.cover_updated_at = versi.get(item.id)
+    return milik
 
 
 @router.get("/api/v1/proposals/{proposal_id}", response_model=ProposalOut)
@@ -153,8 +162,11 @@ async def get_proposal_endpoint(
         # dilihat sudah jadi kebocoran tersendiri.
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
     collected_amount = await collected_amount_for_proposal(session, proposal.id)
+    cover = await ambil_cover(session, proposal_id=proposal.id)
     return ProposalWithCollectedAmount(
-        proposal=proposal, collected_amount=collected_amount
+        proposal=proposal,
+        collected_amount=collected_amount,
+        cover_updated_at=None if cover is None else cover.updated_at,
     )
 
 
