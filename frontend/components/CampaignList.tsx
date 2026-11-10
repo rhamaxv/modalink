@@ -84,32 +84,43 @@ export function CampaignList() {
       : null;
 
   return (
-    <ul className="flex flex-col gap-space-3">
-      {state.items.map((campaign) => {
-        const featured = campaign.id === urgentId;
-        return (
-          <li key={campaign.id}>
-            <Link
-              href={`/investor/campaign/${campaign.id}`}
-              className={`block rounded-card border px-space-4 py-space-4 ${
-                featured ? "border-ink bg-paper" : "border-line bg-panel"
-              }`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-space-2">
-                <h3 className={`font-semibold text-ink ${featured ? "text-[1.25rem]" : "text-[1.125rem]"}`}>
-                  {campaign.title}
-                </h3>
-                <StatusBadge status={campaign.status} />
-              </div>
-              <Amount label="Dana target" amount={campaign.target_amount} size={featured ? "large" : "medium"} />
-              <p className="mt-space-2 text-label text-muted">
-                Tenggat pengajuan {formatDate(campaign.apply_deadline)}, tenggat funding{" "}
-                {formatDate(campaign.funding_deadline)}
-              </p>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex flex-col gap-space-4">
+      {/* Satu-satunya tempat tombol ini dirender saat daftar tidak kosong:
+          lihat komentar di app/investor/campaign/page.tsx untuk alasan
+          header halaman sengaja tidak punya salinannya sendiri lagi. */}
+      <Link
+        href="/investor/campaign/baru"
+        className="inline-flex min-h-[44px] items-center self-start rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-on-accent"
+      >
+        Buat campaign baru
+      </Link>
+      <ul className="flex flex-col gap-space-3">
+        {state.items.map((campaign) => {
+          const featured = campaign.id === urgentId;
+          return (
+            <li key={campaign.id}>
+              <Link
+                href={`/investor/campaign/${campaign.id}`}
+                className={`block rounded-card border px-space-4 py-space-4 ${
+                  featured ? "border-ink bg-paper" : "border-line bg-panel"
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-space-2">
+                  <h3 className={`font-semibold text-ink ${featured ? "text-card-title" : "text-body"}`}>
+                    {campaign.title}
+                  </h3>
+                  <StatusBadge status={campaign.status} />
+                </div>
+                <Amount label="Dana target" amount={campaign.target_amount} size={featured ? "large" : "medium"} />
+                <p className="mt-space-2 text-label text-muted">
+                  Tenggat pengajuan {formatDate(campaign.apply_deadline)}, tenggat funding{" "}
+                  {formatDate(campaign.funding_deadline)}
+                </p>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

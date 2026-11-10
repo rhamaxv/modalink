@@ -215,4 +215,30 @@ describe("CampaignList: investor's own campaigns", () => {
     expect(await within(alert).findByText(/server sedang bermasalah/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /coba lagi/i })).toBeInTheDocument();
   });
+
+  it("never renders the create-campaign action twice, whether the list is empty or not", async () => {
+    // Laporan review: app/investor/campaign/page.tsx dulu merender tombol
+    // header "Buat campaign baru" SENDIRI, lalu CampaignList merender aksi
+    // EmptyState dengan label identik begitu daftar kosong, dua tombol aksen
+    // bertumpuk. Halaman sekarang tidak lagi punya salinannya sendiri (lihat
+    // app/investor/campaign/page.tsx); test ini mengunci itu dari sisi
+    // CampaignList untuk kedua keadaan, kosong maupun terisi.
+    vi.stubGlobal("fetch", (url: string) => {
+      if (url.includes("/auth/me")) return fakeResponse(200, CURRENT_USER);
+      if (url.includes("/campaigns")) return fakeResponse(200, { items: [] });
+      throw new Error(`unexpected fetch call to ${url}`);
+    });
+    render(<CampaignList />);
+    expect(await screen.findAllByText(/buat campaign baru/i)).toHaveLength(1);
+  });
+
+  it("renders exactly one create-campaign link once the investor already has a campaign", async () => {
+    vi.stubGlobal("fetch", (url: string) => {
+      if (url.includes("/auth/me")) return fakeResponse(200, CURRENT_USER);
+      if (url.includes("/campaigns")) return fakeResponse(200, { items: [BASE_CAMPAIGN] });
+      throw new Error(`unexpected fetch call to ${url}`);
+    });
+    render(<CampaignList />);
+    expect(await screen.findAllByText(/buat campaign baru/i)).toHaveLength(1);
+  });
 });
