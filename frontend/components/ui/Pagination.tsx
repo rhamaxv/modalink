@@ -1,5 +1,7 @@
 "use client";
 
+import { Icon } from "@/components/icons/Icon";
+
 type PaginationProps = {
   page: number;
   pageSize: number;
@@ -23,7 +25,7 @@ export function Pagination({ page, pageSize, total, onPageChange, label }: Pagin
   if (totalHalaman <= 1) return null;
 
   const kelas =
-    "inline-flex min-h-[44px] items-center rounded-pill border border-line-strong px-space-3 text-body font-medium text-ink transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:border-line disabled:text-muted disabled:hover:bg-transparent";
+    "inline-flex min-h-[44px] items-center gap-space-2 rounded-pill border border-line-strong px-space-3 text-body font-medium text-ink transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:border-line disabled:text-muted disabled:hover:bg-transparent";
 
   return (
     <nav
@@ -36,6 +38,7 @@ export function Pagination({ page, pageSize, total, onPageChange, label }: Pagin
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
       >
+        <Icon name="arrow-left" size={18} />
         Sebelumnya
       </button>
       {/* aria-live: pindah halaman tidak memindahkan fokus dan tidak memuat
@@ -51,6 +54,7 @@ export function Pagination({ page, pageSize, total, onPageChange, label }: Pagin
         disabled={page >= totalHalaman}
       >
         Berikutnya
+        <Icon name="arrow-right" size={18} />
       </button>
     </nav>
   );

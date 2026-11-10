@@ -1,3 +1,5 @@
+import { Icon, type IconName } from "@/components/icons/Icon";
+
 // Satu tempat untuk seluruh status di aplikasi ini, karena penandaan status yang
 // berbeda-beda per halaman membuat pengguna harus belajar ulang arti warna di
 // setiap layar. Dipakai halaman proposal, campaign, milestone, dan dashboard.
@@ -38,6 +40,19 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
 // Rasio kontras tiap pasangan di bawah sudah diukur dan tercatat di DESIGN.md.
 // Latar memakai --surface, bukan warna status yang dimudakan, supaya tidak ada
 // pasangan baru yang belum terukur masuk lewat pintu belakang.
+// Satu ikon per nada, bukan satu ikon per status. Dua puluh status berbagi
+// lima nada, dan ikon yang berbeda-beda per status justru memaksa pengguna
+// menghafal dua puluh lambang. Ikonnya menegaskan nada yang warnanya sudah
+// sampaikan, dan itulah gunanya: warna saja bukan penanda yang sah (WCAG
+// 1.4.1), dan badge ini muncul di hampir setiap halaman.
+const TONE_ICON: Record<Tone, IconName> = {
+  netral: "clock",
+  berjalan: "clock",
+  "perlu-tindakan": "alert",
+  berhasil: "check",
+  gagal: "alert",
+};
+
 const TONE_CLASS: Record<Tone, string> = {
   netral: "text-muted",
   berjalan: "text-ink",
@@ -63,8 +78,13 @@ export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
   return (
     <span
       data-status={status}
-      className={`inline-flex items-center rounded-pill border border-line bg-panel-raised px-space-3 py-space-1 text-label font-medium ${TONE_CLASS[tone]} ${className}`}
+      className={`inline-flex items-center gap-space-1 rounded-pill border border-line bg-panel-raised px-space-3 py-space-1 text-label font-medium ${TONE_CLASS[tone]} ${className}`}
     >
+      {/* 14px, bukan 20px: ikon di dalam pil setinggi label harus lebih kecil
+          dari tinggi barisnya sendiri, atau pilnya melar dan tinggi tiap baris
+          daftar ikut berubah. Tanpa title, jadi aria-hidden: labelnya sudah
+          mengatakan hal yang sama persis di sebelahnya. */}
+      <Icon name={TONE_ICON[tone]} size={14} />
       {label}
     </span>
   );

@@ -1,3 +1,5 @@
+import { Icon } from "@/components/icons/Icon";
+
 type EmptyStateAction = {
   label: string;
   onClick: () => void;
@@ -15,6 +17,13 @@ type EmptyStateProps = {
 export function EmptyState({ reason, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-start gap-space-3 rounded-card border border-line bg-panel px-space-4 py-space-5 text-left">
+      {/* Satu tanda kecil, bukan ilustrasi besar. Kotak kosong beserta
+          ikonnya yang redup menyatakan "di sini seharusnya ada isi" lebih
+          cepat daripada kalimatnya sendiri, tapi ilustrasi sebesar setengah
+          layar hanya menunda kalimat yang justru menjelaskan sebabnya. */}
+      <span className="flex h-10 w-10 items-center justify-center rounded-sm border border-line text-muted">
+        <Icon name="image" size={20} />
+      </span>
       <p className="max-w-measure text-body text-muted">{reason}</p>
       {action && (
         <button

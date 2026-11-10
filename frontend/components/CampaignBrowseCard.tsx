@@ -12,6 +12,7 @@ import {
   Select,
 } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Icon, type IconName } from "@/components/icons/Icon";
 import { ApiError, api } from "@/lib/api";
 import { formatRupiah } from "@/lib/money";
 
@@ -37,6 +38,19 @@ export type PublicCampaign = {
 // Enam sektor tetap dari backend/app/models/campaign.py (Sector StrEnum).
 // Diekspor supaya CampaignDetailPanel memakai pemetaan yang sama, bukan
 // menyalin ulang enum ini di dua tempat yang bisa diam-diam menyimpang.
+// Kunci yang sama dengan SECTOR_LABEL, dan pagar di tests/icons.test.tsx
+// menolak kalau keduanya pernah berbeda isi. Sektor yang ditambahkan di
+// backend tanpa ikonnya akan tertangkap di sana, bukan muncul sebagai kotak
+// kosong di layar.
+export const SECTOR_ICON: Record<string, IconName> = {
+  kuliner: "kuliner",
+  kerajinan: "kerajinan",
+  pertanian: "pertanian",
+  jasa: "jasa",
+  ritel: "ritel",
+  teknologi: "teknologi",
+};
+
 export const SECTOR_LABEL: Record<string, string> = {
   kuliner: "Kuliner",
   kerajinan: "Kerajinan",
@@ -88,7 +102,10 @@ export function CampaignBrowseCard({ campaign, featured = false, index }: Campai
             TEKS polos gagal kontras di tema terang (lihat
             tests/accent-contrast.test.ts), jadi label kategori tidak pernah
             ditulis sebagai teks berwarna lepas. */}
-        <span className="inline-flex w-fit items-center rounded-pill bg-accent-2 px-space-3 py-space-1 text-label font-medium text-on-accent">
+        <span className="inline-flex w-fit items-center gap-space-1 rounded-pill bg-accent-2 px-space-3 py-space-1 text-label font-medium text-on-accent">
+          {SECTOR_ICON[campaign.sector] && (
+            <Icon name={SECTOR_ICON[campaign.sector]!} size={14} />
+          )}
           {SECTOR_LABEL[campaign.sector] ?? campaign.sector}
         </span>
         {featured && (
@@ -188,7 +205,13 @@ function CampaignBrowseRow({
         <span className="line-clamp-1 text-label text-muted">{campaign.description}</span>
       </span>
 
-      <span className="text-label text-muted">
+      {/* Ikon mendahului namanya, bukan menggantikannya: enam sektor terlalu
+          sedikit bedanya untuk dikenali dari lambang saja, tapi cukup untuk
+          membuat kolom ini bisa dipindai sekilas saat namanya sudah hafal. */}
+      <span className="flex items-center gap-space-2 text-label text-muted">
+        {SECTOR_ICON[campaign.sector] && (
+          <Icon name={SECTOR_ICON[campaign.sector]!} size={16} />
+        )}
         {SECTOR_LABEL[campaign.sector] ?? campaign.sector}
       </span>
 

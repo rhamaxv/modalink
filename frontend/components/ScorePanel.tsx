@@ -1,3 +1,5 @@
+import { Icon } from "@/components/icons/Icon";
+
 type RedFlagSeverity = "info" | "warning" | "critical";
 
 type RedFlag = {
@@ -89,8 +91,9 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
           <button
             type="button"
             onClick={onRescore}
-            className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-body font-semibold text-ink"
+            className="inline-flex min-h-[44px] items-center gap-space-2 rounded-sm border border-line-strong px-space-3 py-space-2 text-body font-semibold text-ink transition-colors hover:bg-panel-raised"
           >
+            <Icon name="score" size={18} />
             Nilai ulang
           </button>
         </div>
@@ -128,7 +131,13 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
   return (
     <div className="flex flex-col gap-space-4 rounded-panel border border-line bg-panel px-space-4 py-space-5">
       <div className="flex flex-wrap items-baseline justify-between gap-space-2">
-        <p className="text-amount-sm font-display text-ink">
+        <p className="flex items-center gap-space-2 text-amount-sm font-display text-ink">
+          {/* Menandai angka ini sebagai penilaian AI, bukan nominal rupiah:
+              keduanya memakai skala tipografi yang sama di produk ini, dan
+              "78" tanpa penanda apa pun terbaca ambigu. Bintang empat sudut,
+              bukan otak atau robot: yang terjadi di sini adalah penilaian,
+              bukan pertunjukan kecerdasan buatan. */}
+          <Icon name="score" size={22} className="text-accent-text" />
           <span className="tabular">{score.total_score}</span>
           <span className="text-label font-medium text-muted"> dari 100</span>
         </p>
