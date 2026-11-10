@@ -20,10 +20,17 @@ export type Milestone = {
   description?: string;
   amount: number;
   status: "pending" | "reported" | "disbursed";
-  /** Seluruh riwayat laporan tahap ini, terbaru maupun yang sudah direvisi
-   * (BR-46): laporan tidak pernah ditimpa, jadi riwayatnya wajib tetap
-   * terlihat, bukan hanya laporan terakhir. */
-  reports?: MilestoneReport[];
+  /**
+   * Laporan TERBARU tahap ini, bukan array riwayat. GET
+   * /proposals/{id}/milestones (.claude/prd/10-api-contract.md baris 73)
+   * mengirim "laporan terakhir", tunggal, lewat field `latest_report`.
+   * Versi sebelumnya mengharapkan `reports: MilestoneReport[]` yang tidak
+   * pernah dikirim API manapun, jadi narasi laporan tidak pernah tampil dan
+   * lead investor menyetujui pencairan tanpa membaca laporannya sama sekali
+   * (BR-46 tetap menjamin revisi tersimpan sebagai baris baru di database,
+   * tapi endpoint ini sendiri cuma mengekspos yang terbaru).
+   */
+  latest_report?: MilestoneReport | null;
 };
 
 export type MilestoneTimelineProps = {
@@ -62,7 +69,13 @@ function StageActions({ milestone, onApprove, onReject }: StageActionsProps) {
           type="button"
           onClick={() => onApprove?.(milestoneId)}
           aria-label={`Setujui pencairan tahap ${milestone.seq}: ${milestone.title}`}
-          className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-on-accent"
+          // bg-ink, bukan bg-accent: tombol ini berulang satu kali per entri
+          // antrian, dan anggaran --accent DESIGN.md adalah tiga kemunculan
+          // per LAYAR, bukan per entri. Antrian dua entri dengan badge aktif
+          // ditambah tombol ini pernah terukur empat aksen di satu layar
+          // (audit investor/milestone). Ink-fill tetap kontras tertinggi
+          // (hitam-putih di kedua tema) tanpa memakai token aksen sama sekali.
+          className="min-h-[44px] rounded-sm bg-ink px-space-4 py-space-2 text-base font-semibold text-paper"
         >
           Setujui
         </button>
@@ -70,7 +83,7 @@ function StageActions({ milestone, onApprove, onReject }: StageActionsProps) {
           type="button"
           onClick={() => setRejecting(true)}
           aria-label={`Tolak laporan tahap ${milestone.seq}: ${milestone.title}`}
-          className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-base font-semibold text-ink"
+          className="min-h-[44px] rounded-sm border border-line-strong px-space-3 py-space-2 text-base font-semibold text-ink"
         >
           Tolak
         </button>
@@ -118,9 +131,11 @@ function StageActions({ milestone, onApprove, onReject }: StageActionsProps) {
 
 // Lini milestone satu proposal, disusun vertikal dengan nominal besar di
 // tiap tahap (motif identitas DESIGN.md). Tahap aktif (tahap pertama yang
-// belum cair, berjalan dari urutan seq) mendapat Amount berukuran besar
-// dan satu lencana aksen "Tahap berjalan"; tahap lain memakai ukuran sedang
-// dan tanpa aksen, supaya aksen tetap bermakna satu per layar (DESIGN.md).
+// belum cair, berjalan dari urutan seq) mendapat Amount berukuran besar dan
+// satu lencana penanda accent-2 "Tahap berjalan"; tahap lain memakai ukuran
+// sedang dan tanpa lencana. Tombol "Setujui" sengaja TIDAK memakai --accent:
+// ia berulang satu kali per entri pada ApprovalQueue, dan anggaran tiga
+// kemunculan lime DESIGN.md dihitung per layar, bukan per entri.
 export function MilestoneTimeline({
   milestones,
   isLeadInvestor = false,
@@ -169,9 +184,14 @@ export function MilestoneTimeline({
               <StatusBadge status={milestone.status} />
             </div>
             <div className="flex flex-wrap items-center gap-space-2">
-              <p className="text-[1.125rem] font-semibold text-ink">{milestone.title}</p>
+              <p className="text-card-title font-semibold text-ink">{milestone.title}</p>
               {aktif && (
-                <span className="inline-flex w-fit items-center rounded-sm bg-accent px-space-2 py-space-1 text-label font-semibold text-on-accent">
+                // accent-2 (periwinkle), bukan accent (lime): ini penanda
+                // tahap mana yang aktif, bukan tindakan, dan DESIGN.md
+                // menugaskan periwinkle khusus untuk peran itu supaya ia bisa
+                // berulang per entri antrian tanpa memakan anggaran tiga
+                // kemunculan lime per layar.
+                <span className="inline-flex w-fit items-center rounded-sm bg-accent-2 px-space-2 py-space-1 text-label font-semibold text-on-accent">
                   Tahap berjalan
                 </span>
               )}
@@ -181,21 +201,17 @@ export function MilestoneTimeline({
             )}
             <p className="text-body text-ink">{teksTahap}</p>
 
-            {milestone.reports && milestone.reports.length > 0 && (
-              <ol className="flex flex-col gap-space-2 border-t border-line pt-space-2">
-                {[...milestone.reports].reverse().map((report, i) => (
-                  <li key={i} className="text-body text-ink">
-                    <p className={report.review_status === "rejected" ? "text-danger" : "text-ink"}>
-                      {reviewLabel(report.review_status)}: {report.narrative}
-                    </p>
-                    {report.review_status === "rejected" && report.reviewer_note && (
-                      <p className="mt-space-1 text-label text-muted">
-                        Catatan revisi: {report.reviewer_note}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ol>
+            {milestone.latest_report && (
+              <div className="flex flex-col gap-space-1 border-t border-line pt-space-2">
+                <p className={milestone.latest_report.review_status === "rejected" ? "text-body text-danger" : "text-body text-ink"}>
+                  {reviewLabel(milestone.latest_report.review_status)}: {milestone.latest_report.narrative}
+                </p>
+                {milestone.latest_report.review_status === "rejected" && milestone.latest_report.reviewer_note && (
+                  <p className="text-label text-muted">
+                    Catatan revisi: {milestone.latest_report.reviewer_note}
+                  </p>
+                )}
+              </div>
             )}
 
             {isLeadInvestor && bisaDiputuskan && (
@@ -235,7 +251,7 @@ export function ApprovalQueue({ milestones, onApprove, onReject }: ApprovalQueue
     <div className="flex flex-col gap-space-6">
       {milestones.map((item) => (
         <div key={`${item.proposalId}-${item.seq}`} className="flex flex-col gap-space-2">
-          <Link href={`/proposal/${item.proposalId}`} className="text-[1.125rem] font-semibold text-ink underline">
+          <Link href={`/proposal/${item.proposalId}`} className="text-card-title font-semibold text-ink underline">
             {item.businessName}
           </Link>
           <MilestoneTimeline

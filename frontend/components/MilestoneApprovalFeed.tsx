@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ErrorState, LoadingState } from "@/components/ui";
+import { Amount, ErrorState, LoadingState } from "@/components/ui";
 import { ApprovalQueue, type ApprovalQueueEntry, type Milestone } from "@/components/MilestoneTimeline";
 import { ApiError, api } from "@/lib/api";
 import { fetchCurrentUser } from "@/lib/auth";
@@ -102,5 +102,19 @@ export function MilestoneApprovalFeed() {
   if (state.status === "error") {
     return <ErrorState message={state.message} onRetry={muat} />;
   }
-  return <ApprovalQueue milestones={state.entries} onApprove={approve} onReject={reject} />;
+
+  // Satu-satunya kemunculan --accent di layar ini (DESIGN.md: "uang" mengisi
+  // ruang tempat foto bekerja di referensi). Angka ini penjumlahan nominal
+  // tahap yang sungguh tampil di antrian, bukan dikarang (R-17): nol entri
+  // berarti nol rupiah, bukan disembunyikan.
+  const totalMenunggu = state.entries.reduce((total, entry) => total + entry.amount, 0);
+
+  return (
+    <div className="flex flex-col gap-space-6">
+      {state.entries.length > 0 && (
+        <Amount label="Total menunggu pencairan Anda" amount={totalMenunggu} size="hero" tone="accent" />
+      )}
+      <ApprovalQueue milestones={state.entries} onApprove={approve} onReject={reject} />
+    </div>
+  );
 }

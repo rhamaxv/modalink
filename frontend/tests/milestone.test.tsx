@@ -56,7 +56,11 @@ describe("MilestoneTimeline", () => {
     expect(screen.getByRole("button", { name: /kirim penolakan/i })).toBeEnabled();
   });
 
-  it("keeps a rejected report's revision history visible together with the reviewer's note", () => {
+  it("shows the latest report's narrative together with the reviewer's rejection note", () => {
+    // GET /proposals/{id}/milestones (10-api-contract.md baris 73) hanya
+    // mengirim satu laporan terbaru lewat `latest_report`, bukan array
+    // riwayat `reports`: test ini mencerminkan bentuk wire yang sungguhan,
+    // bukan bentuk yang pernah dibayangkan komponen (lihat laporan Fase 12).
     const milestones: Milestone[] = [
       {
         id: "m2",
@@ -64,20 +68,35 @@ describe("MilestoneTimeline", () => {
         status: "pending",
         amount: 5_000_000,
         title: "Bahan baku",
-        reports: [
-          {
-            review_status: "rejected",
-            narrative: "Laporan awal.",
-            reviewer_note: "Angka omzet belum disertai bukti.",
-          },
-          { review_status: "pending", narrative: "Revisi dengan bukti." },
-        ],
+        latest_report: {
+          review_status: "rejected",
+          narrative: "Revisi dengan bukti nota.",
+          reviewer_note: "Angka omzet belum disertai bukti.",
+        },
       },
     ];
     render(<MilestoneTimeline milestones={milestones} />);
     expect(screen.getByText(/Angka omzet belum disertai bukti/)).toBeInTheDocument();
-    expect(screen.getByText(/Laporan awal/)).toBeInTheDocument();
-    expect(screen.getByText(/Revisi dengan bukti/)).toBeInTheDocument();
+    expect(screen.getByText(/Revisi dengan bukti nota/)).toBeInTheDocument();
+  });
+
+  it("lets the lead investor read the pending report's narrative before any decision button renders", () => {
+    // Defek yang ditemukan review: lead investor bisa menyetujui pencairan
+    // tanpa pernah melihat laporannya. Test ini membuktikan narasi laporan
+    // sungguhan tampil di DOM, bukan hanya disebut di komentar kode.
+    const milestones: Milestone[] = [
+      {
+        id: "m1",
+        seq: 2,
+        status: "reported",
+        amount: 5_000_000,
+        title: "Bahan baku",
+        latest_report: { review_status: "pending", narrative: "Omzet bulan ini naik 20%." },
+      },
+    ];
+    render(<MilestoneTimeline milestones={milestones} isLeadInvestor />);
+    expect(screen.getByText(/Omzet bulan ini naik 20%/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /setujui/i })).toBeInTheDocument();
   });
 
   it("lets the first milestone be approved without a report", () => {
@@ -118,5 +137,27 @@ describe("ApprovalQueue", () => {
     );
     expect(screen.getByText("Kopi Senja")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Kopi Senja" })).toHaveAttribute("href", "/proposal/p9");
+  });
+
+  it("stays within the three-lime-accent budget regardless of how many entries the queue holds", () => {
+    // Audit browser menemukan EMPAT kemunculan --accent pada investor/milestone
+    // dengan dua entri antrian, karena MilestoneTimeline dulu merender dua
+    // aksen lime per entri (lencana "Tahap berjalan" + tombol "Setujui") tanpa
+    // batas. DESIGN.md menghitung anggaran per LAYAR, bukan per entri, jadi
+    // test ini memakai TIGA entri justru untuk membuktikan jumlahnya tidak
+    // ikut bertambah seiring panjang antrian.
+    const entry = (seq: number) => ({
+      id: `m${seq}`,
+      proposalId: `p${seq}`,
+      businessName: `Usaha ${seq}`,
+      seq,
+      status: "reported" as const,
+      amount: 5_000_000,
+      title: "Bahan baku",
+    });
+    const { container } = render(
+      <ApprovalQueue milestones={[entry(2), entry(3), entry(4)]} />,
+    );
+    expect(container.querySelectorAll(".bg-accent").length).toBe(0);
   });
 });

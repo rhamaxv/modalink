@@ -12,10 +12,8 @@ export default function InvestorMilestonePage() {
   return (
     <div className="mx-auto flex max-w-[72rem] flex-col gap-space-5 px-space-3 py-space-6">
       <div>
-        <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">
-          Milestone menunggu persetujuan
-        </h1>
-        <p className="mt-space-2 max-w-measure text-body text-muted">
+        <h1 className="font-display text-page text-ink">Milestone menunggu persetujuan</h1>
+        <p className="mt-space-3 max-w-measure text-body text-muted">
           Hanya proposal yang Anda danai sebagai lead investor dan sedang menunggu keputusan yang
           tampil di sini.
         </p>
