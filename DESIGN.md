@@ -74,6 +74,23 @@ selama berjam-jam karena pemeriksaannya menggeledah kata "white" alih-alih mengu
 warnanya. Pagar `frontend/tests/accent-contrast.test.ts` sekarang mengukur, dan ia harus
 tetap mengukur.
 
+### Aksen tidak pernah menjadi teks di tema terang
+
+Empat baris gagal di tabel kontras bukan kasus sudut, melainkan akibat langsung
+dari aksen yang tidak ikut berbalik saat tema berganti. Di latar gelap keduanya
+terbaca sebagai teks; di latar terang lime mengukur **1,09:1**, yang artinya
+praktis tidak terlihat.
+
+Versi pertama dokumen ini hanya mengukur aksen terhadap latar gelap lalu menulis
+"lolos" tanpa menyebut syaratnya, dan satu agen sempat memakai `text-accent-2`
+sebagai label di tema terang atas dasar baris itu. Kesalahannya milik dokumen,
+bukan agen.
+
+Aturannya karena itu: **aksen dipakai sebagai latar dengan `--on-accent` di
+atasnya, atau sebagai teks hanya di permukaan gelap.** Label berwarna aksen di
+tema terang ditulis sebagai chip `bg-accent-2 text-on-accent`, bukan sebagai
+teks berwarna, karena kombinasi itu sudah terukur aman di kedua tema.
+
 ### Pembagian kerja dua aksen
 
 Satu aksen menjadi dua bukan berarti dua kali lebih banyak kuning. Keduanya punya tugas
@@ -171,8 +188,12 @@ AA: 4,5:1 teks normal, 3:1 teks besar dan batas kontrol.
 | putih | `--accent` lime | **1,14:1** | **gagal, dilarang** |
 | `--on-accent` | `--accent-2` periwinkle | **9,59:1** | lolos |
 | putih | `--accent-2` | **2,00:1** | **gagal, dilarang** |
-| `--accent` sebagai teks | `--paper` | 16,72:1 | lolos |
-| `--accent-2` sebagai teks | `--paper` | 9,59:1 | lolos |
+| `--accent` sebagai teks | `--paper` gelap | 16,72:1 | lolos |
+| `--accent-2` sebagai teks | `--paper` gelap | 9,59:1 | lolos |
+| `--accent` sebagai teks | `--paper` **terang** | **1,09:1** | **gagal, dilarang** |
+| `--accent` sebagai teks | `--panel` **terang** | **1,00:1** | **gagal, dilarang** |
+| `--accent-2` sebagai teks | `--paper` **terang** | **1,90:1** | **gagal, dilarang** |
+| `--accent-2` sebagai teks | `--panel` **terang** | **1,74:1** | **gagal, dilarang** |
 | `--ok` `#7FCB8C` | `--paper` | 9,86:1 | lolos |
 | `--warn` `#E8A765` | `--paper` | 9,25:1 | lolos |
 | `--danger` `#F08C7E` | `--paper` | 7,98:1 | lolos |
