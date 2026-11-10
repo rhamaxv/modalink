@@ -172,17 +172,16 @@ describe("CampaignForm: client-side score_threshold validation", () => {
 });
 
 describe("CampaignList: investor's own campaigns", () => {
-  it("shows a loading state, then only the campaigns owned by the current investor", async () => {
+  it("asks the server for its own campaigns instead of filtering the whole table in the browser", async () => {
+    // Versi sebelumnya mengunduh seluruh tabel campaign lalu membuang milik
+    // orang lain di klien, jadi setiap investor tetap menerima judul, target,
+    // tenggat, dan investor_id milik investor lain. Yang dijaga sekarang
+    // adalah permintaannya, bukan penyaringannya: ?mine=true, dan tidak ada
+    // panggilan ke daftar publik sama sekali.
+    const dipanggil: string[] = [];
     vi.stubGlobal("fetch", (url: string) => {
-      if (url.includes("/auth/me")) return fakeResponse(200, CURRENT_USER);
-      if (url.includes("/campaigns")) {
-        return fakeResponse(200, {
-          items: [
-            BASE_CAMPAIGN,
-            { ...BASE_CAMPAIGN, id: "c2", investor_id: "other-investor", title: "Campaign Investor Lain" },
-          ],
-        });
-      }
+      dipanggil.push(url);
+      if (url.includes("mine=true")) return fakeResponse(200, { items: [BASE_CAMPAIGN] });
       throw new Error(`unexpected fetch call to ${url}`);
     });
 
@@ -190,12 +189,15 @@ describe("CampaignList: investor's own campaigns", () => {
     expect(screen.getByText(/memuat/i)).toBeInTheDocument();
 
     expect(await screen.findByText(BASE_CAMPAIGN.title)).toBeInTheDocument();
-    expect(screen.queryByText("Campaign Investor Lain")).not.toBeInTheDocument();
+    expect(dipanggil.some((u) => u.includes("mine=true"))).toBe(true);
+    expect(
+      dipanggil.filter((u) => u.includes("/campaigns") && !u.includes("mine=true")),
+      "daftar publik tidak boleh ikut diminta: itu jalur yang membocorkan campaign investor lain",
+    ).toHaveLength(0);
   });
 
   it("shows an empty state with a create-campaign action when there are none yet", async () => {
     vi.stubGlobal("fetch", (url: string) => {
-      if (url.includes("/auth/me")) return fakeResponse(200, CURRENT_USER);
       if (url.includes("/campaigns")) return fakeResponse(200, { items: [] });
       throw new Error(`unexpected fetch call to ${url}`);
     });
@@ -224,7 +226,6 @@ describe("CampaignList: investor's own campaigns", () => {
     // app/investor/campaign/page.tsx); test ini mengunci itu dari sisi
     // CampaignList untuk kedua keadaan, kosong maupun terisi.
     vi.stubGlobal("fetch", (url: string) => {
-      if (url.includes("/auth/me")) return fakeResponse(200, CURRENT_USER);
       if (url.includes("/campaigns")) return fakeResponse(200, { items: [] });
       throw new Error(`unexpected fetch call to ${url}`);
     });

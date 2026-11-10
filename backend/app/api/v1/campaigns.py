@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
@@ -11,7 +11,7 @@ from app.api.deps import (
 )
 from app.db.session import get_session
 from app.domain.clock import Clock
-from app.errors import NotFoundError
+from app.errors import ForbiddenError, NotFoundError
 from app.models.campaign import Campaign
 from app.models.user import Role, User
 from app.schemas.campaign import (
@@ -45,8 +45,23 @@ async def create_campaign_endpoint(
 
 @router.get("", response_model=CampaignListOut)
 async def list_campaigns_endpoint(
+    mine: bool = Query(
+        False,
+        description=(
+            "Campaign milik investor yang sedang masuk, termasuk yang sudah "
+            "ditutup. Tanpa ini daftar bersifat publik dan hanya berisi "
+            "campaign open (10-api-contract.md:44)."
+        ),
+    ),
+    user: User | None = Depends(optional_user),
     session: AsyncSession = Depends(get_session),
 ) -> CampaignListOut:
+    if mine:
+        if user is None or user.role is not Role.INVESTOR:
+            raise ForbiddenError(
+                "bukan_investor", "Hanya investor yang punya daftar campaign sendiri."
+            )
+        return CampaignListOut(items=await list_campaigns(session, pemilik=user))
     return CampaignListOut(items=await list_campaigns(session))
 
 

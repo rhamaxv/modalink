@@ -65,16 +65,35 @@ async def create_campaign(
     return campaign
 
 
-async def list_campaigns(session: AsyncSession) -> list[Campaign]:
+async def list_campaigns(
+    session: AsyncSession, pemilik: User | None = None
+) -> list[Campaign]:
+    """Daftar campaign publik, atau campaign milik satu investor.
+
+    `10-api-contract.md:44` menyebut endpoint publiknya mengembalikan campaign
+    `open`, dan sebelumnya tidak ada penyaring status sama sekali sehingga
+    campaign yang sudah ditutup ikut muncul di penelusuran. Tapi menyaringnya
+    begitu saja memutus kebutuhan lain: investor harus tetap bisa melihat
+    campaign miliknya sendiri yang sudah ditutup di halaman "Campaign saya".
+
+    Karena itu dua jalur, bukan satu filter: tanpa `pemilik` ia daftar publik
+    dan hanya `open`; dengan `pemilik` ia seluruh campaign milik orang itu apa
+    pun statusnya. Jalur kedua sekaligus menutup temuan review keamanan bahwa
+    setiap investor mengunduh seluruh campaign investor lain lalu
+    menyembunyikannya di browser.
+    """
     # Urutan diputus created_at lalu id supaya daftar deterministik (BR-05):
     # dua campaign dengan created_at identik tidak boleh bertukar posisi
     # antar-request.
     # Nama kolom sebagai string, bukan Campaign.created_at.desc(): atribut kelas
     # SQLModel diketik sebagai datetime/UUID biasa oleh mypy (tidak ada plugin
     # sqlmodel), sehingga .desc() di atasnya dianggap tidak ada.
-    hasil = await session.scalars(
-        select(Campaign).order_by(desc("created_at"), desc("id"))
-    )
+    kueri = select(Campaign)
+    if pemilik is None:
+        kueri = kueri.where(Campaign.status == CampaignStatus.OPEN)
+    else:
+        kueri = kueri.where(Campaign.investor_id == pemilik.id)
+    hasil = await session.scalars(kueri.order_by(desc("created_at"), desc("id")))
     return list(hasil)
 
 

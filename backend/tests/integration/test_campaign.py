@@ -74,3 +74,41 @@ async def test_list_campaigns_ordering_is_deterministic(client, investor):
     sekali = (await client.get("/api/v1/campaigns")).json()["items"]
     lagi = (await client.get("/api/v1/campaigns")).json()["items"]
     assert [c["id"] for c in sekali] == [c["id"] for c in lagi]
+
+
+async def test_br05_public_campaign_list_excludes_closed_campaigns(client, investor):
+    """Kontrak menyebut daftar publik berisi campaign `open` saja.
+
+    Sebelumnya tidak ada penyaring status sama sekali, sehingga campaign yang
+    sudah ditutup ikut muncul di penelusuran dan UMKM bisa melamar ke sesuatu
+    yang pasti menolaknya."""
+    dibuat = await client.post(
+        "/api/v1/campaigns", headers=investor.headers, json=body_campaign()
+    )
+    cid = dibuat.json()["id"]
+    await client.post(f"/api/v1/campaigns/{cid}/close", headers=investor.headers)
+
+    publik = await client.get("/api/v1/campaigns")
+    assert publik.status_code == 200
+    assert cid not in {item["id"] for item in publik.json()["items"]}
+
+
+async def test_investor_sees_own_closed_campaign_through_mine(client, investor):
+    """Sisi sebaliknya, dan inilah kenapa penyaringnya tidak boleh menyeluruh:
+    investor tetap harus melihat campaign miliknya yang sudah ditutup."""
+    dibuat = await client.post(
+        "/api/v1/campaigns", headers=investor.headers, json=body_campaign()
+    )
+    cid = dibuat.json()["id"]
+    await client.post(f"/api/v1/campaigns/{cid}/close", headers=investor.headers)
+
+    milik = await client.get("/api/v1/campaigns?mine=true", headers=investor.headers)
+    assert milik.status_code == 200
+    assert cid in {item["id"] for item in milik.json()["items"]}
+
+
+async def test_mine_is_refused_without_an_investor_token(client, umkm):
+    anonim = await client.get("/api/v1/campaigns?mine=true")
+    assert anonim.status_code == 403
+    salah_peran = await client.get("/api/v1/campaigns?mine=true", headers=umkm.headers)
+    assert salah_peran.status_code == 403

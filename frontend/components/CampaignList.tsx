@@ -40,12 +40,13 @@ export function CampaignList() {
   async function load() {
     setState({ status: "loading" });
     try {
-      const [me, all] = await Promise.all([
-        api.get<{ id: string }>("/auth/me"),
-        api.get<{ items: Campaign[] }>("/campaigns"),
-      ]);
-      const mine = all.items.filter((campaign) => campaign.investor_id === me.id);
-      setState({ status: "ready", items: mine });
+      // ?mine=true, bukan mengunduh seluruh tabel lalu menyaring di browser.
+      // Cara lama membuat setiap investor menerima judul, target, tenggat, dan
+      // investor_id milik investor lain hanya untuk membuangnya di klien, dan
+      // ia juga kehilangan campaign sendiri yang sudah ditutup begitu daftar
+      // publik disaring ke status open sesuai 10-api-contract.md:44.
+      const milik = await api.get<{ items: Campaign[] }>("/campaigns?mine=true");
+      setState({ status: "ready", items: milik.items });
     } catch (error) {
       setState({
         status: "error",
