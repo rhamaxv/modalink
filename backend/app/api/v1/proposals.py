@@ -23,6 +23,7 @@ from app.db.session import get_session
 from app.domain.clock import Clock
 from app.errors import NotFoundError
 from app.jobs.inline import InlineRunner
+from app.models.campaign import Sector
 from app.models.proposal import Proposal
 from app.models.scoring import ScoringResult
 from app.models.user import Role, User
@@ -31,6 +32,7 @@ from app.schemas.proposal import (
     ProposalIn,
     ProposalListOut,
     ProposalOut,
+    ProposalSort,
 )
 from app.schemas.scoring import ScoringResultOut
 from app.services.campaign import get_campaign
@@ -94,8 +96,25 @@ async def list_proposals_endpoint(
     clock: Clock = Depends(get_clock),
     page: int = Query(1, ge=1),
     page_size: int = Query(PROPOSAL_PAGE_SIZE_DEFAULT, ge=1, le=PROPOSAL_PAGE_SIZE_MAX),
+    sector: Sector | None = Query(
+        None, description="Sektor campaign yang menaungi proposal."
+    ),
+    campaign_id: UUID | None = Query(
+        None, description="Hanya proposal di bawah satu campaign."
+    ),
+    sort: ProposalSort = Query(
+        ProposalSort.NEWEST, description="Urutan daftar; lihat ProposalSort."
+    ),
 ) -> ProposalListOut:
-    items, total = await list_public_proposals(session, clock, page, page_size)
+    items, total = await list_public_proposals(
+        session,
+        clock,
+        page,
+        page_size,
+        sector=sector,
+        campaign_id=campaign_id,
+        sort=sort,
+    )
     return ProposalListOut(items=items, total=total, page=page, page_size=page_size)
 
 

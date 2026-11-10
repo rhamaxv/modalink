@@ -12,7 +12,7 @@ from app.api.deps import (
 from app.db.session import get_session
 from app.domain.clock import Clock
 from app.errors import ForbiddenError, NotFoundError
-from app.models.campaign import Campaign
+from app.models.campaign import Campaign, Sector
 from app.models.user import Role, User
 from app.schemas.campaign import (
     CampaignIn,
@@ -22,6 +22,8 @@ from app.schemas.campaign import (
 )
 from app.schemas.proposal import ProposalWithSignalsListOut
 from app.services.campaign import (
+    CAMPAIGN_PAGE_SIZE_DEFAULT,
+    CAMPAIGN_PAGE_SIZE_MAX,
     close_campaign_manually,
     create_campaign,
     get_campaign_detail,
@@ -53,6 +55,9 @@ async def list_campaigns_endpoint(
             "campaign open (10-api-contract.md:44)."
         ),
     ),
+    sector: Sector | None = Query(None, description="Sektor usaha campaign."),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(CAMPAIGN_PAGE_SIZE_DEFAULT, ge=1, le=CAMPAIGN_PAGE_SIZE_MAX),
     user: User | None = Depends(optional_user),
     session: AsyncSession = Depends(get_session),
 ) -> CampaignListOut:
@@ -61,8 +66,14 @@ async def list_campaigns_endpoint(
             raise ForbiddenError(
                 "bukan_investor", "Hanya investor yang punya daftar campaign sendiri."
             )
-        return CampaignListOut(items=await list_campaigns(session, pemilik=user))
-    return CampaignListOut(items=await list_campaigns(session))
+        items, total = await list_campaigns(
+            session, pemilik=user, sector=sector, page=page, page_size=page_size
+        )
+    else:
+        items, total = await list_campaigns(
+            session, sector=sector, page=page, page_size=page_size
+        )
+    return CampaignListOut(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/{campaign_id}", response_model=CampaignOut)

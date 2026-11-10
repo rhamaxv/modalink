@@ -46,3 +46,9 @@ class CampaignOut(BaseModel):
 
 class CampaignListOut(BaseModel):
     items: list[CampaignOut]
+    # Bentuk amplop yang sama persis dengan ProposalListOut. Tanpa `total`,
+    # antarmuka tidak punya cara membedakan daftar yang memang habis dari
+    # daftar yang terpotong di halaman pertama.
+    total: int
+    page: int
+    page_size: int

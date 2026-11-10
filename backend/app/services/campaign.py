@@ -12,7 +12,7 @@ from sqlmodel import col, select
 from app.domain.clock import Clock
 from app.domain.transitions import CampaignEvent, IllegalTransition
 from app.errors import ConflictError, UnprocessableError
-from app.models.campaign import Campaign, CampaignStatus
+from app.models.campaign import Campaign, CampaignStatus, Sector
 from app.models.proposal import Proposal, ProposalStatus
 from app.models.scoring import ScoringResult
 from app.models.user import User
@@ -65,9 +65,22 @@ async def create_campaign(
     return campaign
 
 
+# Sama seperti proposal (services/proposal.py): tanpa batas atas, satu
+# request bisa menarik seluruh tabel. Endpoint ini sebelumnya tidak
+# berparameter `page` sama sekali walau kontrak menyebutnya
+# (10-api-contract.md:44), jadi daftar campaign publik mengirim setiap baris
+# yang ada ke setiap pengunjung.
+CAMPAIGN_PAGE_SIZE_DEFAULT = 20
+CAMPAIGN_PAGE_SIZE_MAX = 50
+
+
 async def list_campaigns(
-    session: AsyncSession, pemilik: User | None = None
-) -> list[Campaign]:
+    session: AsyncSession,
+    pemilik: User | None = None,
+    sector: Sector | None = None,
+    page: int = 1,
+    page_size: int = CAMPAIGN_PAGE_SIZE_DEFAULT,
+) -> tuple[list[Campaign], int]:
     """Daftar campaign publik, atau campaign milik satu investor.
 
     `10-api-contract.md:44` menyebut endpoint publiknya mengembalikan campaign
@@ -81,20 +94,30 @@ async def list_campaigns(
     pun statusnya. Jalur kedua sekaligus menutup temuan review keamanan bahwa
     setiap investor mengunduh seluruh campaign investor lain lalu
     menyembunyikannya di browser.
+
+    Mengembalikan pasangan (baris, total), bukan daftar saja: tanpa total,
+    antarmuka tidak bisa membedakan "ini memang semua" dari "ini dua puluh
+    pertama dari delapan puluh", dan diam-diam menyembunyikan sisanya.
     """
     # Urutan diputus created_at lalu id supaya daftar deterministik (BR-05):
     # dua campaign dengan created_at identik tidak boleh bertukar posisi
-    # antar-request.
-    # Nama kolom sebagai string, bukan Campaign.created_at.desc(): atribut kelas
-    # SQLModel diketik sebagai datetime/UUID biasa oleh mypy (tidak ada plugin
-    # sqlmodel), sehingga .desc() di atasnya dianggap tidak ada.
+    # antar-request, dan dengan paginasi seri yang tidak diputus berarti satu
+    # campaign bisa muncul di dua halaman sekaligus.
     kueri = select(Campaign)
     if pemilik is None:
         kueri = kueri.where(Campaign.status == CampaignStatus.OPEN)
     else:
         kueri = kueri.where(Campaign.investor_id == pemilik.id)
-    hasil = await session.scalars(kueri.order_by(desc("created_at"), desc("id")))
-    return list(hasil)
+    if sector is not None:
+        kueri = kueri.where(Campaign.sector == sector)
+
+    total = await session.scalar(select(func.count()).select_from(kueri.subquery()))
+    hasil = await session.scalars(
+        kueri.order_by(col(Campaign.created_at).desc(), col(Campaign.id).desc())
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+    )
+    return list(hasil), int(total or 0)
 
 
 async def get_campaign(session: AsyncSession, campaign_id: UUID) -> Campaign | None:

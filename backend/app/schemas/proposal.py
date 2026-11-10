@@ -1,6 +1,7 @@
 """Skema request/response untuk proposal dan rencana milestonenya (BR-10 sampai BR-18)."""
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Annotated
 from uuid import UUID
 
@@ -10,6 +11,27 @@ from app.domain.transitions import PLEDGE_LOCKED_PROPOSAL_STATUSES
 from app.domain.transitions import ProposalStatus as DomainProposalStatus
 from app.models.proposal import MilestoneStatus, ProposalStatus, ScoringStatus
 from app.schemas.milestone import MilestoneReportOut
+
+
+class ProposalSort(StrEnum):
+    """Nilai sah untuk query `sort` di `GET /proposals` (10-api-contract.md:55).
+
+    Enum, bukan string bebas: nilai yang tidak dikenal harus ditolak 422 di
+    tepi, bukan diam-diam jatuh ke urutan default. Urutan default yang
+    tersamar adalah cara halaman daftar berbohong tentang apa yang
+    ditampilkannya.
+
+    Empat nilai ini semuanya bisa dijawab dari data yang memang ada. Tidak
+    ada "paling mendesak" atau "paling populer" di sini: proposal tidak punya
+    tenggatnya sendiri (tenggat ada di campaign) dan tidak ada penghitung
+    kunjungan, jadi mengurutkan dengan nama semacam itu berarti mengarang
+    peringkat.
+    """
+
+    NEWEST = "newest"
+    AMOUNT_DESC = "amount_desc"
+    AMOUNT_ASC = "amount_asc"
+    MOST_FUNDED = "most_funded"
 
 
 class MilestoneIn(BaseModel):
