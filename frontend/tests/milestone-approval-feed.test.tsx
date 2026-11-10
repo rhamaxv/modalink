@@ -48,8 +48,10 @@ describe("MilestoneApprovalFeed: hero amount", () => {
     // Satu-satunya kemunculan --accent di layar ini: lihat komentar di
     // MilestoneApprovalFeed.tsx. MilestoneTimeline/ApprovalQueue sendiri
     // tidak lagi memakai bg-accent sama sekali (lihat milestone.test.tsx).
+    // text-accent-text, bukan text-accent: yang terakhir adalah token latar
+    // dan gagal 1,09:1 dipakai sebagai teks di tema terang (Amount.tsx).
     expect(container.querySelectorAll(".bg-accent").length).toBe(0);
-    expect(container.querySelectorAll(".text-accent").length).toBe(1);
+    expect(container.querySelectorAll(".text-accent-text").length).toBe(1);
   });
 
   it("hides the hero amount instead of showing a fabricated zero when nothing is waiting", async () => {
