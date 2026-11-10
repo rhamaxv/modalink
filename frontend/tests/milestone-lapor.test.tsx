@@ -33,8 +33,8 @@ afterEach(() => {
 // TypeError terhadap backend asli (laporan Fase 11 Task 12).
 describe("milestone report page", () => {
   it("shows no report form for seq 1 but a report form for seq 2", async () => {
-    const tahap1 = { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "pending", last_report: null };
-    const tahap2 = { id: "m2", seq: 2, title: "Tahap 2", amount: 5_000_000, status: "pending", last_report: null };
+    const tahap1 = { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "pending", latest_report: null };
+    const tahap2 = { id: "m2", seq: 2, title: "Tahap 2", amount: 5_000_000, status: "pending", latest_report: null };
     const milestones = [tahap1, tahap2];
     vi.mocked(api.get).mockImplementation(async () => ({ items: milestones.map((m) => ({ ...m })) }));
 
@@ -57,8 +57,8 @@ describe("milestone report page", () => {
   it("names the unmet prerequisite and keeps the report form unreachable", async () => {
     vi.mocked(api.get).mockResolvedValue({
       items: [
-        { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "pending", last_report: null },
-        { id: "m2", seq: 2, title: "Tahap 2", amount: 5_000_000, status: "pending", last_report: null },
+        { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "pending", latest_report: null },
+        { id: "m2", seq: 2, title: "Tahap 2", amount: 5_000_000, status: "pending", latest_report: null },
       ],
     });
     setRoute("m2");
@@ -70,14 +70,14 @@ describe("milestone report page", () => {
   it("names the pending review status and refuses to resend an already submitted report", async () => {
     vi.mocked(api.get).mockResolvedValue({
       items: [
-        { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "disbursed", last_report: null },
+        { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "disbursed", latest_report: null },
         {
           id: "m2",
           seq: 2,
           title: "Tahap 2",
           amount: 5_000_000,
           status: "reported",
-          last_report: { id: "r1", narrative: "Progres bulan ini...", status: "pending_review", rejection_note: null },
+          latest_report: { narrative: "Progres bulan ini...", review_status: "pending", reviewer_note: null },
         },
       ],
     });
@@ -86,5 +86,36 @@ describe("milestone report page", () => {
     expect((await screen.findAllByText(/menunggu review/i)).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText(/laporan progres/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /kirim laporan/i })).toBeNull();
+  });
+
+  it("shows the reviewer's note when the latest report on an otherwise reportable stage was rejected", async () => {
+    // Defek yang ditemukan review: halaman dulu membaca
+    // `last_report.status === "rejected"` dan `.rejection_note`, field yang
+    // tidak pernah dikirim API (nama sungguhannya `latest_report.review_status`
+    // dan `.reviewer_note`). UMKM yang laporannya ditolak tidak pernah melihat
+    // catatan revisinya. Tahap di sini sudah kembali "pending" (BR-46: reject
+    // mengembalikan milestone ke pending, bukan menjadikannya "reported"),
+    // jadi form laporan baru tetap terbuka SEKALIGUS catatan revisinya tampil.
+    vi.mocked(api.get).mockResolvedValue({
+      items: [
+        { id: "m1", seq: 1, title: "Tahap 1", amount: 5_000_000, status: "disbursed", latest_report: null },
+        {
+          id: "m2",
+          seq: 2,
+          title: "Tahap 2",
+          amount: 5_000_000,
+          status: "pending",
+          latest_report: {
+            narrative: "Progres bulan ini...",
+            review_status: "rejected",
+            reviewer_note: "Lampirkan nota pembelian bahan baku.",
+          },
+        },
+      ],
+    });
+    setRoute("m2");
+    render(<MilestoneLapor />);
+    expect(await screen.findByText(/lampirkan nota pembelian bahan baku/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/laporan progres/i)).toBeInTheDocument();
   });
 });

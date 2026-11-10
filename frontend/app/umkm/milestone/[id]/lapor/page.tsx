@@ -11,10 +11,9 @@ import { ApiError, api, daftarDariRespons } from "@/lib/api";
 const MIN_NARRATIVE = 50;
 
 type MilestoneReport = {
-  id: string;
   narrative: string;
-  status: "pending_review" | "rejected" | "approved";
-  rejection_note?: string | null;
+  review_status: "pending" | "approved" | "rejected";
+  reviewer_note?: string | null;
 };
 
 type Milestone = {
@@ -23,7 +22,15 @@ type Milestone = {
   title: string;
   amount: number;
   status: "pending" | "reported" | "approved" | "disbursed";
-  last_report?: MilestoneReport | null;
+  /**
+   * Laporan TERBARU tahap ini (GET /proposals/{id}/milestones,
+   * backend/app/schemas/proposal.py: MilestoneOut.latest_report). Versi
+   * sebelumnya membaca `last_report.status` dan `.rejection_note`, field
+   * yang tidak pernah dikirim API manapun (nama sungguhannya `latest_report`,
+   * `review_status`, `reviewer_note`): UMKM yang laporannya ditolak tidak
+   * pernah melihat catatan revisinya sama sekali.
+   */
+  latest_report?: MilestoneReport | null;
 };
 
 type Muatan =
@@ -54,13 +61,6 @@ export default function MilestoneLapor() {
     }
     setMuatan({ status: "loading" });
     try {
-      // GET /proposals/{id}/milestones membungkus daftarnya dalam
-      // { items: [...] } (backend/app/schemas/proposal.py: MilestoneListOut),
-      // bukan array mentah. Sebelumnya field ini dibaca seolah array
-      // langsung, yang di browser sungguhan melempar TypeError saat .find
-      // dipanggil pada objek di bawah (lihat laporan Fase 11 Task 12:
-      // ditemukan lewat e2e terhadap backend asli). daftarDariRespons
-      // melempar ApiError yang jelas kalau bentuknya menyimpang lagi.
       const milestones = daftarDariRespons<Milestone>(
         await api.get(`/proposals/${proposalId}/milestones`),
         `/proposals/${proposalId}/milestones`,
@@ -78,23 +78,13 @@ export default function MilestoneLapor() {
     muat();
   }, [muat]);
 
-  if (muatan.status === "loading") {
-    return <LoadingState label="Memuat milestone" minHeight={200} />;
-  }
-  if (muatan.status === "error") {
-    return <ErrorState message={muatan.message} onRetry={muat} />;
-  }
+  const milestone =
+    muatan.status === "siap" ? muatan.milestones.find((m) => m.id === milestoneId) : undefined;
+  const sebelumnya =
+    muatan.status === "siap" ? muatan.milestones.find((m) => m.seq === (milestone?.seq ?? 0) - 1) : undefined;
+  const prasyaratTerpenuhi = milestone ? milestone.seq === 1 || sebelumnya?.status === "disbursed" : false;
 
-  const milestone = muatan.milestones.find((m) => m.id === milestoneId);
-  if (!milestone) {
-    return <EmptyState reason="Milestone ini tidak ditemukan atau bukan milik proposal yang ditentukan." />;
-  }
-
-  const sebelumnya = muatan.milestones.find((m) => m.seq === milestone.seq - 1);
-  const prasyaratTerpenuhi = milestone.seq === 1 || sebelumnya?.status === "disbursed";
-  const activeMilestoneId = milestone.id;
-
-  async function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent, activeMilestoneId: string) {
     event.preventDefault();
     if (narrative.trim().length < MIN_NARRATIVE) return;
     setSubmitting(true);
@@ -116,71 +106,85 @@ export default function MilestoneLapor() {
 
   return (
     <div className="mx-auto flex max-w-measure flex-col gap-space-5 px-space-3 py-space-6">
-      <div>
-        <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold text-ink">{milestone.title}</h1>
-        <div className="mt-space-3 flex flex-wrap items-center gap-space-3">
-          <StatusBadge status={milestone.status} />
-          <Amount label="Nominal tahap ini" amount={milestone.amount} size="medium" />
-        </div>
-      </div>
-
-      {milestone.seq === 1 && (
-        // D-13: tahap pertama cair tanpa laporan, tapi tetap butuh approve
-        // lead investor. Halaman ini tidak boleh menyiratkan pencairan
-        // otomatis, jadi kalimatnya menyebut persetujuan secara eksplisit.
-        <p className="rounded-card border border-line bg-panel px-space-4 py-space-4 text-body text-ink">
-          Tahap pertama tidak memerlukan laporan progres. Tahap ini menunggu persetujuan lead
-          investor sebelum dana cair, bukan cair secara otomatis.
-        </p>
+      {muatan.status === "loading" && <LoadingState label="Memuat milestone" minHeight={200} />}
+      {muatan.status === "error" && <ErrorState message={muatan.message} onRetry={muat} />}
+      {muatan.status === "siap" && !milestone && (
+        <EmptyState reason="Milestone ini tidak ditemukan atau bukan milik proposal yang ditentukan." />
       )}
 
-      {milestone.seq > 1 && !prasyaratTerpenuhi && (
-        <p
-          role="alert"
-          className="rounded-card border border-warn bg-panel px-space-4 py-space-4 text-body text-ink"
-        >
-          Tahap {milestone.seq - 1} belum cair. Laporan untuk tahap ini baru bisa dikirim setelah
-          tahap {milestone.seq - 1} disetujui lead investor dan dananya cair.
-        </p>
-      )}
+      {muatan.status === "siap" && milestone && (
+        <>
+          <div>
+            <h1 className="font-display text-page text-ink">{milestone.title}</h1>
+            <div className="mt-space-3 flex flex-wrap items-center gap-space-3">
+              <StatusBadge status={milestone.status} />
+              <Amount label="Nominal tahap ini" amount={milestone.amount} size="large" />
+            </div>
+          </div>
 
-      {milestone.seq > 1 && prasyaratTerpenuhi && milestone.status === "reported" && (
-        <div className="rounded-card border border-warn bg-panel px-space-4 py-space-4">
-          <StatusBadge status="reported" />
-          <p className="mt-space-2 text-body text-ink">
-            Laporan sudah dikirim dan sedang menunggu review lead investor. Laporan baru hanya
-            bisa dikirim lagi setelah laporan ini disetujui atau ditolak.
-          </p>
-        </div>
-      )}
-
-      {milestone.last_report?.status === "rejected" && milestone.last_report.rejection_note && (
-        <p className="rounded-card border border-danger bg-panel px-space-4 py-space-4 text-body text-ink">
-          Laporan sebelumnya ditolak dengan catatan: &quot;{milestone.last_report.rejection_note}&quot;
-        </p>
-      )}
-
-      {milestone.seq > 1 && prasyaratTerpenuhi && milestone.status !== "reported" && (
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-space-3">
-          <NarrativeField
-            value={narrative}
-            onChange={setNarrative}
-            error={narrative.length > 0 && kurangNarasi > 0 ? `Laporan progres masih kurang ${kurangNarasi} karakter dari minimum ${MIN_NARRATIVE}.` : undefined}
-          />
-          {submitError && (
-            <p role="alert" className="text-label text-danger">
-              {submitError}
+          {milestone.seq === 1 && (
+            // D-13: tahap pertama cair tanpa laporan, tapi tetap butuh approve
+            // lead investor. Halaman ini tidak boleh menyiratkan pencairan
+            // otomatis, jadi kalimatnya menyebut persetujuan secara eksplisit.
+            <p className="rounded-card border border-line bg-panel px-space-4 py-space-4 text-body text-ink">
+              Tahap pertama tidak memerlukan laporan progres. Tahap ini menunggu persetujuan lead
+              investor sebelum dana cair, bukan cair secara otomatis.
             </p>
           )}
-          <button
-            type="submit"
-            disabled={submitting || narrative.trim().length < MIN_NARRATIVE}
-            aria-busy={submitting}
-            className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-body font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-panel disabled:text-muted"
-          >
-            Kirim laporan
-          </button>
-        </form>
+
+          {milestone.seq > 1 && !prasyaratTerpenuhi && (
+            <p
+              role="alert"
+              className="rounded-card border border-warn bg-panel px-space-4 py-space-4 text-body text-ink"
+            >
+              Tahap {milestone.seq - 1} belum cair. Laporan untuk tahap ini baru bisa dikirim setelah
+              tahap {milestone.seq - 1} disetujui lead investor dan dananya cair.
+            </p>
+          )}
+
+          {milestone.seq > 1 && prasyaratTerpenuhi && milestone.status === "reported" && (
+            <div className="rounded-card border border-warn bg-panel px-space-4 py-space-4">
+              <StatusBadge status="reported" />
+              <p className="mt-space-2 text-body text-ink">
+                Laporan sudah dikirim dan sedang menunggu review lead investor. Laporan baru hanya
+                bisa dikirim lagi setelah laporan ini disetujui atau ditolak.
+              </p>
+            </div>
+          )}
+
+          {milestone.latest_report?.review_status === "rejected" && milestone.latest_report.reviewer_note && (
+            <p className="rounded-card border border-danger bg-panel px-space-4 py-space-4 text-body text-ink">
+              Laporan sebelumnya ditolak dengan catatan: &quot;{milestone.latest_report.reviewer_note}&quot;
+            </p>
+          )}
+
+          {milestone.seq > 1 && prasyaratTerpenuhi && milestone.status !== "reported" && (
+            <form
+              onSubmit={(event) => handleSubmit(event, milestone.id)}
+              noValidate
+              className="flex flex-col gap-space-3"
+            >
+              <NarrativeField
+                value={narrative}
+                onChange={setNarrative}
+                error={narrative.length > 0 && kurangNarasi > 0 ? `Laporan progres masih kurang ${kurangNarasi} karakter dari minimum ${MIN_NARRATIVE}.` : undefined}
+              />
+              {submitError && (
+                <p role="alert" className="text-label text-danger">
+                  {submitError}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={submitting || narrative.trim().length < MIN_NARRATIVE}
+                aria-busy={submitting}
+                className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-body font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-panel disabled:text-muted"
+              >
+                Kirim laporan
+              </button>
+            </form>
+          )}
+        </>
       )}
     </div>
   );
