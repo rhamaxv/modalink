@@ -196,16 +196,41 @@ function expectFullBleedWithOneAction(section: HTMLElement) {
   expect(section.querySelectorAll("a[href], button").length).toBe(1);
 }
 
-// DESIGN.md menjatah aksen per LAYAR, bukan per section, jadi inilah tempat
-// yang benar untuk memeriksanya. Satu aksi berlatar aksen di seluruh halaman:
-// lebih dari satu dan ia berhenti menandai mana keputusan utamanya, nol dan
-// halaman tidak punya warna sama sekali, yang justru keluhan pemilik project.
+// DESIGN.md menjatah AKSI berlatar aksen, bukan warna secara umum, dan
+// bedanya menentukan. Versi pertama pagar ini menghitung setiap `.bg-accent`
+// di halaman lalu menuntut tepat satu, termasuk bilah funding dan penanda
+// tahap yang sama sekali bukan aksi. Akibatnya halaman penuh berakhir dengan
+// satu momen warna saja, dan pemilik project menyebutnya datar dua kali.
+//
+// Yang dijaga di sini adalah hierarki tindakan: dua tombol lime di satu layar
+// berarti tidak ada yang menandai keputusan utama. Penanda dan teks beraksen
+// tidak dibatasi pagar ini.
 function expectExactlyOneAccentAction(container: HTMLElement) {
-  const beraksen = container.querySelectorAll(".bg-accent");
+  const aksi = [...container.querySelectorAll("a[href], button")].filter((el) =>
+    el.className.split(" ").includes("bg-accent"),
+  );
   expect(
-    beraksen.length,
-    `halaman ini punya ${beraksen.length} aksi berlatar aksen; DESIGN.md menghendaki tepat satu`,
+    aksi.length,
+    `halaman ini punya ${aksi.length} aksi berlatar aksen; DESIGN.md menghendaki tepat satu`,
   ).toBe(1);
+}
+
+// Sisi sebaliknya, dan ia yang hilang selama ini: halaman tanpa warna sama
+// sekali juga melanggar arah. Diukur pada DOM yang dirender, bukan pada
+// sumber, supaya kelas yang tidak pernah aktif tidak ikut terhitung.
+function expectPageIsNotColourless(container: HTMLElement) {
+  const KELAS_WARNA = [
+    "bg-accent", "bg-accent-2", "text-accent-text", "text-accent-2-text",
+    "border-accent", "text-ok", "text-warn", "text-danger",
+  ];
+  const momen = [...container.querySelectorAll<HTMLElement>("*")].filter((el) => {
+    const kelas = el.className?.split?.(" ") ?? [];
+    return KELAS_WARNA.some((k) => kelas.includes(k));
+  });
+  expect(
+    momen.length,
+    `halaman ini hanya punya ${momen.length} momen warna; satu halaman penuh yang nyaris monokrom adalah keluhan yang memicu arah visual ini ditulis ulang`,
+  ).toBeGreaterThanOrEqual(3);
 }
 
 describe("RHYTHM 3 patterns match what is actually rendered, not just their label", () => {
@@ -277,6 +302,7 @@ describe("RHYTHM 3 patterns match what is actually rendered, not just their labe
     const { container } = render(<Beranda />);
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
     expectExactlyOneAccentAction(container);
+    expectPageIsNotColourless(container);
 
     // Dan ia ada di section pertama. Aksen yang dibelanjakan di bawah lipatan
     // membuat layar pertama tanpa warna, keluhan yang memicu perubahan ini.

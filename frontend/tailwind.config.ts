@@ -22,6 +22,11 @@ const config: Config = {
         accent: "var(--accent)",
         "accent-2": "var(--accent-2)",
         "on-accent": "var(--on-accent)",
+        // Dipakai sebagai warna teks, bukan latar. Berbalik ikut tema karena
+        // ia duduk di atas --paper yang juga berbalik; bandingkan on-accent
+        // yang justru tidak boleh berbalik.
+        "accent-text": "var(--accent-text)",
+        "accent-2-text": "var(--accent-2-text)",
         ok: "var(--ok)",
         warn: "var(--warn)",
         danger: "var(--danger)",

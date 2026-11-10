@@ -74,22 +74,28 @@ selama berjam-jam karena pemeriksaannya menggeledah kata "white" alih-alih mengu
 warnanya. Pagar `frontend/tests/accent-contrast.test.ts` sekarang mengukur, dan ia harus
 tetap mengukur.
 
-### Aksen tidak pernah menjadi teks di tema terang
+### Aksen sebagai teks memakai token sendiri
 
-Empat baris gagal di tabel kontras bukan kasus sudut, melainkan akibat langsung
-dari aksen yang tidak ikut berbalik saat tema berganti. Di latar gelap keduanya
-terbaca sebagai teks; di latar terang lime mengukur **1,09:1**, yang artinya
-praktis tidak terlihat.
+Ada dua peran berbeda dan menyamakannya adalah kesalahan yang membuat warna
+hilang dari halaman:
 
-Versi pertama dokumen ini hanya mengukur aksen terhadap latar gelap lalu menulis
-"lolos" tanpa menyebut syaratnya, dan satu agen sempat memakai `text-accent-2`
-sebagai label di tema terang atas dasar baris itu. Kesalahannya milik dokumen,
-bukan agen.
+- **Aksen sebagai latar**, dengan `--on-accent` di atasnya. `--on-accent`
+  **tidak pernah berbalik**, karena latarnya tidak pernah berbalik.
+- **Aksen sebagai teks**, memakai `--accent-text` dan `--accent-2-text`.
+  Keduanya **berbalik ikut tema**, karena mereka duduk di atas `--paper` yang
+  berbalik dari hampir hitam ke hampir putih.
 
-Aturannya karena itu: **aksen dipakai sebagai latar dengan `--on-accent` di
-atasnya, atau sebagai teks hanya di permukaan gelap.** Label berwarna aksen di
-tema terang ditulis sebagai chip `bg-accent-2 text-on-accent`, bukan sebagai
-teks berwarna, karena kombinasi itu sudah terukur aman di kedua tema.
+| Token | Gelap | Terang | Rasio di tema terang |
+| --- | --- | --- | --- |
+| `--accent-text` | `#DDFD6C` | `#546416` | 6,21:1 di `--paper`, 5,70:1 di `--panel` |
+| `--accent-2-text` | `#AAB2FF` | `#4A54B8` | 6,14:1 di `--paper`, 5,63:1 di `--panel` |
+
+Versi pertama dokumen ini tidak punya token ini, hanya melarang aksen dipakai
+sebagai teks di tema terang karena lime mengukur **1,09:1** di sana. Larangan
+itu benar secara angka dan salah secara akibat: tanpa pengganti, satu-satunya
+jalan aman adalah tidak memakai aksen sebagai teks sama sekali, dan halaman
+kehilangan warnanya **di kedua tema**. Pakai token di atas, jangan `text-accent`
+polos.
 
 ### Pembagian kerja dua aksen
 
@@ -102,9 +108,21 @@ berbeda dan tidak boleh tertukar:
   section, sorotan angka pendukung, penekanan di dalam kalimat. Ia tidak pernah menjadi
   latar tombol.
 
-Anggaran per layar: **tiga kemunculan `--accent`**, dan periwinkle secukupnya karena ia
-tidak bersaing memperebutkan klik. Kalau lime muncul lebih dari tiga kali, ia bukan aksen
-lagi.
+Anggaran per layar, dan bacalah batasnya dengan tepat:
+
+- **Satu aksi berlatar `--accent` per layar**, dan ia di layar pertama. Ini soal hierarki
+  tindakan: dua tombol lime di satu layar berarti tidak ada yang menandai keputusan utama.
+- **`--accent` sebagai penanda** (bilah funding, tahap aktif, angka yang jadi subjek
+  keputusan, label section) sampai tiga kemunculan.
+- **`--accent-2` secukupnya.** Ia penanda, bukan tindakan, jadi ia tidak bersaing
+  memperebutkan klik: label kategori, sorotan angka pendukung, penekanan dalam kalimat.
+
+Batas "satu" hanya berlaku pada **aksi berlatar aksen**, bukan pada warna secara umum.
+Versi pertama dokumen ini menulisnya sebagai satu-aksen-per-halaman tanpa membedakan
+keduanya, lalu pagarnya menegakkan versi miskin itu, dan hasilnya satu halaman penuh
+dengan **satu momen warna saja**. Referensi yang ditunjuk pemilik project memakai aksen di
+eyebrow, nav, tombol, titik carousel, dan elemen grafis sekaligus. Warna yang hemat bukan
+warna yang absen.
 
 ## Tipografi
 

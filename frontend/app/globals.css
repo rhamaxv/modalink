@@ -29,6 +29,17 @@
      daripada putih-pada-kuning 1.53:1 yang arah sebelumnya sudah melarang. */
   --on-accent: #100F0F;
 
+  /* Aksen SEBAGAI TEKS, dan token ini memang berbalik ikut tema, berbeda dari
+     --on-accent di atas. Bedanya bukan detail: --on-accent duduk di atas
+     latar aksen yang tidak pernah berubah, sedangkan token ini duduk di atas
+     --paper yang berbalik dari hampir hitam ke hampir putih. Menyamakan
+     keduanya adalah kesalahan yang membuat aksen hilang sepenuhnya dari teks:
+     lime mengukur 1.09:1 di latar terang, jadi satu-satunya cara aman
+     dianggap "jangan pakai aksen sebagai teks", dan halaman kehilangan
+     warnanya di kedua tema sekaligus. */
+  --accent-text: #DDFD6C;
+  --accent-2-text: #AAB2FF;
+
   --ok: #7FCB8C;
   --warn: #E8A765;
   --danger: #F08C7E;
@@ -61,7 +72,14 @@
   --ok: #2F6B3A;
   --warn: #A3561F;
   --danger: #A32C1F;
-  /* --accent, --accent-2, dan --on-accent sengaja tidak didefinisikan ulang. */
+  /* Versi gelap dari kedua aksen, khusus untuk dipakai sebagai teks di atas
+     latar terang: #546416 mengukur 6.21:1 dan #4A54B8 mengukur 6.14:1,
+     keduanya lolos ambang 4.5:1. Nilai lime dan periwinkle aslinya tetap
+     dipakai sebagai latar di tema ini juga. */
+  --accent-text: #546416;
+  --accent-2-text: #4A54B8;
+  /* --accent, --accent-2, dan --on-accent sengaja tidak didefinisikan ulang:
+     ketiganya adalah pasangan latar-dan-teks yang harus stabil lintas tema. */
 }
 
 body { background: var(--paper); color: var(--ink); }
