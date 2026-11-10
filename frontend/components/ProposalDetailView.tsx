@@ -7,6 +7,7 @@ import { CommentList } from "@/components/CommentList";
 import { FundingBar } from "@/components/FundingBar";
 import { PledgeForm } from "@/components/PledgeForm";
 import { ScorePanel, type ProposalScore, type ScoringStatus } from "@/components/ScorePanel";
+import type { CurrentUser } from "@/lib/auth";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Amount } from "@/components/ui/Amount";
@@ -75,11 +76,10 @@ type MilestoneOut = {
   status: "pending" | "reported" | "disbursed";
 };
 
-type CurrentUser = {
-  id: string;
-  name: string;
-  role: string;
-};
+// Tipe kanonik dari lib/auth.ts, bukan salinan lokal. Salinan yang dulu ada
+// di sini mengetik role sebagai `string` biasa, sehingga perbandingan seperti
+// currentUser.role !== "investor" tidak pernah diperiksa terhadap daftar peran
+// yang sungguh ada, dan salah ketik satu huruf akan lolos tsc diam-diam.
 
 // Proposal dianggap bisa menerima pledge begitu AI meloloskannya (BR-71) dan
 // belum penuh. "submitted" (masih dinilai) dan "rejected" tidak termasuk,
@@ -548,6 +548,7 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
         <CommentList
           key={jumlahKomentarBaru}
           proposalId={proposalId}
+          currentRole={currentUser?.role ?? null}
           currentUserId={currentUser?.id ?? null}
         />
         <div id="form-komentar">

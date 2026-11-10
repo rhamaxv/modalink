@@ -78,3 +78,47 @@ async def test_investor_and_umkm_cannot_vote(client, investor, umkm, listed_prop
             f"/api/v1/proposals/{listed_proposal.id}/vote", headers=akun.headers
         )
         assert res.status_code == 403
+
+
+async def test_comment_listing_carries_the_vote_count_for_anonymous_visitors(
+    client, listed_proposal, community
+):
+    """Jumlah dukungan harus terbaca tanpa menekan tombolnya.
+
+    Sebelumnya vote_count hanya ada di respons POST /vote, jadi pengunjung
+    anonim -- yang memang tidak boleh memberi dukungan -- tidak punya satu pun
+    cara melihat angkanya, dan halaman proposal menulis "Jumlah dukungan belum
+    tersedia" selamanya untuk mereka.
+    """
+    await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/vote", headers=community.headers
+    )
+    body = (await client.get(f"/api/v1/proposals/{listed_proposal.id}/comments")).json()
+    assert body["vote_count"] == 1
+    # None, bukan False: pengunjung anonim bukan "sudah pasti belum mendukung",
+    # ia "tidak diketahui", dan dua keadaan itu berbeda.
+    assert body["voted_by_me"] is None
+
+
+async def test_comment_listing_tells_a_signed_in_account_whether_it_already_voted(
+    client, listed_proposal, community
+):
+    sebelum = (
+        await client.get(
+            f"/api/v1/proposals/{listed_proposal.id}/comments",
+            headers=community.headers,
+        )
+    ).json()
+    assert sebelum["voted_by_me"] is False
+
+    await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/vote", headers=community.headers
+    )
+    sesudah = (
+        await client.get(
+            f"/api/v1/proposals/{listed_proposal.id}/comments",
+            headers=community.headers,
+        )
+    ).json()
+    assert sesudah["voted_by_me"] is True
+    assert sesudah["vote_count"] == 1

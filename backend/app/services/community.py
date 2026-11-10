@@ -33,6 +33,21 @@ async def count_votes(session: AsyncSession, proposal_id: UUID) -> int:
     return jumlah or 0
 
 
+async def has_voted(session: AsyncSession, proposal_id: UUID, user_id: UUID) -> bool:
+    """Apakah satu akun sudah memberi dukungan pada proposal ini.
+
+    Dipakai GET .../comments supaya tombol dukungan sudah menampilkan keadaan
+    yang benar saat halaman dibuka, bukan baru setelah pengguna menekannya
+    sekali dan menemukan bahwa ternyata ia sudah pernah mendukung.
+    """
+    ada = await session.scalar(
+        select(Vote.proposal_id).where(
+            Vote.proposal_id == proposal_id, Vote.user_id == user_id
+        )
+    )
+    return ada is not None
+
+
 async def toggle_vote(
     session: AsyncSession, user: User, proposal: Proposal
 ) -> tuple[bool, int]:

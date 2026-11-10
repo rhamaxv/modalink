@@ -1,17 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import type { ApiComment } from "@/components/CommentForm";
-import { ApiError, api, daftarDariRespons } from "@/lib/api";
+import type { Role } from "@/lib/auth";
+import { ApiError, api } from "@/lib/api";
 
 type VoteOut = {
   voted: boolean;
   vote_count: number;
 };
 
+type CommentListOut = {
+  items: ApiComment[];
+  vote_count: number;
+  voted_by_me: boolean | null;
+};
+
 type CommentListProps = {
   proposalId: string;
+  /** Peran akun yang sedang masuk, atau null kalau anonim/belum diketahui.
+   * Menentukan apakah tombol dukungan ditawarkan sama sekali: POST /vote
+   * hanya untuk peran community (10-api-contract.md:82). */
+  currentRole?: Role | null;
   /** Id akun yang sedang masuk, atau null kalau anonim/belum diketahui.
    * CommentOut (backend/app/schemas/community.py) tidak mengirim "is_mine":
    * komponen ini menentukannya sendiri lewat perbandingan user_id, bukan
@@ -31,20 +43,20 @@ type Keadaan = "loading" | "error" | "loaded";
 // penuh oleh bilah funding, tombol pledge, dan penanda milestone aktif.
 // Vote memakai --ink dan --line, dan statusnya terbaca lewat aria-pressed,
 // bukan warna saja.
-export function CommentList({ proposalId, currentUserId = null }: CommentListProps) {
+export function CommentList({
+  proposalId,
+  currentRole = null,
+  currentUserId = null,
+}: CommentListProps) {
   const [keadaan, setKeadaan] = useState<Keadaan>("loading");
   const [pesanGalat, setPesanGalat] = useState("");
   const [items, setItems] = useState<ApiComment[]>([]);
-  // null, bukan 0: GET .../comments (backend/app/schemas/community.py:
-  // CommentListOut) tidak mengirim vote_count maupun voted_by_me sama sekali
-  // -- keduanya dulu dibaca dari respons ini dan selalu undefined terhadap
-  // backend asli, yang membuat tombol vote kehilangan aria-pressed sama
-  // sekali (React menghilangkan atribut untuk nilai undefined) dan jumlah
-  // dukungan tampil sebagai "undefined dukungan" (laporan Fase 11 Task 12).
-  // null di sini berarti "belum diketahui", beda dari 0 ("diketahui kosong"),
-  // supaya layar tidak berbohong dengan angka yang kita tidak punya sumbernya.
-  // Satu-satunya cara jujur mendapatkan nilai sungguhan hari ini adalah dari
-  // respons POST /vote sendiri, sesudah pengguna menekannya.
+  // null berarti "belum diketahui", beda dari 0 ("diketahui kosong").
+  // Sebelumnya nilainya HANYA bisa diketahui dari respons POST /vote, jadi
+  // setiap pengunjung yang belum pernah menekan tombolnya membaca "Jumlah
+  // dukungan belum tersedia" -- termasuk pengunjung anonim, yang memang
+  // tidak boleh menekannya sama sekali, sehingga angka itu tidak pernah
+  // muncul untuk mereka. GET .../comments sekarang mengirimnya.
   const [voteCount, setVoteCount] = useState<number | null>(null);
   const [votedByMe, setVotedByMe] = useState(false);
   const [voteError, setVoteError] = useState<string | null>(null);
@@ -53,8 +65,17 @@ export function CommentList({ proposalId, currentUserId = null }: CommentListPro
     setKeadaan("loading");
     const jalur = `/proposals/${proposalId}/comments`;
     try {
-      const data = daftarDariRespons<ApiComment>(await api.get(jalur), jalur);
-      setItems(data);
+      const data = await api.get<CommentListOut>(jalur);
+      if (!Array.isArray(data?.items)) {
+        throw new ApiError(
+          "bentuk_respons_tidak_terduga",
+          "Terjadi kesalahan. Coba lagi sebentar lagi.",
+          0,
+        );
+      }
+      setItems(data.items);
+      setVoteCount(data.vote_count ?? null);
+      setVotedByMe(data.voted_by_me ?? false);
       setKeadaan("loaded");
     } catch (error) {
       setPesanGalat(
@@ -75,7 +96,28 @@ export function CommentList({ proposalId, currentUserId = null }: CommentListPro
       setVotedByMe(hasil.voted);
       setVoteCount(hasil.vote_count);
     } catch (error) {
-      setVoteError(error instanceof ApiError ? error.message : "Gagal mencatat vote. Coba lagi sebentar lagi.");
+      // Pesan server diteruskan apa adanya untuk galat yang memang menjelaskan
+      // sesuatu kepada pengguna (misalnya proposal belum terbuka untuk
+      // dukungan publik), TAPI tidak untuk 401 dan 403. Keduanya membalas
+      // kalimat internal seperti "Token tidak ada.", dan kalimat itu sempat
+      // tampil mentah di halaman proposal untuk pengunjung tanpa akun. Pola
+      // penanganan yang sama sudah lebih dulu dipasang di jalur pledge
+      // (ProposalDetailView.muatPledges) dan tidak pernah ikut ke sini.
+      //
+      // Sesudah perbaikan ini, keduanya seharusnya tidak tercapai lewat UI:
+      // tombolnya hanya dirender untuk akun community. Cabang ini tetap ada
+      // untuk token yang kedaluwarsa setelah halaman terbuka.
+      if (error instanceof ApiError && error.status === 401) {
+        setVoteError("Sesi Anda sudah berakhir. Masuk lagi untuk memberi dukungan.");
+      } else if (error instanceof ApiError && error.status === 403) {
+        setVoteError("Hanya akun komunitas yang bisa memberi dukungan.");
+      } else {
+        setVoteError(
+          error instanceof ApiError
+            ? error.message
+            : "Gagal mencatat dukungan. Coba lagi sebentar lagi.",
+        );
+      }
     }
   }
 
@@ -100,18 +142,34 @@ export function CommentList({ proposalId, currentUserId = null }: CommentListPro
 
   return (
     <div className="flex flex-col gap-space-4">
+      {/* Tombolnya hanya ditawarkan kepada yang memang boleh memakainya.
+          Sebelumnya setiap pengunjung melihat "Dukung proposal ini", dan
+          menekannya membalas pesan mentah server "Token tidak ada." tepat di
+          bawahnya. Menawarkan aksi yang pasti ditolak lalu menjelaskan
+          penolakannya dengan kalimat internal adalah dua kesalahan, bukan
+          satu. */}
       <div className="flex flex-wrap items-center gap-space-3">
-        <button
-          type="button"
-          aria-pressed={votedByMe}
-          onClick={toggleVote}
-          className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-body font-semibold text-ink aria-pressed:bg-ink aria-pressed:text-paper"
-        >
-          Dukung proposal ini
-        </button>
+        {currentRole === "community" ? (
+          <button
+            type="button"
+            aria-pressed={votedByMe}
+            onClick={toggleVote}
+            className="min-h-[44px] rounded-sm border border-line-strong px-space-3 py-space-2 text-body font-semibold text-ink transition-colors hover:bg-panel aria-pressed:bg-ink aria-pressed:text-paper"
+          >
+            {votedByMe ? "Dukungan Anda tercatat" : "Dukung proposal ini"}
+          </button>
+        ) : null}
         <span className="tabular text-body text-muted">
           {voteCount === null ? "Jumlah dukungan belum tersedia" : `${voteCount} dukungan`}
         </span>
+        {currentRole === null && (
+          <Link
+            href="/masuk"
+            className="inline-flex min-h-[44px] items-center text-body font-medium text-ink underline underline-offset-2"
+          >
+            Masuk sebagai komunitas untuk ikut mendukung
+          </Link>
+        )}
       </div>
       {voteError && (
         <p role="alert" className="text-label text-danger">
