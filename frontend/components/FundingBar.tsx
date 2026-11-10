@@ -33,15 +33,26 @@ export function FundingBar({ terkumpul, target, pendana }: FundingBarProps) {
         <p className="tabular text-body text-muted">dari {formatRupiah(target)}</p>
       </div>
 
-      <div
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={persen}
-        aria-valuetext={`${formatRupiah(terkumpul)} dari ${formatRupiah(target)}`}
-        className="h-3 w-full overflow-hidden rounded-sm bg-panel"
-      >
-        <div className="h-full bg-accent" style={{ width: `${persen}%` }} />
+      {/*
+        Bilah 24px dengan angka persentase di sampingnya, bukan garis 4px:
+        ini adalah satu dari tiga kemunculan --accent yang dijatah DESIGN.md
+        untuk layar ini, dan ia jawaban pertanyaan pertama investor begitu
+        membuka proposal. Persentasenya dihitung dari angka yang sama yang
+        menggambar lebar bilah (persenProgres di lib/money.ts), bukan nilai
+        terpisah yang bisa menyimpang darinya.
+      */}
+      <div className="flex items-center gap-space-3">
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={persen}
+          aria-valuetext={`${formatRupiah(terkumpul)} dari ${formatRupiah(target)}`}
+          className="h-6 w-full overflow-hidden rounded-sm bg-panel"
+        >
+          <div className="h-full bg-accent" style={{ width: `${persen}%` }} />
+        </div>
+        <p className="tabular shrink-0 text-card-title font-display font-bold text-ink">{persen}%</p>
       </div>
 
       <div className="flex flex-wrap items-baseline justify-between gap-space-2 text-label font-medium text-muted">
