@@ -39,11 +39,14 @@ type ProposalCardProps = {
 
 export function ProposalCard({ proposal, featured = false, index }: ProposalCardProps) {
   return (
-    <article
-      className={`flex flex-col gap-space-3 rounded-card border px-space-4 py-space-4 ${
-        featured ? "border-ink bg-paper" : "border-line bg-panel"
-      }`}
-    >
+    // Satu set kelas untuk kartu biasa maupun unggulan, bukan dua: DESIGN.md
+    // membatasi batas kartu pada --line, bukan penekanan warna, jadi
+    // hierarkinya datang dari ukuran nominal dan cuplikan cerita (di bawah),
+    // bukan dari border atau latar yang berbeda. bg-panel-raised, bukan
+    // bg-panel: kartu ini dipakai di atas section berlatar bg-panel (halaman
+    // jelajah) maupun di atas bg-paper (panel manajemen campaign), dan
+    // panel-raised tetap terlihat sebagai permukaan terangkat di kedua latar.
+    <article className="flex flex-col gap-space-3 rounded-card border border-line bg-panel-raised px-space-4 py-space-4">
       <div className="flex flex-wrap items-start justify-between gap-space-2">
         <div className="flex items-baseline gap-space-2">
           {index !== undefined && (
@@ -51,7 +54,7 @@ export function ProposalCard({ proposal, featured = false, index }: ProposalCard
               {String(index + 1).padStart(2, "0")}
             </span>
           )}
-          <h3 className="text-[1.125rem] font-semibold text-ink">{proposal.business_name}</h3>
+          <h3 className="text-card-title font-semibold text-ink">{proposal.business_name}</h3>
         </div>
         <StatusBadge status={proposal.status} />
       </div>
@@ -74,10 +77,96 @@ export function ProposalCard({ proposal, featured = false, index }: ProposalCard
           bisa dinilai ulang dari halaman proposal.
         </p>
       )}
-      <Link href={`/proposal/${proposal.id}`} className="text-base font-medium text-ink underline">
+      <Link
+        href={`/proposal/${proposal.id}`}
+        className="inline-flex min-h-[44px] items-center text-body font-medium text-ink underline underline-offset-2"
+      >
         Baca proposal
       </Link>
     </article>
+  );
+}
+
+type FeaturedState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "empty" }
+  | { status: "ready"; proposal: Proposal };
+
+// Jawaban DESIGN.md atas "apa yang mengisi ruang tempat foto bekerja di
+// referensi": satu proposal nyata yang sudah terbuka untuk didanai, dengan
+// nominalnya di ukuran "hero", persis posisi yang di the5ers.com ditempati
+// foto manusia. Dipakai sekali di hero halaman landing (app/page.tsx), bukan
+// di halaman jelajah: ProposalCard di sana sudah punya kartu unggulannya
+// sendiri di ukuran "large" (tokoh utama KARTU, lihat komentar Amount.tsx),
+// "hero" sengaja hanya untuk angka yang memimpin HALAMAN.
+export function FeaturedProposalHighlight() {
+  const [state, setState] = useState<FeaturedState>({ status: "loading" });
+
+  async function load() {
+    setState({ status: "loading" });
+    try {
+      const result = await api.get<{ items: Proposal[] }>("/proposals");
+      const utama = result.items[0];
+      setState(utama ? { status: "ready", proposal: utama } : { status: "empty" });
+    } catch (error) {
+      setState({
+        status: "error",
+        message: error instanceof ApiError ? error.message : "Terjadi kesalahan. Coba lagi sebentar lagi.",
+      });
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  // Tinggi minimum dipesan di ketiga keadaan supaya hero tidak melompat
+  // begitu data datang: perkiraan tinggi kotak "ready" di bawah.
+  if (state.status === "loading") {
+    return <LoadingState label="Memuat proposal unggulan" minHeight={220} />;
+  }
+  if (state.status === "error") {
+    return <ErrorState message={state.message} onRetry={load} />;
+  }
+  if (state.status === "empty") {
+    // Bukan EmptyState biasa: aksinya adalah NAVIGASI ke rute yang sudah
+    // ada, bukan mutasi, jadi ia memakai <Link> sungguhan (Fungsional
+    // Pattern "anchor ke rute nyata"), bukan tombol yang berpura-pura
+    // berpindah halaman lewat useRouter(). Tautan teks, bukan tombol
+    // bg-accent: section CTA di bagian bawah halaman ini sudah memegang
+    // satu-satunya aksi utama berwarna aksen di layar, dan kekosongan di
+    // sini hanyalah jalan pintas sekunder ke rute yang sama, bukan aksi
+    // kedua yang bersaing memperebutkan perhatian.
+    return (
+      <div className="flex flex-col items-start gap-space-3 rounded-card border border-line bg-panel px-space-4 py-space-5 text-left">
+        <p className="max-w-measure text-body text-muted">
+          Belum ada proposal yang terbuka untuk didanai saat ini.
+        </p>
+        <Link
+          href="/daftar"
+          className="inline-flex min-h-[44px] items-center text-body font-medium text-ink underline underline-offset-2"
+        >
+          Daftar sebagai UMKM
+        </Link>
+      </div>
+    );
+  }
+
+  const { proposal } = state;
+  return (
+    <div className="flex flex-col gap-space-3 rounded-feature border border-line bg-panel-raised px-space-5 py-space-6">
+      <p className="text-label font-medium uppercase tracking-wide text-muted">
+        {proposal.business_name}
+      </p>
+      <Amount label="Dana diminta" amount={proposal.requested_amount} size="hero" />
+      <Link
+        href={`/proposal/${proposal.id}`}
+        className="inline-flex min-h-[44px] items-center text-body font-medium text-ink underline underline-offset-2"
+      >
+        Baca proposal ini
+      </Link>
+    </div>
   );
 }
 
@@ -121,10 +210,17 @@ export function ProposalList() {
   }
 
   return (
-    <div className="flex flex-col gap-space-3">
+    // <ol>, bukan <div>: setiap kartu sudah menampilkan nomor urutnya (span
+    // "01", "02", ...) secara visual, jadi daftar ini memang bernomor, dan
+    // semantiknya harus mengatakan itu ke pembaca layar juga. Kelas pada
+    // <li> cuma melepas penanda bullet default, komposisinya tetap kelas
+    // yang sama seperti <div> sebelumnya.
+    <ol className="flex flex-col gap-space-3">
       {state.items.map((proposal, index) => (
-        <ProposalCard key={proposal.id} proposal={proposal} featured={index === 0} index={index} />
+        <li key={proposal.id} className="list-none">
+          <ProposalCard proposal={proposal} featured={index === 0} index={index} />
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
