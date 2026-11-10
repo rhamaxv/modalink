@@ -12,7 +12,9 @@ import pytest
 # muatan unggahan. Bukan gambar karangan: ketiganya memang bisa dibuka.
 PNG_1x1 = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
-    "890000000a49444154789c6300010000050001" "0d0a2db4" "0000000049454e44ae426082"
+    "890000000a49444154789c6300010000050001"
+    "0d0a2db4"
+    "0000000049454e44ae426082"
 )
 JPEG_AWAL = b"\xff\xd8\xff\xe0" + b"\x00" * 60
 WEBP_AWAL = b"RIFF" + b"\x00\x00\x00\x00" + b"WEBP" + b"\x00" * 60
@@ -164,7 +166,11 @@ class TestTipeDitentukanDariByteBukanDariKlien:
             (b"<html><script>alert(1)</script></html>", "x.png", "image/png"),
             # SVG sengaja tidak termasuk format yang diterima meski ia gambar:
             # SVG bisa memuat <script>.
-            (b'<svg xmlns="http://www.w3.org/2000/svg"><script/></svg>', "x.svg", "image/svg+xml"),
+            (
+                b'<svg xmlns="http://www.w3.org/2000/svg"><script/></svg>',
+                "x.svg",
+                "image/svg+xml",
+            ),
             # Teks biasa yang mengaku JPEG.
             (b"bukan gambar sama sekali", "x.jpg", "image/jpeg"),
             # PDF: berkas sungguhan, format sungguhan, tetap bukan gambar.

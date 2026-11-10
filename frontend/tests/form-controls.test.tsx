@@ -59,6 +59,14 @@ describe("every form control in the app uses the one shared definition", () => {
         // Kelas yang dioper lewat variabel dilewati di sini dan diperiksa
         // oleh test render di bawah, yang melihat DOM sungguhan.
         if (/className=\{[A-Za-z]/.test(tag)) continue;
+        // Input yang DISEMBUNYIKAN SECARA VISUAL dikecualikan, dan ini bukan
+        // celah: .control menata sesuatu yang tidak pernah terlihat, jadi
+        // memasangnya di sana tidak berarti apa-apa. Pola ini dipakai input
+        // berkas di CoverUpload, yang pemicunya adalah <label> bergaya
+        // tombol. Yang menggantikan pagar ini untuk kasus itu adalah test
+        // "visible trigger" di bawah, yang memeriksa pemicunya sungguh
+        // terlihat dan punya kotak sentuh 44px.
+        if (/className="[^"]*\bsr-only\b/.test(tag)) continue;
         if (!/className="[^"]*\bcontrol\b/.test(tag)) {
           pelanggar.push(`${berkas}: ${tag.slice(0, 90).replace(/\s+/g, " ")}`);
         }
@@ -114,6 +122,20 @@ describe("the shared control definition covers what the browser would otherwise 
 
   it("keeps every control at the 44px touch target", () => {
     expect(css).toMatch(/\.control\s*\{[^}]*min-height:\s*44px/);
+  });
+});
+
+describe("a visually hidden input must still have a visible trigger", () => {
+  it("gives the cover upload a 44px label that activates its hidden file input", () => {
+    const sumber = readFileSync("components/CoverUpload.tsx", "utf8");
+    // Input dan label terhubung lewat id yang sama, jadi label itu benar-benar
+    // mengaktifkan input saat diklik maupun ditekan dari keyboard.
+    expect(sumber).toMatch(/<input[\s\S]*?id=\{inputId\}/);
+    expect(sumber).toMatch(/<label[\s\S]*?htmlFor=\{inputId\}/);
+    expect(sumber).toMatch(/min-h-\[44px\]/);
+    // Cincin fokus harus pindah ke label: yang terlihat pengguna adalah
+    // label, bukan input yang disembunyikan di belakangnya.
+    expect(sumber).toContain("peer-focus-visible:outline");
   });
 });
 

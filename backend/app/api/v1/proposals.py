@@ -167,6 +167,7 @@ async def get_proposal_endpoint(
         proposal=proposal,
         collected_amount=collected_amount,
         cover_updated_at=None if cover is None else cover.updated_at,
+        sector=campaign.sector,
     )
 
 

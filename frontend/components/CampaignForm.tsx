@@ -26,6 +26,7 @@ export type CampaignOut = {
   title: string;
   description: string;
   sector: string;
+  cover_updated_at?: string | null;
   target_amount: number;
   apply_deadline: string;
   funding_deadline: string;

@@ -53,6 +53,11 @@ class ProposalWithCollectedAmount:
     # klien: menentukan apakah gambar dirender sama sekali, dan menjadi kunci
     # cache pada URL gambarnya (lihat services/cover.py versi_cache).
     cover_updated_at: datetime | None = None
+    # Sektor milik campaign yang menaungi proposal ini, bukan kolom di tabel
+    # proposals (lihat _public_proposal_query). Ikut dikirim karena daftar
+    # publik sudah bisa DISARING per sektor; tanpa menampilkannya di tiap
+    # baris, penyaring itu bekerja terhadap sesuatu yang tidak terlihat.
+    sector: Sector | None = None
 
     def __getattr__(self, name: str):
         return getattr(self.proposal, name)
@@ -231,14 +236,26 @@ async def list_public_proposals(
         select(func.count()).select_from(kueri_dasar.subquery())
     )
 
+    # Campaign selalu ikut di-JOIN, bukan hanya saat `sector` dipakai sebagai
+    # penyaring: sektornya ikut dikirim di setiap baris. JOIN biasa, bukan
+    # outer: setiap proposal wajib punya campaign lewat foreign key.
     baris_kueri = (
         _public_proposal_query(sector, campaign_id)
-        .add_columns(func.coalesce(terkumpul.c.collected_amount, 0))
+        .add_columns(
+            func.coalesce(terkumpul.c.collected_amount, 0),
+            col(Campaign.sector),
+        )
         .outerjoin(terkumpul, terkumpul.c.proposal_id == Proposal.id)
         .order_by(*_proposal_order_by(sort, terkumpul))
         .limit(page_size)
         .offset((page - 1) * page_size)
     )
+    if sector is None:
+        # _public_proposal_query hanya memasang JOIN ke campaigns ketika
+        # menyaring sektor; di jalur tanpa filter, JOIN-nya dipasang di sini.
+        baris_kueri = baris_kueri.join(
+            Campaign, col(Campaign.id) == col(Proposal.campaign_id)
+        )
     baris = (await session.execute(baris_kueri)).all()
 
     # D-06/BR-61: daftar ini juga "pembacaan proposal", jadi proposal yang
@@ -248,11 +265,13 @@ async def list_public_proposals(
     # bukan urutan yang aman dipakai mengunci baris (review keamanan Finding
     # 1, lihat docstring evaluate_expiry_many). Hanya baris di halaman ini,
     # bukan seluruh tabel, konsisten dengan tujuan paginasi.
-    await evaluate_expiry_many(session, [p for p, _ in baris], clock)
+    await evaluate_expiry_many(session, [p for p, _, _ in baris], clock)
 
     return [
-        ProposalWithCollectedAmount(proposal=p, collected_amount=int(jumlah))
-        for p, jumlah in baris
+        ProposalWithCollectedAmount(
+            proposal=p, collected_amount=int(jumlah), sector=sektor_baris
+        )
+        for p, jumlah, sektor_baris in baris
     ], int(total or 0)
 
 

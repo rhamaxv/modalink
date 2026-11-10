@@ -8,6 +8,9 @@ import { FundingBar } from "@/components/FundingBar";
 import { PledgeForm } from "@/components/PledgeForm";
 import { ScorePanel, type ProposalScore, type ScoringStatus } from "@/components/ScorePanel";
 import type { CurrentUser } from "@/lib/auth";
+import { CoverImage } from "@/components/ui/CoverImage";
+import { CoverUpload } from "@/components/CoverUpload";
+import { SECTOR_ICON } from "@/components/CampaignBrowseCard";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Amount } from "@/components/ui/Amount";
@@ -42,6 +45,12 @@ type ProposalOut = {
   // SETIAP pengunjung tanpa akun -- padahal kartu proposal di /jelajah
   // sudah menampilkan progres funding ke publik (05-feature-komunitas.md).
   collected_amount: number;
+  // null berarti belum ada foto sampul; nilainya sekaligus kunci cache URL
+  // gambarnya (lihat lib/cover.ts).
+  cover_updated_at: string | null;
+  // Sektor campaign yang menaungi proposal ini, dipakai sebagai lambang
+  // sampul cadangan saat fotonya belum ada.
+  sector: string | null;
   status: ProposalStatus;
   scoring_status: ScoringStatus;
   lead_investor_id: string | null;
@@ -299,10 +308,46 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
 
   return (
     <div className="mx-auto flex max-w-[76rem] flex-col gap-space-6 px-space-3 py-space-5">
+      {/* Banner sampul mendahului judul, bukan diselipkan di samping:
+          halaman ini sebelumnya membuka dengan judul di atas ruang kosong
+          selebar separuh layar. Rasio 3:1 dipilih supaya ia memberi halaman
+          sebuah pembuka tanpa mendorong nominal dan progres pendanaan ke
+          bawah lipatan. Usaha yang belum mengunggah foto tetap mendapat
+          bentuk lewat lambang sektornya. */}
+      <CoverImage
+        owner="proposals"
+        id={proposalId}
+        coverUpdatedAt={data.cover_updated_at}
+        nama={data.business_name}
+        sectorIcon={data.sector ? SECTOR_ICON[data.sector] : undefined}
+        ukuran="banner"
+      />
+
       <header className="flex flex-wrap items-center justify-between gap-space-2 border-b border-line pb-space-3">
         <h1 className="text-page font-display text-ink">{data.business_name}</h1>
         <StatusBadge status={data.status} />
       </header>
+
+      {/* Kontrol unggah hanya untuk pemilik proposalnya sendiri. Server juga
+          menolak orang lain (404, lihat api/v1/covers.py); yang di sini
+          supaya kontrolnya tidak ditawarkan kepada orang yang pasti ditolak,
+          kesalahan yang sama yang baru diperbaiki pada tombol dukungan. */}
+      {currentUser?.id === data.umkm_id && (
+        <section
+          data-pola="kelola-sampul"
+          className="rounded-panel border border-line bg-panel px-space-4 py-space-4"
+        >
+          <h2 className="mb-space-3 text-card-title font-semibold text-ink">Foto sampul</h2>
+          <CoverUpload
+            owner="proposals"
+            id={proposalId}
+            nama={data.business_name}
+            coverUpdatedAt={data.cover_updated_at}
+            sectorIcon={data.sector ? SECTOR_ICON[data.sector] : undefined}
+            onBerubah={muatProposal}
+          />
+        </section>
+      )}
 
       {/* 1. Nominal utama: motif identitas DESIGN.md, satu-satunya pemakaian
           size="hero" di halaman ini. Lebar penuh, rata kiri, satu kolom,

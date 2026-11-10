@@ -28,6 +28,26 @@ pekerjaan yang di situs itu dilakukan foto. Dokumen lama sudah menyebut nominal 
 tokoh utama tapi menetapkan batas minimum 1,75rem, yaitu 28px, dan 28px itulah yang
 membuatnya hilang. Batas itu dinaikkan.
 
+### Pembaruan: gambarnya sekarang ada
+
+Kalimat "Modalink punya **nol** gambar" di atas benar saat dokumen ini ditulis, dan ia yang
+melahirkan seluruh keputusan di paragraf sebelumnya. Premis itu sudah berubah: UMKM dan
+investor kini bisa mengunggah **foto sampul** usaha atau campaign mereka sendiri
+(`PUT /proposals/{id}/cover`, `PUT /campaigns/{id}/cover`). Fotonya nyata, diunggah
+pemiliknya, dan tidak dikarang siapa pun, jadi R-18 dan R-36 tidak dilanggar.
+
+Yang berubah dan yang tidak:
+
+- **Uang tetap elemen grafis utama.** Foto menambah bidang, tidak menggantikan angka.
+  Setiap kartu dan baris yang memuat sampul tetap menyebut nominalnya.
+- **Keadaan tanpa foto adalah keadaan yang dirancang, bukan kasus pinggiran.** Sebagian
+  besar usaha tidak akan pernah mengunggah apa pun, jadi sampul cadangan memakai lambang
+  sektornya sendiri (lihat `components/icons/Icon.tsx`): baris tanpa foto tetap punya
+  bentuk dan tetap bisa dibedakan satu sama lain. Kotak kosong dan gambar rusak dilarang.
+- **Tidak ada foto stok, ilustrasi dekoratif, atau gambar yang dihasilkan untuk mengisi
+  ruang.** Satu-satunya gambar yang boleh muncul adalah yang diunggah pemilik usaha atau
+  pemilik campaign.
+
 ## Dial
 
 | Dial | Nilai | Artinya di sini |

@@ -24,6 +24,7 @@ const OPEN_CAMPAIGN = {
   funding_deadline: "2027-03-01T23:59:59Z",
   score_threshold: 60,
   status: "open",
+  cover_updated_at: null,
   created_at: "2026-01-01T00:00:00Z",
 };
 

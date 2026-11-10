@@ -299,18 +299,43 @@ describe("RHYTHM 3 patterns match what is actually rendered, not just their labe
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
   });
 
-  it("kiri-sorotan-nominal on the landing page truly renders two columns (narrative, then the featured amount)", async () => {
+  it("kiri-dinding-sampul on the landing page truly renders two columns (narrative, then the cover wall)", async () => {
     stubEmptyFetch();
     const { container } = render(<Beranda />);
-    expectAsymmetricTwoColumn(findSectionByPola(container, "kiri-sorotan-nominal"));
+    expectAsymmetricTwoColumn(findSectionByPola(container, "kiri-dinding-sampul"));
     await screen.findByText("Belum ada proposal yang terbuka untuk didanai saat ini.");
   });
 
-  it("the featured amount on the landing page actually renders at the hero scale, once settled", async () => {
+  it("fills the hero with real businesses and their covers, not one stacked label block", async () => {
+    // Menggantikan pagar lama yang menuntut satu nominal berukuran hero di
+    // kolom kanan. Blok itu (FeaturedProposalHighlight) dibuang atas
+    // permintaan pemilik project, dan premis DESIGN.md yang melahirkannya
+    // sudah berubah: saat arah visual ditulis, produk ini tidak punya gambar
+    // apa pun, jadi ruang tempat foto bekerja di referensi diisi uang. UMKM
+    // sekarang bisa mengunggah foto sampul, jadi ruang itu diisi usaha
+    // sungguhan. Nominalnya tidak hilang, ia pindah ke tiap kotak.
     stubFetchWithProposals();
-    render(<Beranda />);
-    const nominal = await screen.findByText("Rp25.000.000");
-    expect(nominal.className.split(" ")).toContain("text-amount");
+    const { container } = render(<Beranda />);
+    await screen.findByText("Kopi Senja");
+
+    const hero = findSectionByPola(container, "kiri-dinding-sampul");
+    const tautan = [...hero.querySelectorAll("a[href]")].filter((a) =>
+      a.getAttribute("href")?.startsWith("/proposal/"),
+    );
+    expect(tautan.length, "hero harus memuat beberapa usaha, bukan satu").toBeGreaterThan(1);
+    // Tiap kotak tetap menyebut nominalnya.
+    expect(screen.getByText(/Rp25\.000\.000 dicari/)).toBeInTheDocument();
+  });
+
+  it("gives a business with no uploaded photo a shape instead of a broken image", async () => {
+    // Keadaan yang paling sering terlihat, bukan kasus pinggiran: sebagian
+    // besar usaha tidak akan pernah mengunggah apa pun.
+    stubFetchWithProposals();
+    const { container } = render(<Beranda />);
+    await screen.findByText("Kopi Senja");
+    const hero = findSectionByPola(container, "kiri-dinding-sampul");
+    expect(hero.querySelectorAll("img").length, "stub ini tidak punya sampul").toBe(0);
+    expect(hero.querySelectorAll("svg").length).toBeGreaterThan(0);
   });
 
   it("daftar-bernomor on the landing page is a real <ol>, not a <div> with number-shaped spans", async () => {

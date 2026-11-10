@@ -5,6 +5,9 @@ import { Amount, EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ApiError, api } from "@/lib/api";
 import { CampaignForm, type CampaignOut } from "@/components/CampaignForm";
+import { CoverImage } from "@/components/ui/CoverImage";
+import { CoverUpload } from "@/components/CoverUpload";
+import { SECTOR_ICON } from "@/components/CampaignBrowseCard";
 import { ProposalCard, type Proposal } from "@/components/ProposalCard";
 
 function formatDate(iso: string): string {
@@ -79,6 +82,14 @@ export function CampaignManagePanel({ campaignId }: { campaignId: string }) {
 
   return (
     <div className="flex flex-col gap-space-5">
+      <CoverImage
+        owner="campaigns"
+        id={campaign.id}
+        coverUpdatedAt={campaign.cover_updated_at ?? null}
+        nama={campaign.title}
+        sectorIcon={SECTOR_ICON[campaign.sector]}
+        ukuran="banner"
+      />
       <div className="flex flex-col gap-space-2">
         <div className="flex flex-wrap items-start justify-between gap-space-3">
           <h1 className="font-display text-page text-ink">{campaign.title}</h1>
@@ -98,6 +109,23 @@ export function CampaignManagePanel({ campaignId }: { campaignId: string }) {
             <dd>{formatDate(campaign.funding_deadline)}</dd>
           </div>
         </dl>
+
+        {isOwner && (
+          <section
+            data-pola="kelola-sampul"
+            className="mt-space-3 rounded-panel border border-line bg-panel px-space-4 py-space-4"
+          >
+            <h2 className="mb-space-3 text-card-title font-semibold text-ink">Foto sampul</h2>
+            <CoverUpload
+              owner="campaigns"
+              id={campaign.id}
+              nama={campaign.title}
+              coverUpdatedAt={campaign.cover_updated_at ?? null}
+              sectorIcon={SECTOR_ICON[campaign.sector]}
+              onBerubah={load}
+            />
+          </section>
+        )}
 
         {isOwner && campaign.status === "open" && (
           <div className="mt-space-3 flex flex-col gap-space-2">

@@ -12,6 +12,7 @@ import {
   Select,
 } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { CoverImage } from "@/components/ui/CoverImage";
 import { Icon, type IconName } from "@/components/icons/Icon";
 import { ApiError, api } from "@/lib/api";
 import { formatRupiah } from "@/lib/money";
@@ -32,6 +33,7 @@ export type PublicCampaign = {
   funding_deadline: string;
   score_threshold: number;
   status: string;
+  cover_updated_at: string | null;
   created_at: string;
 };
 
@@ -192,11 +194,20 @@ function CampaignBrowseRow({
   return (
     <Link
       href={`/jelajah/campaign/${campaign.id}`}
-      className="group flex flex-col gap-space-2 border-b border-line px-space-2 py-space-3 transition-colors hover:bg-panel-raised md:grid md:grid-cols-[2.5rem_minmax(0,1fr)_9rem_12rem_11rem] md:items-center md:gap-space-4"
+      className="group flex flex-col gap-space-2 border-b border-line px-space-2 py-space-3 transition-colors hover:bg-panel-raised md:grid md:grid-cols-[1.75rem_3.5rem_minmax(0,1fr)_8rem_11rem_11rem] md:items-center md:gap-space-3"
     >
       <span aria-hidden="true" className="tabular text-label font-medium text-muted">
         {String(index + 1).padStart(2, "0")}
       </span>
+
+      <CoverImage
+        owner="campaigns"
+        id={campaign.id}
+        coverUpdatedAt={campaign.cover_updated_at}
+        nama={campaign.title}
+        sectorIcon={SECTOR_ICON[campaign.sector]}
+        ukuran="thumb"
+      />
 
       <span className="flex min-w-0 flex-col gap-space-1">
         <span className="truncate text-card-title font-semibold text-ink group-hover:underline">

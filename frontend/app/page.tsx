@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui";
-import { FeaturedProposalHighlight } from "@/components/ProposalCard";
+import { ProposalCoverWall } from "@/components/ProposalCoverWall";
 
 const LANGKAH = [
   {
@@ -43,16 +43,20 @@ const TAUTAN_TEKS =
 // kerjakan.
 //
 // Tidak ada statistik, testimoni, atau bilah logo di halaman ini: produk
-// ini belum punya satu pun data nyata untuk itu (R-17, R-18, R-36). Ruang
-// yang di referensi (the5ers.com) diisi 341 foto manusia, di sini diisi satu
-// nominal rupiah nyata (FeaturedProposalHighlight): DESIGN.md menjawab
-// "apa yang mengisi ruang tempat foto bekerja" dengan uang, bukan ilustrasi
-// yang dikarang.
+// ini belum punya satu pun data nyata untuk itu (R-17, R-18, R-36).
+//
+// Ruang yang di referensi (the5ers.com) diisi 341 foto manusia dulu diisi
+// satu nominal rupiah, karena saat DESIGN.md ditulis produk ini memang tidak
+// punya gambar apa pun dan mengarang ilustrasi bukan pilihan. Premis itu
+// berubah: UMKM sekarang bisa mengunggah foto sampul usahanya sendiri, jadi
+// ruang itu diisi empat usaha SUNGGUHAN beserta fotonya (ProposalCoverWall).
+// Nominalnya tidak hilang, ia ikut di tiap kotak. Usaha yang belum mengunggah
+// foto tetap punya bidang lewat lambang sektornya, bukan kotak kosong.
 //
 // RHYTHM 3 (DESIGN.md): setiap elemen section memasang data-pola, dan
 // tests/composition.test.tsx menolak dua pola berurutan yang sama, lalu
 // memeriksa bahwa pola itu benar sesuai struktur yang dirender, bukan
-// sekadar label. Empat section di bawah: kiri-sorotan-nominal (asimetris,
+// sekadar label. Empat section di bawah: kiri-dinding-sampul (asimetris,
 // dua kolom tak setara), daftar-bernomor (daftar bernomor sungguhan),
 // dua-kolom-setara (dua kolom selebar sama), lebar-penuh-cta (latar
 // menembus tepi, teks terbatas measure).
@@ -66,7 +70,7 @@ export default function Beranda() {
         pertama.
       */}
       <section
-        data-pola="kiri-sorotan-nominal"
+        data-pola="kiri-dinding-sampul"
         className="mx-auto flex w-full max-w-[72rem] items-center px-space-3 py-space-7 md:min-h-[78vh]"
       >
         <div className="grid w-full gap-space-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-center">
@@ -110,7 +114,7 @@ export default function Beranda() {
               </ButtonLink>
             </div>
           </div>
-          <FeaturedProposalHighlight />
+          <ProposalCoverWall />
         </div>
       </section>
 

@@ -221,7 +221,12 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     ("GET", "/api/v1/proposals/{proposal_id}/cover", None, 422),
     ("PUT", "/api/v1/campaigns/{campaign_id}/cover", None, 401),
     ("PUT", "/api/v1/campaigns/{campaign_id}/cover", "umkm", 403),  # peran salah
-    ("PUT", "/api/v1/campaigns/{campaign_id}/cover", "investor_lain", 403),  # bukan pemilik
+    (
+        "PUT",
+        "/api/v1/campaigns/{campaign_id}/cover",
+        "investor_lain",
+        403,
+    ),  # bukan pemilik
     ("DELETE", "/api/v1/campaigns/{campaign_id}/cover", None, 401),
     ("DELETE", "/api/v1/campaigns/{campaign_id}/cover", "umkm", 403),
     ("DELETE", "/api/v1/campaigns/{campaign_id}/cover", "investor_lain", 403),

@@ -27,6 +27,7 @@ type ProposalMasuk = {
   // terkirim oleh GET /campaigns/{id}/proposals; sebelumnya cuma tidak
   // pernah dideklarasikan di sini.
   collected_amount: number;
+  cover_updated_at: string | null;
   status: string;
   scoring_status: string;
   created_at: string;
@@ -40,7 +41,7 @@ const PANJANG_CUPLIKAN = 160;
 // mengarang data (R-17/R-38): isinya tetap kalimat nyata dari proposal,
 // cuma dipotong supaya ProposalCard (yang mengharapkan bentuk ringkas)
 // tetap bisa dipakai apa adanya tanpa diubah.
-function petakeProposal(p: ProposalMasuk): Proposal {
+function petakeProposal(p: ProposalMasuk, sektorCampaign: string | null): Proposal {
   const cuplikan =
     p.business_profile.length > PANJANG_CUPLIKAN
       ? `${p.business_profile.slice(0, PANJANG_CUPLIKAN)}...`
@@ -51,6 +52,11 @@ function petakeProposal(p: ProposalMasuk): Proposal {
     business_profile_excerpt: cuplikan,
     requested_amount: p.requested_amount,
     collected_amount: p.collected_amount,
+    cover_updated_at: p.cover_updated_at ?? null,
+    // Sektor proposal selalu sama dengan sektor campaign yang menaunginya,
+    // dan di panel ini campaign-nya sudah diketahui, jadi dioper dari sana
+    // alih-alih diminta ulang per proposal.
+    sector: sektorCampaign,
     status: p.status,
     scoring_status: p.scoring_status,
     created_at: p.created_at,
@@ -161,7 +167,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
                     publik (listed ke atas) mendapat cuplikan cerita usaha,
                     bukan proposal pertama yang dipilih sembarang. */}
                 <ProposalCard
-                  proposal={petakeProposal(proposal)}
+                  proposal={petakeProposal(proposal, campaign.sector)}
                   index={index}
                   featured={["listed", "partially_funded", "funded"].includes(proposal.status)}
                 />

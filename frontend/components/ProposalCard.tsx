@@ -12,7 +12,8 @@ import {
   Select,
 } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { SECTOR_LABEL } from "@/components/CampaignBrowseCard";
+import { CoverImage } from "@/components/ui/CoverImage";
+import { SECTOR_ICON, SECTOR_LABEL } from "@/components/CampaignBrowseCard";
 import { ApiError, api } from "@/lib/api";
 import { formatRupiah, persenProgres } from "@/lib/money";
 
@@ -35,6 +36,13 @@ export type Proposal = {
   collected_amount: number;
   status: string;
   scoring_status: string;
+  // null berarti belum ada foto sampul; nilainya sekaligus kunci cache URL
+  // gambarnya (lihat lib/cover.ts).
+  cover_updated_at: string | null;
+  // Sektor campaign yang menaungi proposal ini, bukan kolom milik proposal.
+  // Dipakai sebagai lambang sampul cadangan dan sebagai kolom yang bisa
+  // dipindai saat penyaring sektor dipakai.
+  sector: string | null;
   created_at: string;
 };
 
@@ -245,18 +253,35 @@ function ProposalRow({ proposal, index }: { proposal: Proposal; index: number })
   return (
     <Link
       href={`/proposal/${proposal.id}`}
-      className="group flex flex-col gap-space-2 border-b border-line px-space-2 py-space-3 transition-colors hover:bg-panel-raised md:grid md:grid-cols-[1.75rem_minmax(0,1fr)_13rem_13rem] md:items-center md:gap-space-3"
+      className="group flex flex-col gap-space-2 border-b border-line px-space-2 py-space-3 transition-colors hover:bg-panel-raised md:grid md:grid-cols-[1.75rem_3.5rem_minmax(0,1fr)_13rem_13rem] md:items-center md:gap-space-3"
     >
       <span aria-hidden="true" className="tabular text-label font-medium text-muted">
         {String(index + 1).padStart(2, "0")}
       </span>
 
+      {/* Foto sampul usaha, atau lambang sektornya bila belum ada foto.
+          Sebagian besar usaha tidak akan pernah mengunggah apa pun, jadi
+          keadaan tanpa foto itulah yang paling sering terlihat, dan ia tetap
+          harus punya bentuk. */}
+      <CoverImage
+        owner="proposals"
+        id={proposal.id}
+        coverUpdatedAt={proposal.cover_updated_at}
+        nama={proposal.business_name}
+        sectorIcon={proposal.sector ? SECTOR_ICON[proposal.sector] : undefined}
+        ukuran="thumb"
+      />
+
       <span className="flex min-w-0 flex-col gap-space-1">
         <span className="truncate text-card-title font-semibold text-ink group-hover:underline">
           {proposal.business_name}
         </span>
-        <span className="line-clamp-1 text-label text-muted">
-          {proposal.business_profile_excerpt}
+        <span className="flex min-w-0 items-center gap-space-2 text-label text-muted">
+          {proposal.sector && (
+            <span className="shrink-0">{SECTOR_LABEL[proposal.sector] ?? proposal.sector}</span>
+          )}
+          {proposal.sector && <span aria-hidden="true">·</span>}
+          <span className="line-clamp-1">{proposal.business_profile_excerpt}</span>
         </span>
       </span>
 

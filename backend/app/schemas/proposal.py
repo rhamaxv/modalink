@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.domain.transitions import PLEDGE_LOCKED_PROPOSAL_STATUSES
 from app.domain.transitions import ProposalStatus as DomainProposalStatus
+from app.models.campaign import Sector
 from app.models.proposal import MilestoneStatus, ProposalStatus, ScoringStatus
 from app.schemas.milestone import MilestoneReportOut
 
@@ -107,6 +108,9 @@ class ProposalOut(BaseModel):
     # "punya sampul": waktunya sekaligus menjadi kunci cache pada URL gambar,
     # sehingga sampul yang diganti tidak tertutup versi lama di browser.
     cover_updated_at: datetime | None = None
+    # Sektor campaign yang menaungi proposal ini. None hanya pada bentuk
+    # keluaran yang belum mengambilnya (lihat services/proposal.py).
+    sector: Sector | None = None
     created_at: datetime
 
     @model_validator(mode="after")
@@ -145,6 +149,9 @@ class ProposalListItemOut(BaseModel):
     # "punya sampul": waktunya sekaligus menjadi kunci cache pada URL gambar,
     # sehingga sampul yang diganti tidak tertutup versi lama di browser.
     cover_updated_at: datetime | None = None
+    # Sektor campaign yang menaungi proposal ini. None hanya pada bentuk
+    # keluaran yang belum mengambilnya (lihat services/proposal.py).
+    sector: Sector | None = None
     created_at: datetime
 
     @model_validator(mode="after")

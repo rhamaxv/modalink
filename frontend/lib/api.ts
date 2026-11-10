@@ -10,6 +10,11 @@ import { getToken } from "./token";
 // prefiks /api/v1 dan 404, sementara setiap container melaporkan dirinya sehat.
 const BASIS = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
+// Diekspor untuk lib/cover.ts, yang menyusun URL gambar sendiri alih-alih
+// lewat fetch: <img src> tidak melewati helper api di bawah sama sekali, tapi
+// ia tetap harus menunjuk basis yang sama persis.
+export const API_BASE = BASIS;
+
 export class ApiError extends Error {
   constructor(
     readonly code: string,
@@ -66,8 +71,45 @@ async function minta<T>(metode: string, jalur: string, body?: unknown): Promise<
   return respons.status === 204 ? (undefined as T) : respons.json();
 }
 
+// Unggahan multipart tidak bisa lewat `minta` di atas, dan bukan sekadar
+// karena bodinya berbeda: `minta` selalu memasang Content-Type
+// application/json, sedangkan untuk FormData header itu HARUS dibiarkan
+// kosong supaya browser menuliskannya sendiri lengkap dengan boundary.
+// Menyetelnya sendiri membuat server tidak bisa memisahkan bagian-bagiannya
+// dan unggahan gagal dengan galat yang jauh dari sebabnya.
+async function unggah(jalur: string, berkas: File): Promise<void> {
+  const form = new FormData();
+  form.append("file", berkas);
+  const header: Record<string, string> = {};
+  const token = getToken();
+  if (token) header.Authorization = `Bearer ${token}`;
+
+  let respons: Response;
+  try {
+    respons = await fetch(`${BASIS}${jalur}`, { method: "PUT", headers: header, body: form });
+  } catch {
+    throw new ApiError(
+      "jaringan_bermasalah",
+      "Koneksi ke server bermasalah. Periksa jaringan lalu coba lagi.",
+      0,
+    );
+  }
+  if (!respons.ok) {
+    const isi: unknown = await respons.json().catch(() => null);
+    const e = (isi as { error?: Record<string, unknown> } | null)?.error;
+    throw new ApiError(
+      typeof e?.code === "string" ? e.code : "galat_tak_dikenal",
+      typeof e?.message === "string"
+        ? e.message
+        : "Terjadi kesalahan di server. Coba lagi sebentar lagi.",
+      respons.status,
+    );
+  }
+}
+
 export const api = {
   get: <T>(jalur: string) => minta<T>("GET", jalur),
+  unggah,
   post: <T>(jalur: string, body?: unknown) => minta<T>("POST", jalur, body),
   patch: <T>(jalur: string, body?: unknown) => minta<T>("PATCH", jalur, body),
   del: <T>(jalur: string) => minta<T>("DELETE", jalur),
