@@ -115,7 +115,7 @@ function MoneyField({ label, value, onChange, required }: MoneyFieldProps) {
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
-        className="min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
+        className="control"
       />
     </div>
   );

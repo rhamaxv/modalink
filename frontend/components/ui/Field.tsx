@@ -41,8 +41,13 @@ export function Field({
 }: FieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
-  const controlClassName =
-    "min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink";
+  // Kelas .control didefinisikan sekali di app/globals.css dan dipakai setiap
+  // kontrol formulir di aplikasi ini. Versi sebelumnya memakai border-ink,
+  // yaitu putih penuh di tema gelap: batas kontrol seterang itu membuat
+  // formulir terbaca sebagai deretan kotak, bukan sebagai field. Ia juga
+  // tidak pernah mencabut gaya bawaan sistem, sehingga panah <select>,
+  // pemilih tanggal, dan tombol naik-turun angka tetap digambar browser.
+  const controlClassName = "control";
 
   return (
     <div className="flex flex-col gap-space-1">
@@ -74,7 +79,6 @@ export function Field({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           required={required}
-          rows={5}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           className={controlClassName}

@@ -212,7 +212,7 @@ function NarrativeField({ value, onChange, error }: NarrativeFieldProps) {
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         rows={5}
-        className="min-h-[112px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
+        className="control"
       />
       {error && (
         <p id={errorId} role="alert" className="text-label text-danger">

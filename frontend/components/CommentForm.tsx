@@ -79,7 +79,7 @@ export function CommentForm({ proposalId, onKirim }: CommentFormProps) {
         rows={3}
         aria-invalid={formError ? true : undefined}
         aria-describedby={formError ? errorId : undefined}
-        className="min-h-[88px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
+        className="control"
       />
       {formError && (
         <p id={errorId} role="alert" className="text-label text-danger">

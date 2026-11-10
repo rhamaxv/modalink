@@ -31,10 +31,11 @@ export function Select({ label, value, options, onChange }: SelectProps) {
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        // border-line-strong (3.94:1), bukan border-line: ini batas kontrol
-        // interaktif, dan DESIGN.md memisahkan dua token itu justru untuk
-        // kasus ini.
-        className="min-h-[44px] rounded-sm border border-line-strong bg-panel px-space-2 text-body font-medium text-ink"
+        // .control sama dengan yang dipakai setiap field formulir
+        // (app/globals.css); .control-inline mencabut width:100% karena
+        // kontrol ini hidup di satu baris penyaring bersama kontrol lain,
+        // bukan di dalam kolom formulir yang melebar penuh.
+        className="control control-inline"
       >
         {options.map((pilihan) => (
           <option key={pilihan.value} value={pilihan.value}>

@@ -3,6 +3,15 @@
 @tailwind utilities;
 
 :root {
+  /* Memberi tahu browser tema mana yang sedang berlaku, dan ini BUKAN
+     duplikasi dari token di bawah. Sebagian kontrol digambar oleh sistem
+     operasi, bukan oleh CSS kita: daftar pilihan yang terbuka dari <select>,
+     pemilih tanggal type="date", tombol naik-turun type="number", dan
+     scrollbar. Tanpa baris ini, semuanya tetap digambar terang di atas
+     halaman hampir hitam, dan itu terlihat persis seperti kontrol yang lupa
+     ditata. */
+  color-scheme: dark;
+
   /* Gelap adalah default dan keadaan yang dirancang (DESIGN.md). Blok
      [data-theme="light"] di bawah adalah inversinya, bukan sebaliknya. */
   --paper: #100F0F;
@@ -55,6 +64,12 @@
 
   --measure: 66ch;
 
+  /* Panah <select>, digambar sendiri karena appearance:none mencabut panah
+     bawaan. Warnanya tertanam di dalam data URI dan data URI tidak bisa
+     membaca variabel CSS, jadi tokennya didefinisikan ulang per tema di
+     bawah, bukan diwarnai lewat var(). Nilainya sama dengan --muted. */
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23A3A09B' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
   /* Leading 1.10 pada judul adalah separuh dari efeknya: judul 64px dengan
      leading 1.25 terasa lebih lemah daripada judul 50px dengan leading 1.10. */
   --leading-display: 1.1;
@@ -62,6 +77,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --paper: #FBF9F4;
   --panel: #F3EFE6;
   --panel-raised: #EAE4D8;
@@ -78,6 +94,7 @@
      dipakai sebagai latar di tema ini juga. */
   --accent-text: #546416;
   --accent-2-text: #4A54B8;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%235C574E' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   /* --accent, --accent-2, dan --on-accent sengaja tidak didefinisikan ulang:
      ketiganya adalah pasangan latar-dan-teks yang harus stabil lintas tema. */
 }
@@ -86,6 +103,79 @@ body { background: var(--paper); color: var(--ink); }
 
 /* Angka rupiah sejajar per digit di seluruh tabel. */
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* SATU definisi untuk setiap kontrol formulir di aplikasi ini: input, select,
+   dan textarea. Ditulis sebagai kelas CSS, bukan sebagai rangkaian utility
+   Tailwind yang disalin per komponen, karena tiga alasan yang semuanya butuh
+   CSS sungguhan: appearance:none plus panah gambar sendiri untuk <select>,
+   pembedaan per elemen lewat selector tipe (select.control, textarea.control),
+   dan keadaan [aria-invalid] yang sudah dipasang Field tapi selama ini tidak
+   mengubah apa pun yang terlihat.
+
+   Sebelum ini tiap formulir menyalin string kelasnya sendiri dan hasilnya
+   menyimpang: Field memakai border --ink (putih penuh di tema gelap), Select
+   memakai --line-strong, dan <input> mentah di MilestonePlan dan ProposalForm
+   memakai salinannya masing-masing. */
+.control {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  line-height: var(--leading-body);
+  /* Mencabut gaya bawaan sistem. Untuk <select> ini juga mencabut panahnya,
+     yang digambar ulang di bawah. */
+  appearance: none;
+  transition: border-color 120ms ease;
+}
+
+.control::placeholder { color: var(--muted); }
+
+/* Batas menguat saat ditunjuk, bukan latar yang berubah: latar yang berubah
+   pada kontrol teks membuatnya sekilas terbaca seperti sedang nonaktif. */
+.control:hover:not(:disabled):not(:focus) { border-color: var(--ink); }
+
+/* aria-invalid sudah dipasang Field sejak awal tapi tidak pernah terlihat.
+   Warna bukan satu-satunya penandanya: pesan galatnya tetap ditulis sebagai
+   teks di bawah kontrol (role="alert"), jadi informasi ini tidak hilang bagi
+   siapa pun yang tidak bisa membedakan warnanya. */
+.control[aria-invalid="true"] { border-color: var(--danger); }
+
+.control:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+select.control {
+  /* Ruang di kanan disediakan untuk panah gambar sendiri supaya teks pilihan
+     terpanjang tidak pernah menabraknya. */
+  padding-right: var(--space-5);
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: 12px 8px;
+  cursor: pointer;
+}
+
+textarea.control {
+  min-height: 8rem;
+  /* Hanya vertikal: menarik melebar bisa merusak lebar kolom formulirnya. */
+  resize: vertical;
+}
+
+/* Tanggal dan angka masih menitipkan ikonnya ke browser. color-scheme di
+   :root sudah membuat ikon itu mengikuti tema; baris ini merapatkan jaraknya
+   supaya tidak menempel ke tepi kanan kontrol. */
+.control[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+
+/* Kontrol yang hidup di satu baris bersama kontrol lain (bilah penyaring
+   halaman jelajah), bukan di dalam kolom formulir yang melebar penuh. */
+.control-inline { width: auto; min-width: 11rem; }
 
 :focus-visible {
   outline: 2px solid var(--ink);

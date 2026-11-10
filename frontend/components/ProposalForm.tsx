@@ -260,7 +260,7 @@ function MoneyField({ label, value, onChange, error, required }: MoneyFieldProps
         required={required}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className="min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
+        className="control"
       />
       {error && (
         <p id={errorId} role="alert" className="text-label text-danger">
@@ -308,7 +308,7 @@ function TextAreaField({ label, hint, value, onChange, error, required }: TextAr
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         rows={4}
-        className="min-h-[88px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
+        className="control"
       />
       {error && (
         <p id={errorId} role="alert" className="text-label text-danger">
