@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Amount, EmptyState, ErrorState, LoadingState } from "@/components/ui";
+import {
+  Amount,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Pagination,
+  ResultCount,
+} from "@/components/ui";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ApiError, api } from "@/lib/api";
 
@@ -26,7 +33,9 @@ function formatDate(iso: string): string {
 type ListState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; items: Campaign[] };
+  | { status: "ready"; items: Campaign[]; total: number };
+
+const PAGE_SIZE = 20;
 
 // Keputusan di layar ini: campaign mana yang perlu saya urus sekarang. GET
 // /campaigns mengembalikan campaign MILIK SEMUA investor (lihat
@@ -36,8 +45,9 @@ type ListState =
 export function CampaignList() {
   const router = useRouter();
   const [state, setState] = useState<ListState>({ status: "loading" });
+  const [page, setPage] = useState(1);
 
-  async function load() {
+  const load = useCallback(async () => {
     setState({ status: "loading" });
     try {
       // ?mine=true, bukan mengunduh seluruh tabel lalu menyaring di browser.
@@ -45,19 +55,27 @@ export function CampaignList() {
       // investor_id milik investor lain hanya untuk membuangnya di klien, dan
       // ia juga kehilangan campaign sendiri yang sudah ditutup begitu daftar
       // publik disaring ke status open sesuai 10-api-contract.md:44.
-      const milik = await api.get<{ items: Campaign[] }>("/campaigns?mine=true");
-      setState({ status: "ready", items: milik.items });
+      //
+      // page dan page_size ikut dikirim sejak GET /campaigns diberi paginasi:
+      // tanpa ini, investor dengan lebih dari dua puluh campaign hanya akan
+      // melihat dua puluh pertama dan tidak diberi tahu apa pun tentang
+      // sisanya, kelas kegagalan yang persis sama dengan yang baru saja
+      // diperbaiki di halaman jelajah.
+      const milik = await api.get<{ items: Campaign[]; total: number }>(
+        `/campaigns?mine=true&page=${page}&page_size=${PAGE_SIZE}`,
+      );
+      setState({ status: "ready", items: milik.items, total: milik.total ?? milik.items.length });
     } catch (error) {
       setState({
         status: "error",
         message: error instanceof ApiError ? error.message : "Terjadi kesalahan. Coba lagi sebentar lagi.",
       });
     }
-  }
+  }, [page]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   if (state.status === "loading") {
     return <LoadingState label="Memuat campaign saya" minHeight={160} />;
@@ -78,7 +96,12 @@ export function CampaignList() {
   // perlu diurus sekarang; itulah yang mendapat perlakuan menonjol, bukan
   // urutan acak atau urutan dari server (DESIGN.md: variasi kartu harus
   // mencerminkan hierarki isi yang nyata).
-  const openCampaigns = state.items.filter((campaign) => campaign.status === "open");
+  // Dihitung dari baris di HALAMAN INI saja, jadi penandanya hanya dipasang
+  // di halaman pertama: "paling dekat di antara dua puluh yang kebetulan
+  // tampil" bukan klaim yang sama dengan "paling dekat di antara semuanya",
+  // dan menuliskannya seolah-olah sama adalah angka yang menyesatkan.
+  const openCampaigns =
+    page === 1 ? state.items.filter((campaign) => campaign.status === "open") : [];
   const urgentId =
     openCampaigns.length > 0
       ? openCampaigns.reduce((a, b) => (new Date(a.apply_deadline) < new Date(b.apply_deadline) ? a : b)).id
@@ -95,6 +118,7 @@ export function CampaignList() {
       >
         Buat campaign baru
       </Link>
+      <ResultCount page={page} pageSize={PAGE_SIZE} total={state.total} noun="campaign" />
       <ul className="flex flex-col gap-space-3">
         {state.items.map((campaign) => {
           const featured = campaign.id === urgentId;
@@ -122,6 +146,13 @@ export function CampaignList() {
           );
         })}
       </ul>
+      <Pagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={state.total}
+        onPageChange={setPage}
+        label="Halaman daftar campaign saya"
+      />
     </div>
   );
 }
