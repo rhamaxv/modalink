@@ -81,7 +81,7 @@ export function CampaignManagePanel({ campaignId }: { campaignId: string }) {
     <div className="flex flex-col gap-space-5">
       <div className="flex flex-col gap-space-2">
         <div className="flex flex-wrap items-start justify-between gap-space-3">
-          <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">{campaign.title}</h1>
+          <h1 className="font-display text-page text-ink">{campaign.title}</h1>
           <StatusBadge status={campaign.status} />
         </div>
         <p className="max-w-measure text-body text-muted">{campaign.description}</p>
@@ -178,7 +178,7 @@ export function CampaignManagePanel({ campaignId }: { campaignId: string }) {
       </div>
 
       <div>
-        <h2 className="text-[1.75rem] font-semibold text-ink">Proposal yang masuk</h2>
+        <h2 className="font-display text-section text-ink">Proposal yang masuk</h2>
         {proposals.length === 0 ? (
           <div className="mt-space-3">
             <EmptyState reason="Belum ada proposal masuk ke campaign ini." />

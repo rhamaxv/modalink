@@ -55,11 +55,38 @@ describe("milestone plan", () => {
     expect(hapus).toHaveLength(0);
   });
 
+  it("gives the delete-stage button an interactive-boundary border, not the decorative one", async () => {
+    // Laporan review: tombol "Hapus tahap" memakai border-line (1.27:1
+    // terhadap bg-panel), gagal ambang 3:1 untuk batas kontrol interaktif.
+    // Satu-satunya batas interaktif di aplikasi ini yang terlewat saat
+    // batas lain sudah dipindahkan ke border-line-strong (3.62:1).
+    render(<ProposalForm requestedAmount={10_000_000} />);
+    await userEvent.click(screen.getByRole("button", { name: /tambah tahap/i }));
+    const hapus = screen.getByRole("button", { name: /hapus tahap 3/i });
+    const classes = hapus.className.split(/\s+/);
+    expect(classes).toContain("border-line-strong");
+    expect(classes).not.toContain("border-line");
+  });
+
   it("rejects a fractional value typed into the amount column", async () => {
     render(<ProposalForm requestedAmount={10_000_000} />);
     const kolom = nominalField(0);
     await userEvent.type(kolom, "5000000.5");
     expect(nominalField(0)).toHaveValue("5000000");
+  });
+
+  it("shows a numeric keypad on mobile for both money inputs, matching CampaignForm's treatment of the same kind of value", () => {
+    // Laporan review: nominal milestone dan nominal proposal dulu
+    // type="text" tanpa inputMode sama sekali, jadi ponsel menampilkan
+    // keyboard huruf untuk nominal rupiah, sementara CampaignForm sudah
+    // type="number" untuk field sejenis. inputMode="numeric" menyamakan
+    // keypadnya tanpa kehilangan filter digit kustom (type tetap "text").
+    render(<ProposalForm requestedAmount={10_000_000} />);
+    expect(screen.getByLabelText(/jumlah dana yang diminta/i)).toHaveAttribute("inputmode", "numeric");
+    nominalField(0);
+    screen.getAllByLabelText(/nominal tahap/i).forEach((field) => {
+      expect(field).toHaveAttribute("inputmode", "numeric");
+    });
   });
 
   it("announces the shortfall to screen readers without stealing focus", () => {

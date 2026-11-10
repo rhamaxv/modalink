@@ -172,7 +172,7 @@ export function ProposalForm({
         required
       />
 
-      <Field
+      <MoneyField
         label="Jumlah dana yang diminta"
         value={requestedAmountInput}
         onChange={(value) => setRequestedAmountInput(value.replace(/[^0-9]/g, ""))}
@@ -199,7 +199,7 @@ export function ProposalForm({
       />
 
       <div>
-        <h2 className="text-[1.125rem] font-semibold text-ink">Rencana milestone</h2>
+        <h2 className="text-card-title font-semibold text-ink">Rencana milestone</h2>
         <p className="mt-space-1 text-label text-muted">
           Jumlah seluruh tahap harus sama persis dengan dana yang diminta.
         </p>
@@ -221,6 +221,53 @@ export function ProposalForm({
         Kirim proposal
       </button>
     </form>
+  );
+}
+
+type MoneyFieldProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  required?: boolean;
+};
+
+// Field (fase 10) tidak boleh diubah di sini (lihat catatan TextAreaField di
+// bawah), dan type="number" bawaannya tidak cocok untuk rupiah: ia
+// mengizinkan "e", "+", "-", "." lalu membulatkan diam-diam, sementara filter
+// digit yang dipakai di formulir ini butuh <input> bertipe teks sungguhan.
+// inputMode="numeric" tetap memunculkan keypad angka di ponsel tanpa
+// kehilangan filter itu (laporan review: field ini dan nominal milestone
+// dulu tidak punya inputMode sama sekali, jadi ponsel menampilkan keyboard
+// huruf untuk nominal rupiah, padahal CampaignForm sudah type="number" untuk
+// nominal sejenis).
+function MoneyField({ label, value, onChange, error, required }: MoneyFieldProps) {
+  const id = useId();
+  const errorId = `${id}-error`;
+  return (
+    <div className="flex flex-col gap-space-1">
+      <label htmlFor={id} className="text-label font-medium text-muted">
+        {label}
+        {required && <span aria-hidden="true"> *</span>}
+      </label>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required={required}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        className="min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
+      />
+      {error && (
+        <p id={errorId} role="alert" className="text-label text-danger">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

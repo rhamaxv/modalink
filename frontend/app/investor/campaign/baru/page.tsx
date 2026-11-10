@@ -13,10 +13,8 @@ export default function NewCampaignPage() {
   return (
     <div className="mx-auto flex max-w-measure flex-col gap-space-5 px-space-3 py-space-6">
       <div>
-        <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">
-          Buat campaign baru
-        </h1>
-        <p className="mt-space-2 text-body text-muted">
+        <h1 className="font-display text-page text-ink">Buat campaign baru</h1>
+        <p className="mt-space-3 text-body text-muted">
           Ambang skor menentukan proposal mana yang otomatis terbuka untuk didanai. Setelah ada
           proposal masuk, ambang ini terkunci dan tidak bisa diubah lagi.
         </p>

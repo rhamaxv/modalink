@@ -56,30 +56,7 @@ export default function ProposalBaru() {
     muat();
   }, [muat]);
 
-  if (muatan.status === "loading") {
-    return <LoadingState label="Memuat daftar campaign" minHeight={240} />;
-  }
-  if (muatan.status === "error") {
-    return <ErrorState message={muatan.message} onRetry={muat} />;
-  }
-
-  const campaign =
-    muatan.campaigns.find((c) => c.id === campaignId) ?? muatan.campaigns[0];
-
-  if (!campaign) {
-    return (
-      <EmptyState reason="Belum ada campaign yang terbuka untuk menerima proposal saat ini." />
-    );
-  }
-
-  const tenggatLewat = new Date(campaign.apply_deadline).getTime() < Date.now();
-  const disabledReason = tenggatLewat
-    ? `Tenggat pengajuan proposal untuk campaign ini sudah lewat (${new Date(campaign.apply_deadline).toLocaleDateString("id-ID")}). Pilih campaign lain atau tunggu campaign berikutnya.`
-    : undefined;
-
-  const activeCampaignId = campaign.id;
-
-  async function handleSubmit(payload: ProposalSubmission) {
+  async function handleSubmit(activeCampaignId: string, payload: ProposalSubmission) {
     setSubmitError(null);
     setSubmitting(true);
     try {
@@ -93,40 +70,65 @@ export default function ProposalBaru() {
     }
   }
 
+  // H1 dirender sebelum cabang status data mana pun, dan loading/error/kosong
+  // dirender DI DALAM pembungkus lebar yang sama dengan form sungguhan: versi
+  // sebelumnya mengembalikan ketiga keadaan itu sebelum pembungkus dan
+  // sebelum H1, jadi kotaknya rapat ke tepi layar di 375px dan judul halaman
+  // baru muncul (memindahkan seluruh layout) begitu campaign datang.
+  const campaign =
+    muatan.status === "siap"
+      ? muatan.campaigns.find((c) => c.id === campaignId) ?? muatan.campaigns[0]
+      : undefined;
+  const tenggatLewat = campaign ? new Date(campaign.apply_deadline).getTime() < Date.now() : false;
+  const disabledReason = tenggatLewat
+    ? `Tenggat pengajuan proposal untuk campaign ini sudah lewat (${new Date(campaign!.apply_deadline).toLocaleDateString("id-ID")}). Pilih campaign lain atau tunggu campaign berikutnya.`
+    : undefined;
+
   return (
-    <div className="mx-auto flex flex-col gap-space-5 px-space-3 py-space-6">
+    <div className="mx-auto flex max-w-[72rem] flex-col gap-space-5 px-space-3 py-space-6">
       <div className="max-w-measure">
-        <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold text-ink">Ajukan proposal</h1>
-        <p className="mt-space-2 text-body text-muted">
+        <h1 className="font-display text-page text-ink">Ajukan proposal</h1>
+        <p className="mt-space-3 text-body text-muted">
           Isi selengkap dan sespesifik mungkin. AI menilai berdasarkan isian field-field ini.
         </p>
       </div>
 
-      {muatan.campaigns.length > 1 && (
-        <Field
-          label="Campaign"
-          value={campaignId}
-          onChange={setCampaignId}
-          options={muatan.campaigns.map((c) => ({ value: c.id, label: c.title }))}
-        />
+      {muatan.status === "loading" && <LoadingState label="Memuat daftar campaign" minHeight={240} />}
+      {muatan.status === "error" && <ErrorState message={muatan.message} onRetry={muat} />}
+
+      {muatan.status === "siap" && !campaign && (
+        <EmptyState reason="Belum ada campaign yang terbuka untuk menerima proposal saat ini." />
       )}
 
-      {submitError && (
-        <p
-          role="alert"
-          className="rounded-sm border border-danger bg-panel px-space-3 py-space-2 text-body text-danger"
-        >
-          {submitError}
-        </p>
-      )}
+      {muatan.status === "siap" && campaign && (
+        <>
+          {muatan.campaigns.length > 1 && (
+            <Field
+              label="Campaign"
+              value={campaignId}
+              onChange={setCampaignId}
+              options={muatan.campaigns.map((c) => ({ value: c.id, label: c.title }))}
+            />
+          )}
 
-      <ProposalForm
-        key={campaign.id}
-        maxAmount={campaign.target_amount}
-        disabledReason={disabledReason}
-        submitting={submitting}
-        onSubmit={handleSubmit}
-      />
+          {submitError && (
+            <p
+              role="alert"
+              className="rounded-sm border border-danger bg-panel px-space-3 py-space-2 text-body text-danger"
+            >
+              {submitError}
+            </p>
+          )}
+
+          <ProposalForm
+            key={campaign.id}
+            maxAmount={campaign.target_amount}
+            disabledReason={disabledReason}
+            submitting={submitting}
+            onSubmit={(payload) => handleSubmit(campaign.id, payload)}
+          />
+        </>
+      )}
     </div>
   );
 }

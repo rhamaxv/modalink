@@ -22,6 +22,17 @@ afterEach(() => {
 });
 
 describe("umkm beranda", () => {
+  it("keeps the page title and a capped-width container visible while proposals are still loading", () => {
+    // Laporan review: loading/error/kosong dulu dikembalikan SEBELUM
+    // pembungkus halaman, jadi kotaknya rapat ke tepi layar di 375px dan
+    // <h1> baru muncul begitu data datang, memindahkan seluruh layout.
+    vi.mocked(api.get).mockReturnValue(new Promise(() => {}));
+    const { container } = render(<UmkmBeranda />);
+    expect(screen.getByRole("heading", { name: /proposal anda/i })).toBeInTheDocument();
+    expect(screen.getByText(/memuat proposal anda/i)).toBeInTheDocument();
+    expect(container.firstElementChild?.className).toMatch(/max-w-/);
+  });
+
   it("names why it is empty and offers an action leading to the submission form", async () => {
     vi.mocked(api.get).mockResolvedValueOnce([]);
     render(<UmkmBeranda />);
@@ -90,6 +101,38 @@ describe("umkm beranda", () => {
     expect(await screen.findByText(/rencana penggunaan dana tidak merinci porsi per pos/i))
       .toBeInTheDocument();
   });
+
+  it("gives data-pola=\"daftar-bernomor\" and data-pola=\"tabel-padat\" genuinely different markup", async () => {
+    // Audit browser: kedua section ini dulu merender markup yang SAMA PERSIS
+    // (dua kartu polos, tanpa nomor dan tanpa tabel), melanggar RHYTHM 3.
+    // Test ini mengunci bahwa label pola sekarang jujur terhadap isinya.
+    vi.mocked(api.get).mockResolvedValueOnce([
+      {
+        id: "p1",
+        business_name: "Warung Kopi Berkah",
+        requested_amount: 10_000_000,
+        status: "submitted",
+        scoring_status: "failed",
+      },
+      {
+        id: "p2",
+        business_name: "Batik Senja",
+        requested_amount: 20_000_000,
+        status: "listed",
+        scoring_status: "pending",
+      },
+    ]);
+    render(<UmkmBeranda />);
+    await screen.findByText(/Warung Kopi Berkah/i);
+
+    const bernomor = document.querySelector('[data-pola="daftar-bernomor"]')!;
+    expect(bernomor.querySelector("ol")).not.toBeNull();
+    expect(bernomor.textContent).toMatch(/01/);
+
+    const padat = document.querySelector('[data-pola="tabel-padat"]')!;
+    expect(padat.querySelector("table")).not.toBeNull();
+    expect(padat.querySelector("thead")).not.toBeNull();
+  });
 });
 
 describe("umkm proposal submission", () => {
@@ -110,6 +153,14 @@ describe("umkm proposal submission", () => {
       ],
     });
   }
+
+  it("keeps the page title and a capped-width container visible while campaigns are still loading", () => {
+    vi.mocked(api.get).mockReturnValue(new Promise(() => {}));
+    const { container } = render(<ProposalBaru />);
+    expect(screen.getByRole("heading", { name: /ajukan proposal/i })).toBeInTheDocument();
+    expect(screen.getByText(/memuat daftar campaign/i)).toBeInTheDocument();
+    expect(container.firstElementChild?.className).toMatch(/max-w-/);
+  });
 
   it("refuses submission to a campaign whose apply deadline has passed, stating the reason before sending", async () => {
     mockCampaigns({ apply_deadline: "2020-01-01T00:00:00Z" });
