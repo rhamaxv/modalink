@@ -18,30 +18,52 @@ diaudit setelah jadi.
 
 ## Dial yang berlaku, dan konsekuensinya
 
-**ENERGY 2 / RHYTHM 3 / MOTION 2.**
+**ENERGY 4 / RHYTHM 3 / MOTION 2.** ENERGY naik dari 2 pada 10 November 2026: arah
+sebelumnya tidak melanggar aturan apa pun, ia hanya **datar dan tanpa rasa**, yang
+antislop sendiri namai *Sterile Default*. Perbaikannya menaikkan dial, bukan menambah
+larangan.
 
-RHYTHM 3 berarti **tidak boleh ada dua section berurutan dengan pola komposisi yang sama**. Ini
-diuji, bukan dijanjikan: setiap `<section>` memasang `data-pola="<nama>"`, dan
-`tests/komposisi.test.tsx` menolak dua pola identik berurutan.
+RHYTHM 3 berarti **tidak boleh ada dua section berurutan dengan pola komposisi yang sama**.
+Ini diuji dua lapis di `tests/composition.test.tsx`: lapis pertama menolak dua
+`data-pola` identik berurutan, lapis kedua memeriksa **DOM yang sungguh dirender**, karena
+audit desain pernah menemukan section berlabel `dua-kolom-asimetris` yang kenyataannya satu
+kolom. Label yang berbeda belum berarti komposisi yang berbeda.
 
-Pola yang tersedia: `naratif-kiri`, `dua-kolom-asimetris`, `lebar-penuh-kutipan`,
-`daftar-bernomor`, `tabel-padat`.
+MOTION 2 berarti scroll-reveal terukur di halaman publik dan transisi state di dashboard.
+Tidak ada parallax, tidak ada bounce, tidak ada loop tanpa henti.
 
-MOTION 2 berarti scroll-reveal terukur di halaman publik dan transisi state di dashboard. Tidak
-ada parallax, tidak ada bounce, tidak ada loop tanpa henti.
+## Dua aksen, dengan tugas berbeda
 
-## Aksen kuning
+`--accent` **lime `#DDFD6C`** adalah tindakan dan uang: satu tombol aksi utama per layar,
+bilah progres funding, penanda tahap milestone yang sedang berjalan.
 
-`--accent` adalah satu-satunya aksen, dan ia muncul hanya di momen yang berarti: tombol aksi utama
-satu per layar, bilah progres funding, penanda milestone yang sedang berjalan.
+`--accent-2` **periwinkle `#AAB2FF`** adalah penanda, bukan tindakan: label kategori,
+sorotan angka pendukung. **Ia tidak pernah menjadi latar tombol.**
 
-**Teks di atas `--accent` selalu `--ink`, tidak pernah putih.** Kontras putih di atas `#FFC94A`
-hanya 1.53:1.
+Tiga aturan yang diuji dan tidak bisa ditawar:
 
-Kalau aksen muncul lebih dari tiga kali di satu layar, dia bukan aksen lagi.
+1. **Teks di atas kedua aksen selalu `--on-accent`**, tidak pernah putih dan tidak pernah
+   `--ink`. Putih di atas lime mengukur **1,14:1**, di atas periwinkle **2,00:1**, keduanya
+   lebih buruk daripada putih-pada-kuning 1,53:1 yang arah lama sudah larang. `--ink`
+   berbalik ikut tema, aksen tidak, dan pelanggaran ini pernah hidup di setiap tombol
+   selama berjam-jam karena pemeriksanya menggeledah kata "white" alih-alih mengukur warna.
+2. **Aksen tidak pernah menjadi teks di tema terang.** Lime sebagai teks di latar terang
+   mengukur **1,09:1**. Pakai sebagai latar dengan `--on-accent`, atau sebagai teks hanya
+   di permukaan gelap.
+3. **Tepat satu aksi berlatar aksen per halaman, dan ia di layar pertama.** Dijatah per
+   halaman, bukan per section: halaman depan sempat membelanjakan satu-satunya aksennya di
+   CTA paling bawah, sehingga layar pertama tidak punya warna sama sekali.
 
-Panel skor AI **tidak** memakai aksen: ia informasi, bukan aksi. Aksen disimpan untuk tombol
-pledge di sebelahnya.
+Pakai `Button` dan `ButtonLink` dari `components/ui`, jangan menyusun gaya tombol sendiri.
+Halaman yang menyusunnya sendiri berakhir dengan setiap CTA berupa tautan teks transparan.
+
+Panel skor AI **tidak** memakai aksen: ia informasi, bukan aksi.
+
+## Garis punya dua token, dan memilih yang salah tidak akan terlihat
+
+`--line` mengukur 1,46:1 dan **hanya sah sebagai pemisah dekoratif atau tepi kartu**.
+Batas kontrol yang bisa diklik atau difokus memakai `--line-strong` (3,94:1). Satu tombol
+pernah lolos review dengan border 1,27:1 karena keduanya dulu satu token.
 
 ## Server dan client component
 
