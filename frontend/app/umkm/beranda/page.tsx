@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Amount, EmptyState, ErrorState, LoadingState } from "@/components/ui";
@@ -25,7 +25,12 @@ type Muatan =
 
 // Satu keputusan di layar ini: apa yang harus dikerjakan sekarang (DESIGN.md).
 // Karena itu, proposal yang penilaiannya gagal secara teknis tampil duluan,
-// di atas ringkasan apa pun, bukan terkubur di tabel status.
+// di atas ringkasan apa pun, bukan terkubur di tabel status. H1 dirender
+// sebelum cabang status data mana pun, dan loading/error/kosong dirender di
+// DALAM pembungkus lebar yang sama dengan isi sungguhan, bukan sebelumnya:
+// versi sebelumnya mengembalikan ketiga keadaan itu sebelum pembungkus,
+// jadi kotaknya rapat ke tepi layar di 375px dan judul halaman baru muncul
+// (lalu memindahkan seluruh layout) begitu data datang.
 export default function UmkmBeranda() {
   const router = useRouter();
   const [muatan, setMuatan] = useState<Muatan>({ status: "loading" });
@@ -65,108 +70,154 @@ export default function UmkmBeranda() {
     }
   }
 
-  if (muatan.status === "loading") {
-    return <LoadingState label="Memuat proposal Anda" minHeight={240} />;
-  }
-  if (muatan.status === "error") {
-    return <ErrorState message={muatan.message} onRetry={muat} />;
-  }
-  if (muatan.proposals.length === 0) {
-    return (
-      <EmptyState
-        reason="Anda belum pernah mengajukan proposal. Ajukan proposal pertama Anda untuk mulai dinilai AI dan dibuka untuk pendanaan."
-        action={{
-          label: "Ajukan proposal baru",
-          onClick: () => router.push("/umkm/proposal/baru"),
-        }}
-      />
-    );
-  }
-
-  const perluTindakan = muatan.proposals.filter((p) => p.scoring_status === "failed");
-  const lainnya = muatan.proposals.filter((p) => p.scoring_status !== "failed");
+  const perluTindakan = muatan.status === "siap" ? muatan.proposals.filter((p) => p.scoring_status === "failed") : [];
+  const lainnya = muatan.status === "siap" ? muatan.proposals.filter((p) => p.scoring_status !== "failed") : [];
 
   return (
-    <div className="mx-auto flex flex-col gap-space-6 px-space-3 py-space-6">
+    <div className="mx-auto flex max-w-[72rem] flex-col gap-space-6 px-space-3 py-space-6">
       <div className="max-w-measure">
-        <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold text-ink">Proposal Anda</h1>
+        <h1 className="font-display text-page text-ink">Proposal Anda</h1>
       </div>
 
-      {perluTindakan.length > 0 && (
-        <section data-pola="daftar-bernomor">
-          <h2 className="text-[1.125rem] font-semibold text-ink">Perlu tindakan Anda sekarang</h2>
-          <div className="mt-space-3 flex flex-col gap-space-3">
-            {perluTindakan.map((p) => (
-              <div
-                key={p.id}
-                data-testid="kartu-proposal"
-                className="rounded-card border border-warn bg-panel p-space-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-space-3">
-                  <p className="min-w-0 text-[1.125rem] font-semibold text-ink">{p.business_name}</p>
-                  <StatusBadge status={p.status} />
-                </div>
-                {/* D-09: kegagalan mesin skor bukan keputusan atas usaha ini.
-                    Kalimat di bawah sengaja tidak memuat kata yang berarti
-                    "ditolak" atau "tidak lolos". */}
-                <p className="mt-space-2 text-body text-ink">
-                  Penilaian otomatis belum berhasil dilakukan karena gangguan teknis pada mesin
-                  penilai. Ini bukan keputusan atas usaha Anda. Coba nilai ulang.
-                </p>
-                {rescoreError[p.id] && (
-                  <p role="alert" className="mt-space-2 text-label text-danger">
-                    {rescoreError[p.id]}
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => nilaiUlang(p.id)}
-                  disabled={rescoring[p.id]}
-                  aria-busy={rescoring[p.id]}
-                  className="mt-space-3 min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-body font-semibold text-ink disabled:border-line disabled:text-muted"
-                >
-                  Nilai ulang
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
+      {muatan.status === "loading" && <LoadingState label="Memuat proposal Anda" minHeight={240} />}
+      {muatan.status === "error" && <ErrorState message={muatan.message} onRetry={muat} />}
+      {muatan.status === "siap" && muatan.proposals.length === 0 && (
+        <EmptyState
+          reason="Anda belum pernah mengajukan proposal. Ajukan proposal pertama Anda untuk mulai dinilai AI dan dibuka untuk pendanaan."
+          action={{
+            label: "Ajukan proposal baru",
+            onClick: () => router.push("/umkm/proposal/baru"),
+          }}
+        />
       )}
 
-      <section data-pola="tabel-padat">
-        <h2 className="text-[1.125rem] font-semibold text-ink">Semua proposal</h2>
-        <div className="mt-space-3 flex flex-col gap-space-3">
-          {lainnya.map((p) => (
-            <ProposalCard key={p.id} proposal={p} />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
+      {muatan.status === "siap" && muatan.proposals.length > 0 && (
+        <>
+          {perluTindakan.length > 0 && (
+            // Daftar BERNOMOR sungguhan: label pola ini pernah identik dengan
+            // "tabel-padat" di bawah, dua kartu polos tanpa nomor maupun
+            // tabel (audit RHYTHM 3). Penomoran di sini bukan dekorasi: ia
+            // menunjukkan urutan proposal mana yang paling dulu butuh
+            // tindakan Anda.
+            <section data-pola="daftar-bernomor">
+              <h2 className="font-display text-section text-ink">Perlu tindakan Anda sekarang</h2>
+              <ol className="mt-space-3 flex flex-col gap-space-3">
+                {perluTindakan.map((p, i) => (
+                  <li
+                    key={p.id}
+                    data-testid="kartu-proposal"
+                    className="flex gap-space-3 rounded-card border border-warn bg-panel p-space-4"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="tabular text-label font-medium text-muted"
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-space-3">
+                        <p className="min-w-0 text-card-title font-semibold text-ink">{p.business_name}</p>
+                        <StatusBadge status={p.status} />
+                      </div>
+                      {/* D-09: kegagalan mesin skor bukan keputusan atas usaha ini.
+                          Kalimat di bawah sengaja tidak memuat kata yang berarti
+                          "ditolak" atau "tidak lolos". */}
+                      <p className="mt-space-2 text-body text-ink">
+                        Penilaian otomatis belum berhasil dilakukan karena gangguan teknis pada mesin
+                        penilai. Ini bukan keputusan atas usaha Anda. Coba nilai ulang.
+                      </p>
+                      {rescoreError[p.id] && (
+                        <p role="alert" className="mt-space-2 text-label text-danger">
+                          {rescoreError[p.id]}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => nilaiUlang(p.id)}
+                        disabled={rescoring[p.id]}
+                        aria-busy={rescoring[p.id]}
+                        className="mt-space-3 min-h-[44px] rounded-sm border border-line-strong px-space-3 py-space-2 text-body font-semibold text-ink disabled:text-muted"
+                      >
+                        Nilai ulang
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
 
-function ProposalCard({ proposal }: { proposal: ProposalMine }) {
-  return (
-    <div data-testid="kartu-proposal" className="rounded-card border border-line bg-panel p-space-4">
-      <div className="flex flex-wrap items-center justify-between gap-space-3">
-        <p className="min-w-0 text-[1.125rem] font-semibold text-ink">{proposal.business_name}</p>
-        <StatusBadge status={proposal.status} />
-      </div>
-      <div className="mt-space-2">
-        <Amount label="Dana yang diminta" amount={proposal.requested_amount} size="medium" />
-      </div>
-      {proposal.scoring_status === "done" && <ScoreSummary proposalId={proposal.id} />}
-      {/* Tanpa tautan ini, dashboard UMKM tidak punya jalan sama sekali ke
-          /proposal/[id] -- satu-satunya halaman tempat pledge, milestone,
-          dan tautan "Lapor progres" berada. Ditemukan lewat e2e Fase 11
-          Task 12: card ini dulu hanya menampilkan ringkasan, tidak pernah
-          mengarahkan ke mana pun (laporan Fase 11 Task 12). */}
-      <Link
-        href={`/proposal/${proposal.id}`}
-        className="mt-space-3 inline-block text-base font-medium text-ink underline"
-      >
-        Baca proposal
-      </Link>
+          {lainnya.length > 0 && (
+            // Tabel PADAT sungguhan, bukan kartu bertumpuk berlabel "tabel":
+            // satu baris per proposal, skor (bila sudah dinilai) dibuka di
+            // baris detail di bawahnya, bukan dikartukan ulang.
+            <section data-pola="tabel-padat" className="min-w-0">
+              <h2 className="font-display text-section text-ink">Semua proposal</h2>
+              {/*
+                min-w-0 di sini dan di <section> di atas, bukan dekorasi:
+                tanpanya, anak flex (section ini di dalam wrapper flex-col
+                halaman) memakai lebar konten maksimum sebagai min-width
+                otomatisnya (CSS flexbox default), dan tabel 640px di bawah
+                mendorong SELURUH halaman melebar sampai scroll horizontal
+                di level dokumen muncul di 500px, meski div ini sendiri
+                sudah overflow-x-auto. Ditemukan lewat pengukuran browser
+                sungguhan (window.scrollTo membuktikan halaman bisa
+                scroll 54px secara horizontal), bukan ditaksir dari kode.
+              */}
+              <div className="mt-space-3 overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-line-strong text-label text-muted">
+                      <th scope="col" className="px-space-2 py-space-2 font-medium">Usaha</th>
+                      <th scope="col" className="px-space-2 py-space-2 font-medium">Status</th>
+                      <th scope="col" className="px-space-2 py-space-2 font-medium">Dana diminta</th>
+                      <th scope="col" className="px-space-2 py-space-2 font-medium">
+                        <span className="sr-only">Tautan proposal</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lainnya.map((p) => (
+                      <Fragment key={p.id}>
+                        <tr data-testid="kartu-proposal" className="border-b border-line align-top">
+                          <td className="px-space-2 py-space-3 text-card-title font-semibold text-ink">
+                            {p.business_name}
+                          </td>
+                          <td className="px-space-2 py-space-3">
+                            <StatusBadge status={p.status} />
+                          </td>
+                          <td className="px-space-2 py-space-3">
+                            <Amount label="Dana diminta" amount={p.requested_amount} size="medium" />
+                          </td>
+                          <td className="px-space-2 py-space-3">
+                            {/* Tanpa tautan ini, dashboard UMKM tidak punya jalan sama
+                                sekali ke /proposal/[id] -- satu-satunya halaman tempat
+                                pledge, milestone, dan "Lapor progres" berada (laporan
+                                Fase 11 Task 12). */}
+                            <Link
+                              href={`/proposal/${p.id}`}
+                              className="text-base font-medium text-ink underline"
+                            >
+                              Baca proposal
+                            </Link>
+                          </td>
+                        </tr>
+                        {p.scoring_status === "done" && (
+                          <tr>
+                            <td colSpan={4} className="px-space-2 pb-space-4">
+                              <ScoreSummary proposalId={p.id} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -210,7 +261,7 @@ function ScoreSummary({ proposalId }: { proposalId: string }) {
   }
 
   return (
-    <div className="mt-space-3 border-t border-line pt-space-3">
+    <div className="border-t border-line pt-space-3">
       <ScorePanel score={state.data} />
     </div>
   );
