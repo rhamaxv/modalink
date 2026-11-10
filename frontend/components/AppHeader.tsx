@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { NavRole } from "@/components/NavRole";
+import { NavRole, NAV_LINK_CLASS } from "@/components/NavRole";
 import { clearToken, fetchCurrentUser, getToken, type CurrentUser } from "@/lib/auth";
 
 type AuthState =
@@ -39,6 +39,14 @@ type AuthState =
 export function AppHeader() {
   const router = useRouter();
   const [auth, setAuth] = useState<AuthState>({ status: "checking" });
+  // Panel nav tertutup secara default di semua lebar layar, termasuk
+  // desktop: di atas breakpoint md kelas `md:flex` pada <nav> yang menimpa
+  // `hidden`, jadi nilai state ini sendiri tidak pernah dibaca di sana.
+  // Aman diinisialisasi false tanpa membaca apa pun milik klien, tidak
+  // seperti `auth` di atas yang harus "checking" dulu (lihat komentar di
+  // bawah): status buka/tutup menu bukan sesuatu yang server tahu atau
+  // tebak keliru, jadi tidak ada risiko hidrasi di sini.
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -58,26 +66,54 @@ export function AppHeader() {
   function keluar() {
     clearToken();
     setAuth({ status: "guest" });
+    setMenuOpen(false);
     router.push("/");
+  }
+
+  function tutupMenu() {
+    setMenuOpen(false);
   }
 
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-paper">
-      <div className="mx-auto flex w-full max-w-[72rem] flex-wrap items-center justify-between gap-space-3 px-space-3 py-space-3">
-        <Link href="/" className="text-label font-semibold text-ink">
+      {/*
+        Dua baris yang digabung jadi satu lewat flex-wrap, bukan dua
+        <div> bertingkat: baris pertama (merek + tombol Menu) selalu
+        tampil dan tidak pernah lebih dari satu baris tinggi. Audit
+        browser menemukan header sticky tumbuh sampai 161px di 320px
+        lebar karena ia dulu menyelesaikan mobile dengan membungkus baris
+        nav desktop apa adanya. <nav> di bawah memakai `hidden` sampai
+        menuOpen aktif ATAU lebar layar mencapai md, dan w-full memaksanya
+        pindah ke baris sendiri saat memang ditampilkan, jadi tinggi
+        default (tertutup, di bawah md) tetap satu baris.
+      */}
+      <div className="mx-auto flex w-full max-w-[72rem] flex-wrap items-center justify-between gap-space-3 px-space-3 py-space-2">
+        <Link href="/" className="text-label font-semibold text-ink" onClick={tutupMenu}>
           Modalink
         </Link>
-        <nav className="flex flex-wrap items-center gap-space-4">
-          <Link href="/jelajah" className="text-base font-medium text-ink underline">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((terbuka) => !terbuka)}
+          aria-expanded={menuOpen}
+          aria-controls="nav-utama"
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm border border-line-strong px-space-3 text-body font-medium text-ink md:hidden"
+        >
+          {menuOpen ? "Tutup" : "Menu"}
+        </button>
+        <nav
+          id="nav-utama"
+          className={`${menuOpen ? "flex" : "hidden"} w-full flex-col items-start gap-space-3 border-t border-line pt-space-3 md:flex md:w-auto md:flex-row md:items-center md:gap-space-4 md:border-t-0 md:pt-0`}
+        >
+          <Link href="/jelajah" className={NAV_LINK_CLASS} onClick={tutupMenu}>
             Jelajahi
           </Link>
           {auth.status === "signed-in" && <NavRole role={auth.user.role} />}
           {auth.status === "guest" && (
             <>
-              <Link href="/masuk" className="text-base font-medium text-ink underline">
+              <Link href="/masuk" className={NAV_LINK_CLASS} onClick={tutupMenu}>
                 Masuk
               </Link>
-              <Link href="/daftar" className="text-base font-medium text-ink underline">
+              <Link href="/daftar" className={NAV_LINK_CLASS} onClick={tutupMenu}>
                 Daftar
               </Link>
             </>
@@ -86,7 +122,7 @@ export function AppHeader() {
             <button
               type="button"
               onClick={keluar}
-              className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-base font-medium text-ink"
+              className="inline-flex min-h-[44px] items-center rounded-sm border border-ink px-space-3 py-space-2 text-body font-medium text-ink"
             >
               Keluar
             </button>
