@@ -84,11 +84,11 @@ export function CampaignManagePanel({ campaignId }: { campaignId: string }) {
           <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">{campaign.title}</h1>
           <StatusBadge status={campaign.status} />
         </div>
-        <p className="max-w-measure text-base leading-[1.6] text-muted">{campaign.description}</p>
+        <p className="max-w-measure text-body text-muted">{campaign.description}</p>
         <Amount label="Dana target" amount={campaign.target_amount} />
 
         {/* D-16: dua tenggat, label berbeda, tidak pernah hanya satu. */}
-        <dl className="mt-space-2 grid grid-cols-1 gap-space-2 text-[0.8125rem] text-muted sm:grid-cols-2">
+        <dl className="mt-space-2 grid grid-cols-1 gap-space-2 text-label text-muted sm:grid-cols-2">
           <div>
             <dt className="font-medium text-ink">Tenggat pengajuan proposal</dt>
             <dd>{formatDate(campaign.apply_deadline)}</dd>
@@ -113,12 +113,12 @@ export function CampaignManagePanel({ campaignId }: { campaignId: string }) {
               // Konfirmasi dibangun sebagai elemen di halaman, bukan
               // window.confirm: dialog bawaan browser memblokir seluruh
               // event dan tidak bisa diuji otomatis.
-              <div className="flex flex-col gap-space-2 rounded-card border border-line bg-surface px-space-3 py-space-3">
-                <p className="text-base leading-[1.6] text-ink">
+              <div className="flex flex-col gap-space-2 rounded-card border border-line bg-panel px-space-3 py-space-3">
+                <p className="text-body text-ink">
                   Yakin ingin menutup campaign ini? Proposal baru tidak bisa masuk lagi setelah
                   ditutup, tapi proposal yang sudah masuk tetap berjalan sampai selesai.
                 </p>
-                {closeError && <p role="alert" className="text-[0.8125rem] text-danger">{closeError}</p>}
+                {closeError && <p role="alert" className="text-label text-danger">{closeError}</p>}
                 <div className="flex flex-wrap gap-space-2">
                   <button
                     type="button"
@@ -144,7 +144,7 @@ export function CampaignManagePanel({ campaignId }: { campaignId: string }) {
         )}
 
         {campaign.status === "closed" && (
-          <p className="mt-space-2 text-[0.8125rem] text-muted">
+          <p className="mt-space-2 text-label text-muted">
             Campaign ini sudah ditutup. Proposal baru tidak bisa masuk lagi, tapi proposal yang
             sudah masuk tetap berjalan sampai selesai.
           </p>

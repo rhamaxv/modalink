@@ -1,15 +1,32 @@
 import type { Metadata } from "next";
-import { Source_Sans_3 } from "next/font/google";
+import localFont from "next/font/local";
 import { AppHeader } from "@/components/AppHeader";
 import "./globals.css";
 
-// Satu keluarga sans humanis untuk seluruh produk (DESIGN.md). Source Sans 3
-// dipilih dari tiga kandidat yang disebut DESIGN.md (Source Sans 3, Public Sans,
-// IBM Plex Sans): bentuk hurufnya terbuka dan netral, cocok untuk formulir
-// panjang berbahasa Indonesia, dan tidak membawa asosiasi merek seperti IBM
-// Plex (identitas IBM) atau Public Sans (identitas pemerintah AS/USWDS).
-const sansHumanis = Source_Sans_3({
-  subsets: ["latin"],
+// Dua keluarga, sesuai DESIGN.md: Cabinet Grotesk untuk judul, General Sans
+// untuk teks. Keduanya dari Fontshare dengan ITF Free Font License.
+//
+// Di-host sendiri lewat next/font/local, bukan lewat CDN Fontshare: deployment
+// lomba wajib tetap bisa diakses juri sampai penilaian selesai, dan satu
+// dependency jaringan pihak ketiga adalah satu cara lagi ia bisa mati di saat
+// yang tidak bisa kami kendalikan. Berkasnya ada di app/fonts/.
+const display = localFont({
+  src: [
+    { path: "./fonts/CabinetGrotesk-700.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/CabinetGrotesk-800.woff2", weight: "800", style: "normal" },
+    { path: "./fonts/CabinetGrotesk-900.woff2", weight: "900", style: "normal" },
+  ],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const teks = localFont({
+  src: [
+    { path: "./fonts/GeneralSans-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/GeneralSans-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/GeneralSans-600.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/GeneralSans-700.woff2", weight: "700", style: "normal" },
+  ],
   variable: "--font-sans",
   display: "swap",
 });
@@ -32,21 +49,22 @@ export default function RootLayout({
     // data-theme sama sekali) dan melaporkannya sebagai hydration mismatch,
     // walau atributnya memang benar-benar dikelola di luar React dengan
     // sengaja.
-    <html lang="id" className={sansHumanis.variable} suppressHydrationWarning>
+    <html lang="id" className={`${teks.variable} ${display.variable}`} suppressHydrationWarning>
       <head>
         {/*
-          Tema disetel sebelum cat pertama supaya tidak ada kedipan dari terang
-          ke gelap saat halaman dimuat. ThemeToggle menulis dan membaca kunci
-          localStorage yang sama: "theme", nilai "light"/"dark".
+          Tema disetel sebelum cat pertama supaya tidak ada kedipan saat
+          halaman dimuat. Gelap adalah default (DESIGN.md), jadi yang ditulis
+          ke <html> adalah data-theme="light" ketika pengguna memintanya, bukan
+          sebaliknya. ThemeToggle membaca dan menulis kunci yang sama: "theme".
         */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function () {
               try {
                 var tersimpan = localStorage.getItem("theme");
-                var gelap = tersimpan === "dark" ||
-                  (!tersimpan && window.matchMedia("(prefers-color-scheme: dark)").matches);
-                if (gelap) document.documentElement.setAttribute("data-theme", "dark");
+                var terang = tersimpan === "light" ||
+                  (!tersimpan && window.matchMedia("(prefers-color-scheme: light)").matches);
+                if (terang) document.documentElement.setAttribute("data-theme", "light");
               } catch (e) {}
             })();`,
           }}

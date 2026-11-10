@@ -154,7 +154,7 @@ export function CampaignForm({ mode, campaignId, initialValues, submitLabel, onS
       {formError && (
         <p
           role="alert"
-          className="rounded-sm border border-danger bg-surface px-space-3 py-space-2 text-base leading-[1.6] text-danger"
+          className="rounded-sm border border-danger bg-panel px-space-3 py-space-2 text-body text-danger"
         >
           {formError}
         </p>
@@ -211,7 +211,7 @@ export function CampaignForm({ mode, campaignId, initialValues, submitLabel, onS
         type="submit"
         disabled={submitting}
         aria-busy={submitting}
-        className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+        className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-base font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-panel disabled:text-muted"
       >
         {submitLabel ?? (mode === "create" ? "Buat campaign" : "Simpan perubahan")}
       </button>

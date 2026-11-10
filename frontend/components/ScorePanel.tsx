@@ -46,7 +46,7 @@ const SEVERITY_LABEL: Record<RedFlagSeverity, string> = {
 };
 
 // Warna severity dipilih dari token status yang sudah terukur kontrasnya di
-// DESIGN.md (--ok/--warn/--danger terhadap --surface), bukan pasangan baru.
+// DESIGN.md (--ok/--warn/--danger terhadap --panel), bukan pasangan baru.
 const SEVERITY_CLASS: Record<RedFlagSeverity, string> = {
   info: "text-muted",
   warning: "text-warn",
@@ -81,15 +81,15 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
       // di sini memberi jalan keluar nyata, bukan pesan "ditolak" yang
       // menyesatkan pemilik usaha.
       return (
-        <div className="flex flex-col items-start gap-space-3 rounded-panel border border-line bg-surface px-space-4 py-space-5">
-          <p className="max-w-measure text-base leading-[1.6] text-ink">
+        <div className="flex flex-col items-start gap-space-3 rounded-panel border border-line bg-panel px-space-4 py-space-5">
+          <p className="max-w-measure text-body text-ink">
             Penilaian AI belum bisa diselesaikan karena gangguan teknis. Status proposal ini
             tidak berubah, dan Anda bisa memicu penilaian ulang kapan saja.
           </p>
           <button
             type="button"
             onClick={onRescore}
-            className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-base leading-[1.6] font-semibold text-ink"
+            className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-body font-semibold text-ink"
           >
             Nilai ulang
           </button>
@@ -104,7 +104,7 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
       <div
         role="status"
         aria-live="polite"
-        className="flex items-center gap-space-2 rounded-panel border border-line bg-surface px-space-4 py-space-5 text-base leading-[1.6] text-muted"
+        className="flex items-center gap-space-2 rounded-panel border border-line bg-panel px-space-4 py-space-5 text-body text-muted"
       >
         <span
           aria-hidden="true"
@@ -116,13 +116,13 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
   }
 
   return (
-    <div className="flex flex-col gap-space-4 rounded-panel border border-line bg-surface px-space-4 py-space-5">
+    <div className="flex flex-col gap-space-4 rounded-panel border border-line bg-panel px-space-4 py-space-5">
       <div className="flex flex-wrap items-baseline justify-between gap-space-2">
         <p className="text-[1.75rem] font-semibold text-ink">
           <span className="tabular">{score.total_score}</span>
-          <span className="text-[0.8125rem] font-medium text-muted"> dari 100</span>
+          <span className="text-label font-medium text-muted"> dari 100</span>
         </p>
-        <p className="tabular text-[0.8125rem] font-medium text-muted">
+        <p className="tabular text-label font-medium text-muted">
           Ambang campaign: {score.threshold_used}
         </p>
       </div>
@@ -130,10 +130,10 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
       <dl className="grid gap-space-3 sm:grid-cols-3">
         {KOMPONEN.map((komponen) => (
           <div key={komponen.key} className="flex flex-col gap-space-1">
-            <dt className="text-[0.8125rem] font-medium text-muted">{komponen.label}</dt>
+            <dt className="text-label font-medium text-muted">{komponen.label}</dt>
             <dd className="tabular text-[1.125rem] font-semibold text-ink">
               {score[komponen.key]}
-              <span className="text-[0.8125rem] font-medium text-muted"> dari {komponen.maksimum}</span>
+              <span className="text-label font-medium text-muted"> dari {komponen.maksimum}</span>
             </dd>
           </div>
         ))}
@@ -141,14 +141,14 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
 
       {score.red_flags.length > 0 && (
         <div className="flex flex-col gap-space-3 border-t border-line pt-space-3">
-          <p className="text-[0.8125rem] font-medium text-muted">Red flag</p>
+          <p className="text-label font-medium text-muted">Red flag</p>
           <ul className="flex flex-col gap-space-3">
             {score.red_flags.map((flag) => (
               <li key={flag.code} className="flex flex-col gap-space-1">
                 <p className={`text-base font-semibold leading-[1.6] ${SEVERITY_CLASS[flag.severity]}`}>
                   {SEVERITY_LABEL[flag.severity]}: {flag.message}
                 </p>
-                <p className="max-w-measure text-base leading-[1.6] text-muted">
+                <p className="max-w-measure text-body text-muted">
                   Kutipan dari proposal: &ldquo;{flag.evidence}&rdquo;
                 </p>
               </li>
@@ -158,11 +158,11 @@ export function ScorePanel({ score, scoringStatus, onRescore }: ScorePanelProps)
       )}
 
       <div className="flex flex-col gap-space-2 border-t border-line pt-space-3">
-        <p className="max-w-measure text-base leading-[1.6] text-ink">{score.brief.recommendation}</p>
-        <p className="text-[0.8125rem] text-muted">
+        <p className="max-w-measure text-body text-ink">{score.brief.recommendation}</p>
+        <p className="text-label text-muted">
           Dinilai oleh model {score.model_name} pada {formatTanggal(score.created_at)}.
         </p>
-        <p className="text-[0.8125rem] font-medium text-muted">
+        <p className="text-label font-medium text-muted">
           Skor ini sinyal pendukung. Keputusan akhir ada di investor.
         </p>
       </div>

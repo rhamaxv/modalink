@@ -27,13 +27,13 @@ export default function ExplorePage() {
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">
           Jelajahi proposal UMKM
         </h1>
-        <p className="mt-space-3 text-base leading-[1.6] text-muted">
+        <p className="mt-space-3 text-body text-muted">
           Setiap proposal di bawah sudah lolos penilaian AI dan terbuka untuk didanai. Baca
           ceritanya, lalu putuskan mana yang layak Anda dalami lebih jauh.
         </p>
       </section>
 
-      <section data-pola="daftar-bernomor" className="w-full bg-surface px-space-3 py-space-6">
+      <section data-pola="daftar-bernomor" className="w-full bg-panel px-space-3 py-space-6">
         <div className="mx-auto w-full max-w-[72rem]">
           <h2 className="text-[1.75rem] font-semibold text-ink">Proposal yang terbuka untuk didanai</h2>
           <div className="mt-space-4">
@@ -45,7 +45,7 @@ export default function ExplorePage() {
       <section data-pola="dua-kolom-asimetris" className="mx-auto w-full max-w-[72rem] px-space-3 py-space-6">
         <div className="grid gap-space-5 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <h2 className="text-[1.75rem] font-semibold text-ink">Bagaimana dananya sampai</h2>
-          <div className="flex max-w-measure flex-col gap-space-3 text-base leading-[1.6] text-muted">
+          <div className="flex max-w-measure flex-col gap-space-3 text-body text-muted">
             <p>
               UMKM mengajukan proposal lengkap dengan rencana milestone. AI menilainya lebih
               dulu, dan proposal yang lolos ambang skor campaign baru terbuka untuk didanai di
@@ -62,13 +62,13 @@ export default function ExplorePage() {
 
       <section
         data-pola="lebar-penuh-cta"
-        className="w-full border-t border-line bg-surface px-space-3 py-space-6"
+        className="w-full border-t border-line bg-panel px-space-3 py-space-6"
       >
         <div className="mx-auto flex max-w-measure flex-col items-start gap-space-3">
           <h2 className="text-[1.75rem] font-semibold text-ink">
             Punya usaha, atau dana untuk disalurkan?
           </h2>
-          <p className="text-base leading-[1.6] text-muted">
+          <p className="text-body text-muted">
             Daftar sebagai UMKM untuk mengajukan proposal, atau sebagai investor untuk mulai
             mendanai usaha lokal.
           </p>

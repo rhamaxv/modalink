@@ -41,13 +41,13 @@ export function ProposalCard({ proposal, featured = false, index }: ProposalCard
   return (
     <article
       className={`flex flex-col gap-space-3 rounded-card border px-space-4 py-space-4 ${
-        featured ? "border-ink bg-paper" : "border-line bg-surface"
+        featured ? "border-ink bg-paper" : "border-line bg-panel"
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-space-2">
         <div className="flex items-baseline gap-space-2">
           {index !== undefined && (
-            <span aria-hidden="true" className="tabular text-[0.8125rem] font-medium text-muted">
+            <span aria-hidden="true" className="tabular text-label font-medium text-muted">
               {String(index + 1).padStart(2, "0")}
             </span>
           )}
@@ -61,7 +61,7 @@ export function ProposalCard({ proposal, featured = false, index }: ProposalCard
         size={featured ? "large" : "medium"}
       />
       {featured && (
-        <p className="max-w-measure text-base leading-[1.6] text-muted">
+        <p className="max-w-measure text-body text-muted">
           {proposal.business_profile_excerpt}
         </p>
       )}
@@ -69,7 +69,7 @@ export function ProposalCard({ proposal, featured = false, index }: ProposalCard
         // D-09: scoring_status terpisah dari status proposal. Gagal di sini
         // berarti job penilaiannya error secara teknis, bukan proposalnya
         // ditolak; proposal tetap "submitted" dan bisa dinilai ulang.
-        <p className="text-[0.8125rem] text-warn">
+        <p className="text-label text-warn">
           Penilaian AI gagal dijalankan karena kendala teknis. Proposal ini belum ditolak dan
           bisa dinilai ulang dari halaman proposal.
         </p>

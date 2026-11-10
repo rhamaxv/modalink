@@ -67,7 +67,7 @@ export function CommentForm({ proposalId, onKirim }: CommentFormProps) {
 
   return (
     <form onSubmit={submit} noValidate className="flex max-w-measure flex-col gap-space-2">
-      <label htmlFor={id} className="text-[0.8125rem] font-medium text-muted">
+      <label htmlFor={id} className="text-label font-medium text-muted">
         Komentar
       </label>
       <textarea
@@ -77,10 +77,10 @@ export function CommentForm({ proposalId, onKirim }: CommentFormProps) {
         maxLength={BATAS_PANJANG}
         rows={3}
         aria-invalid={formError ? true : undefined}
-        className="min-h-[88px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink"
+        className="min-h-[88px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
       />
       {formError && (
-        <p role="alert" className="text-[0.8125rem] text-danger">
+        <p role="alert" className="text-label text-danger">
           {formError}
         </p>
       )}
@@ -88,7 +88,7 @@ export function CommentForm({ proposalId, onKirim }: CommentFormProps) {
         type="submit"
         disabled={submitting}
         aria-busy={submitting}
-        className="min-h-[44px] self-start rounded-sm border border-ink px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-ink"
+        className="min-h-[44px] self-start rounded-sm border border-ink px-space-4 py-space-2 text-body font-semibold text-ink"
       >
         Kirim
       </button>

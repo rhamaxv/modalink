@@ -79,7 +79,7 @@ function SignInFormInner() {
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-space-4">
       {formError && (
-        <p role="alert" className="rounded-sm border border-danger bg-surface px-space-3 py-space-2 text-base leading-[1.6] text-danger">
+        <p role="alert" className="rounded-sm border border-danger bg-panel px-space-3 py-space-2 text-body text-danger">
           {formError}
         </p>
       )}
@@ -111,9 +111,9 @@ function SignInFormInner() {
         // aria-busy dan atribut disabled, bukan dengan mengganti labelnya.
         // disabled:opacity-60 di atas bg-accent terukur 1.26:1 di tema gelap
         // dan 3.62:1 di tema terang, gagal 4.5:1. Diganti pasangan token yang
-        // sudah terukur lolos: --muted di atas --surface (6.25:1 terang,
+        // sudah terukur lolos: --muted di atas --panel (6.25:1 terang,
         // 6.50:1 gelap).
-        className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+        className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-body font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-panel disabled:text-muted"
       >
         Masuk
       </button>

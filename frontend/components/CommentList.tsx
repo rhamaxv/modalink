@@ -105,16 +105,16 @@ export function CommentList({ proposalId, currentUserId = null }: CommentListPro
           type="button"
           aria-pressed={votedByMe}
           onClick={toggleVote}
-          className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-base leading-[1.6] font-semibold text-ink aria-pressed:bg-ink aria-pressed:text-paper"
+          className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-body font-semibold text-ink aria-pressed:bg-ink aria-pressed:text-paper"
         >
           Dukung proposal ini
         </button>
-        <span className="tabular text-base leading-[1.6] text-muted">
+        <span className="tabular text-body text-muted">
           {voteCount === null ? "Jumlah dukungan belum tersedia" : `${voteCount} dukungan`}
         </span>
       </div>
       {voteError && (
-        <p role="alert" className="text-[0.8125rem] text-danger">
+        <p role="alert" className="text-label text-danger">
           {voteError}
         </p>
       )}
@@ -127,7 +127,7 @@ export function CommentList({ proposalId, currentUserId = null }: CommentListPro
           <button
             type="button"
             onClick={arahkanKeFormKomentar}
-            className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-base leading-[1.6] font-semibold text-ink"
+            className="min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-body font-semibold text-ink"
           >
             Tulis komentar pertama
           </button>
@@ -141,15 +141,15 @@ export function CommentList({ proposalId, currentUserId = null }: CommentListPro
                   dipakai ProposalDetailView untuk investor_id pledge di
                   bagian funding, supaya satu komentar tetap bisa dibedakan
                   dari komentar lain tanpa membocorkan identitas penuh. */}
-              <p className="text-[0.8125rem] font-medium text-muted">
+              <p className="text-label font-medium text-muted">
                 Pengguna &hellip;{item.user_id.slice(-4)}
               </p>
-              <p className="text-base leading-[1.6] text-ink">{item.body}</p>
+              <p className="text-body text-ink">{item.body}</p>
               {item.user_id === currentUserId && (
                 <button
                   type="button"
                   onClick={() => hapusKomentar(item.id)}
-                  className="mt-space-1 min-h-[44px] text-[0.8125rem] font-medium text-muted underline"
+                  className="mt-space-1 min-h-[44px] text-label font-medium text-muted underline"
                 >
                   Hapus komentar
                 </button>

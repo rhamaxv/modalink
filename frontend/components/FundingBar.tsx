@@ -20,10 +20,10 @@ export function FundingBar({ terkumpul, target, pendana }: FundingBarProps) {
     <div className="flex flex-col gap-space-3">
       <div className="flex flex-wrap items-baseline justify-between gap-space-2">
         <div className="text-left">
-          <p className="text-[0.8125rem] font-medium text-muted">Terkumpul</p>
+          <p className="text-label font-medium text-muted">Terkumpul</p>
           <p className="tabular text-[1.75rem] font-semibold text-ink">{formatRupiah(terkumpul)}</p>
         </div>
-        <p className="tabular text-base leading-[1.6] text-muted">dari {formatRupiah(target)}</p>
+        <p className="tabular text-body text-muted">dari {formatRupiah(target)}</p>
       </div>
 
       <div
@@ -32,12 +32,12 @@ export function FundingBar({ terkumpul, target, pendana }: FundingBarProps) {
         aria-valuemax={100}
         aria-valuenow={persen}
         aria-valuetext={`${formatRupiah(terkumpul)} dari ${formatRupiah(target)}`}
-        className="h-3 w-full overflow-hidden rounded-sm bg-surface"
+        className="h-3 w-full overflow-hidden rounded-sm bg-panel"
       >
         <div className="h-full bg-accent" style={{ width: `${persen}%` }} />
       </div>
 
-      <div className="flex flex-wrap items-baseline justify-between gap-space-2 text-[0.8125rem] font-medium text-muted">
+      <div className="flex flex-wrap items-baseline justify-between gap-space-2 text-label font-medium text-muted">
         <p className="tabular">sisa {formatRupiah(sisa)}</p>
         <p className="tabular">Didanai oleh {pendana} investor</p>
       </div>

@@ -65,12 +65,12 @@ export function PledgeForm({ proposalId = "", sisa, onSukses }: PledgeFormProps)
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-space-3">
-      <p className="tabular text-[0.8125rem] font-medium text-muted">
+      <p className="tabular text-label font-medium text-muted">
         Maksimal {formatRupiah(sisaSekarang)} lagi bisa didanai.
       </p>
 
       {formError && (
-        <p role="alert" className="rounded-sm border border-danger bg-surface px-space-3 py-space-2 text-base leading-[1.6] text-danger">
+        <p role="alert" className="rounded-sm border border-danger bg-panel px-space-3 py-space-2 text-body text-danger">
           {formError}
         </p>
       )}
@@ -78,7 +78,7 @@ export function PledgeForm({ proposalId = "", sisa, onSukses }: PledgeFormProps)
       <Field label="Nominal pledge (Rp)" value={nominal} onChange={setNominal} required />
 
       {melebihiSisa && (
-        <p role="status" className="text-[0.8125rem] font-medium text-warn">
+        <p role="status" className="text-label font-medium text-warn">
           Nominal melebihi sisa dana yang dibutuhkan.
         </p>
       )}
@@ -87,7 +87,7 @@ export function PledgeForm({ proposalId = "", sisa, onSukses }: PledgeFormProps)
         type="submit"
         disabled={submitting || !nominalValid || melebihiSisa}
         aria-busy={submitting}
-        className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+        className="min-h-[44px] rounded-sm bg-accent px-space-4 py-space-2 text-body font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-panel disabled:text-muted"
       >
         Danai
       </button>

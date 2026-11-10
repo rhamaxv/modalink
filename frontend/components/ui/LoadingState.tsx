@@ -26,7 +26,7 @@ export function LoadingState({ label, minHeight = DEFAULT_MIN_HEIGHT }: LoadingS
       role="status"
       aria-live="polite"
       style={{ minHeight: `${minHeight}px` }}
-      className="flex items-center gap-space-2 rounded-card border border-line bg-surface px-space-4 py-space-3 text-base leading-[1.6] text-muted"
+      className="flex items-center gap-space-2 rounded-card border border-line bg-panel px-space-4 py-space-3 text-body text-muted"
     >
       <span
         aria-hidden="true"

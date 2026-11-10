@@ -64,7 +64,7 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-paper">
       <div className="mx-auto flex w-full max-w-[72rem] flex-wrap items-center justify-between gap-space-3 px-space-3 py-space-3">
-        <Link href="/" className="text-[0.8125rem] font-semibold text-ink">
+        <Link href="/" className="text-label font-semibold text-ink">
           Modalink
         </Link>
         <nav className="flex flex-wrap items-center gap-space-4">

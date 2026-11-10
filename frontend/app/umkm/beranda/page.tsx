@@ -100,7 +100,7 @@ export default function UmkmBeranda() {
               <div
                 key={p.id}
                 data-testid="kartu-proposal"
-                className="rounded-card border border-warn bg-surface p-space-4"
+                className="rounded-card border border-warn bg-panel p-space-4"
               >
                 <div className="flex flex-wrap items-center justify-between gap-space-3">
                   <p className="min-w-0 text-[1.125rem] font-semibold text-ink">{p.business_name}</p>
@@ -109,12 +109,12 @@ export default function UmkmBeranda() {
                 {/* D-09: kegagalan mesin skor bukan keputusan atas usaha ini.
                     Kalimat di bawah sengaja tidak memuat kata yang berarti
                     "ditolak" atau "tidak lolos". */}
-                <p className="mt-space-2 text-base leading-[1.6] text-ink">
+                <p className="mt-space-2 text-body text-ink">
                   Penilaian otomatis belum berhasil dilakukan karena gangguan teknis pada mesin
                   penilai. Ini bukan keputusan atas usaha Anda. Coba nilai ulang.
                 </p>
                 {rescoreError[p.id] && (
-                  <p role="alert" className="mt-space-2 text-[0.8125rem] text-danger">
+                  <p role="alert" className="mt-space-2 text-label text-danger">
                     {rescoreError[p.id]}
                   </p>
                 )}
@@ -123,7 +123,7 @@ export default function UmkmBeranda() {
                   onClick={() => nilaiUlang(p.id)}
                   disabled={rescoring[p.id]}
                   aria-busy={rescoring[p.id]}
-                  className="mt-space-3 min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-base leading-[1.6] font-semibold text-ink disabled:border-line disabled:text-muted"
+                  className="mt-space-3 min-h-[44px] rounded-sm border border-ink px-space-3 py-space-2 text-body font-semibold text-ink disabled:border-line disabled:text-muted"
                 >
                   Nilai ulang
                 </button>
@@ -147,7 +147,7 @@ export default function UmkmBeranda() {
 
 function ProposalCard({ proposal }: { proposal: ProposalMine }) {
   return (
-    <div data-testid="kartu-proposal" className="rounded-card border border-line bg-surface p-space-4">
+    <div data-testid="kartu-proposal" className="rounded-card border border-line bg-panel p-space-4">
       <div className="flex flex-wrap items-center justify-between gap-space-3">
         <p className="min-w-0 text-[1.125rem] font-semibold text-ink">{proposal.business_name}</p>
         <StatusBadge status={proposal.status} />

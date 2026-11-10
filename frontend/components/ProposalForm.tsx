@@ -149,7 +149,7 @@ export function ProposalForm({
       {disabledReason && (
         <p
           role="alert"
-          className="rounded-sm border border-warn bg-surface px-space-3 py-space-2 text-base leading-[1.6] text-warn"
+          className="rounded-sm border border-warn bg-panel px-space-3 py-space-2 text-body text-warn"
         >
           {disabledReason}
         </p>
@@ -200,7 +200,7 @@ export function ProposalForm({
 
       <div>
         <h2 className="text-[1.125rem] font-semibold text-ink">Rencana milestone</h2>
-        <p className="mt-space-1 text-[0.8125rem] text-muted">
+        <p className="mt-space-1 text-label text-muted">
           Jumlah seluruh tahap harus sama persis dengan dana yang diminta.
         </p>
         <div className="mt-space-3">
@@ -216,7 +216,7 @@ export function ProposalForm({
         type="submit"
         disabled={tidakBisaDikirim}
         aria-busy={submitting}
-        className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+        className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-body font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-panel disabled:text-muted"
       >
         Kirim proposal
       </button>
@@ -244,12 +244,12 @@ function TextAreaField({ label, hint, value, onChange, error, required }: TextAr
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
   return (
     <div className="flex flex-col gap-space-1">
-      <label htmlFor={id} className="text-[0.8125rem] font-medium text-muted">
+      <label htmlFor={id} className="text-label font-medium text-muted">
         {label}
         {required && <span aria-hidden="true"> *</span>}
       </label>
       {hint && (
-        <p id={hintId} className="text-[0.8125rem] text-muted">
+        <p id={hintId} className="text-label text-muted">
           {hint}
         </p>
       )}
@@ -261,10 +261,10 @@ function TextAreaField({ label, hint, value, onChange, error, required }: TextAr
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         rows={4}
-        className="min-h-[88px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink"
+        className="min-h-[88px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
       />
       {error && (
-        <p id={errorId} role="alert" className="text-[0.8125rem] text-danger">
+        <p id={errorId} role="alert" className="text-label text-danger">
           {error}
         </p>
       )}

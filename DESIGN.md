@@ -1,155 +1,222 @@
-# DESIGN.md: Arah visual Logicodix
+# DESIGN.md: Arah visual Modalink
 
-Arah di bawah ini ditentukan oleh pemilik project. Dokumen ini hanya merapikannya menjadi token
-dan aturan yang bisa dipakai saat membangun. Nilai hex adalah titik awal yang boleh digeser;
-karakter, palet, tipografi, dan dial di bawah **bukan** titik awal, melainkan keputusan.
+Arah ini ditentukan pemilik project pada 10 November 2026, menggantikan arah sebelumnya
+secara penuh. Dokumen lama bercorak **editorial & naratif** di atas kertas hangat dengan
+satu aksen kuning. Ia tidak gagal karena melanggar aturan; ia gagal karena **datar dan
+tanpa rasa**, yang modul antislop sendiri namai *Sterile Default*: hasil menyaring terlalu
+kuat tanpa arah yang cukup kuat. Perbaikannya bukan menambah larangan, melainkan menaikkan
+dial kehidupannya.
+
+Referensi yang ditunjuk pemilik project: [the5ers.com](https://the5ers.com). Nilai di bawah
+diukur langsung dari situs itu, bukan ditaksir.
 
 `antislop` adalah filter di atas arah ini, bukan sumber arah. Kalau keduanya bertabrakan,
 sebut tabrakannya ke pemilik project, jangan diam-diam memilih salah satu.
 
-## Design Read
+## Satu hal yang harus dipecahkan sendiri
 
-> Membacanya sebagai: platform pendanaan UMKM untuk dua audiens sekaligus (investor yang menimbang
-> angka, pemilik usaha yang mengisi formulir panjang), dalam bahasa visual **editorial & naratif**,
-> dial **ENERGY 2 / RHYTHM 3 / MOTION 2**.
+Referensinya memuat **341 gambar dan 89 SVG** dalam satu halaman. Sebagian besar rasanya
+datang dari fotografi manusia nyata. Modalink punya **nol** gambar, dan mengarangnya
+dilarang aturan lomba sekaligus R-18 dan R-36.
 
-## Karakter: editorial & naratif
+Jadi menyalin sistem visualnya tanpa menjawab "apa yang mengisi ruang tempat foto mereka"
+hanya menghasilkan situs **gelap yang tetap datar**.
 
-Tiap proposal diperlakukan seperti artikel, bukan seperti baris tabel. Foto dan cerita usaha
-mendapat ruang; angka tidak dijejalkan ke dalam grid rapat.
-
-Kenapa: produk ini menjual *dampak*, dan dampak dibaca sebagai cerita, bukan sebagai metrik.
-
-Karakter editorial biasanya dibawa oleh serif. Di sini tidak. Hierarki datang dari **ukuran dan
-ruang**, bukan dari bentuk huruf:
-
-- Judul halaman besar sekali (clamp 2.5rem sampai 4rem), bukan 1.5rem yang ditebalkan.
-- Lebar baris teks naratif dibatasi 62 sampai 68 karakter. Form dan tabel boleh lebih lebar.
-- Jarak antar blok lega: skala spasi 4, 8, 16, 24, 40, 64, 96. Bukan 16 di mana-mana.
-
-Kenapa satu sans humanis dan bukan serif: teks Indonesia di formulir panjang lebih mudah dibaca
-dengan sans humanis, dan editorial yang dibangun dari sans adalah jalur yang lebih jarang dipakai,
-jadi lebih sulit terbaca generik.
+Jawabannya **uang**. Nominal rupiah tabular adalah elemen grafis produk ini, bukan sekadar
+data. Di atas latar hampir hitam, angka setinggi 80px dengan bobot display melakukan
+pekerjaan yang di situs itu dilakukan foto. Dokumen lama sudah menyebut nominal sebagai
+tokoh utama tapi menetapkan batas minimum 1,75rem, yaitu 28px, dan 28px itulah yang
+membuatnya hilang. Batas itu dinaikkan.
 
 ## Dial
 
 | Dial | Nilai | Artinya di sini |
 | --- | --- | --- |
-| ENERGY | 2 | Landing page punya karakter kuat. Dashboard tenang dan fokus kerja. |
-| RHYTHM | 3 | **Tidak boleh ada dua section berpola sama.** Lihat aturan di bawah. |
+| ENERGY | **4** | Naik dari 2. Tipografi tegas, kontras tinggi, komposisi asimetris. Dashboard tetap lebih tenang daripada halaman publik, tapi tidak lagi pucat. |
+| RHYTHM | 3 | **Tidak boleh ada dua section berurutan berpola sama.** Tetap seperti sebelumnya. |
 | MOTION | 2 | Scroll-reveal terukur di halaman publik, transisi state di dashboard. Tidak ada parallax, tidak ada bounce. |
-
-RHYTHM 3 adalah aturan, bukan saran. Kalau dua section berurutan sama-sama "judul di tengah +
-grid kartu seragam", salah satunya harus diubah. Variasi yang tersedia: lebar penuh vs terbatas,
-rata kiri vs tengah, satu kolom vs dua kolom asimetris, dengan rule horizontal vs tanpa.
 
 ## Palet
 
-Dua warna inti (netral tidak dihitung) plus satu aksen. Total sesuai batas R-29.
+Dua warna inti netral plus **dua aksen**. Jumlah ini sengaja melewati batas satu-aksen di
+arah sebelumnya, dan itu keputusan sadar: dua aksen dengan peran berbeda adalah yang
+membedakan referensi ini dari latar gelap biasa.
 
-| Token | Terang | Gelap | Peran |
+| Token | Gelap (utama) | Terang | Peran |
 | --- | --- | --- | --- |
-| `--ink` | `#1A1917` | `#F2EEE6` | Teks utama, garis tegas |
-| `--paper` | `#FBF9F4` | `#141310` | Latar halaman |
-| `--surface` | `#F3EFE6` | `#201E19` | Kartu, panel, baris tabel bergaris |
-| `--muted` | `#5C574E` | `#A8A196` | Teks sekunder, label, satuan |
-| `--line` | `#DCD5C7` | `#36332B` | Border, pemisah |
-| `--accent` | `#FFC94A` | `#FFC94A` | **Aksen tunggal** |
-| `--ok` | `#2F6B3A` | `#7FCB8C` | Status positif (funded, cair) |
-| `--warn` | `#A3561F` | `#E8A765` | Perlu tindakan (laporan menunggu review) |
-| `--danger` | `#A32C1F` | `#F08C7E` | Rejected, failed |
+| `--paper` | `#100F0F` | `#FBF9F4` | Latar halaman |
+| `--panel` | `#1A1918` | `#F3EFE6` | Kartu dan panel |
+| `--panel-raised` | `#242322` | `#EAE4D8` | Panel di atas panel |
+| `--ink` | `#FFFFFF` | `#100F0F` | Teks utama |
+| `--muted` | `#A3A09B` | `#5C574E` | Teks sekunder, label, satuan |
+| `--line` | `#32302E` | `#DCD5C7` | Pemisah dekoratif, tepi kartu |
+| `--line-strong` | `#767166` | `#8A8275` | **Batas kontrol interaktif** |
+| `--accent` | `#DDFD6C` | `#DDFD6C` | Aksi utama, bilah funding, tahap aktif |
+| `--accent-2` | `#AAB2FF` | `#AAB2FF` | Penanda sekunder: label kategori, sorotan data |
+| `--on-accent` | `#100F0F` | `#100F0F` | **Teks di atas kedua aksen. Tidak pernah berbalik.** |
+| `--ok` | `#7FCB8C` | `#2F6B3A` | Status positif |
+| `--warn` | `#E8A765` | `#A3561F` | Perlu tindakan |
+| `--danger` | `#F08C7E` | `#A32C1F` | Gagal, ditolak |
 
-### Aturan kuning yang tidak bisa dilanggar
+### Aturan aksen yang tidak bisa dilanggar
 
-Kuning adalah satu-satunya warna yang **tidak bisa** menjadi latar teks putih. Rasio kontras
-putih di atas `#FFC94A` hanya 1.53:1, jauh di bawah ambang 4.5:1.
+Teks di atas `--accent` maupun `--accent-2` **selalu** `--on-accent`. Tidak pernah putih,
+dan tidak pernah `--ink`.
 
-- Teks di atas `--accent` **selalu** `--ink`. Tidak pernah putih.
-- `--accent` muncul hanya di momen yang berarti: tombol aksi utama satu per layar, bar progres
-  funding, penanda tahap milestone yang sedang berjalan. Tidak di ikon, tidak di border kartu,
-  tidak di badge biasa.
-- Kalau aksen muncul lebih dari tiga kali di satu layar, dia bukan aksen lagi. Kurangi.
+Alasannya bukan selera, dan bukan pula warisan dari palet lama: putih di atas lime
+mengukur **1,14:1** dan di atas periwinkle **2,00:1**. Keduanya **lebih buruk** daripada
+putih-pada-kuning 1,53:1 yang arah sebelumnya sudah melarang.
 
-Kenapa dipakai hemat: aksen yang jarang muncul membuat tiap kemunculannya berarti, dan itu yang
-mengarahkan mata ke keputusan yang sedang diminta dari pengguna.
+`--on-accent` sengaja **tidak punya pasangan di blok tema terang**. `--ink` berbalik saat
+tema berganti, aksen tidak, jadi teks di atas aksen tidak boleh mengikuti token yang
+berbalik. Pelanggaran aturan ini pernah dikirim ke produksi dan hidup di setiap tombol
+selama berjam-jam karena pemeriksaannya menggeledah kata "white" alih-alih mengukur
+warnanya. Pagar `frontend/tests/accent-contrast.test.ts` sekarang mengukur, dan ia harus
+tetap mengukur.
+
+### Pembagian kerja dua aksen
+
+Satu aksen menjadi dua bukan berarti dua kali lebih banyak kuning. Keduanya punya tugas
+berbeda dan tidak boleh tertukar:
+
+- `--accent` **lime** adalah tindakan dan uang. Tombol aksi utama satu per layar, bilah
+  progres funding, penanda tahap milestone yang sedang berjalan.
+- `--accent-2` **periwinkle** adalah penanda, bukan tindakan. Label kategori di atas judul
+  section, sorotan angka pendukung, penekanan di dalam kalimat. Ia tidak pernah menjadi
+  latar tombol.
+
+Anggaran per layar: **tiga kemunculan `--accent`**, dan periwinkle secukupnya karena ia
+tidak bersaing memperebutkan klik. Kalau lime muncul lebih dari tiga kali, ia bukan aksen
+lagi.
 
 ## Tipografi
 
-Satu keluarga sans humanis untuk semua. Kandidat: Source Sans 3, Public Sans, atau IBM Plex Sans.
-Pilih satu, jangan campur.
+**Dua keluarga, bukan satu.** Ini perubahan dari arah sebelumnya, dan ia yang paling
+menentukan rasanya.
 
-Kenapa humanis: bentuk hurufnya lebih terbuka dan lebih mudah dibaca di formulir panjang
-berbahasa Indonesia dibanding grotesk geometris.
-
-| Peran | Ukuran | Berat |
+| Peran | Keluarga | Bobot |
 | --- | --- | --- |
-| Judul halaman | `clamp(2.5rem, 5vw, 4rem)` | 600 |
-| Judul section | 1.75rem | 600 |
-| Judul kartu | 1.125rem | 600 |
-| Teks | 1rem, line-height 1.6 | 400 |
-| Label, satuan, caption | 0.8125rem | 500 |
+| Judul halaman dan judul section | **Cabinet Grotesk** | 700, 800 untuk nominal besar |
+| Teks, label, kontrol, angka | **General Sans** | 400, 500, 600, 700 |
 
-**Angka rupiah wajib `font-variant-numeric: tabular-nums`.** Tanpa itu, kolom nominal di tabel
-tidak sejajar per digit dan angka jadi sulit dibandingkan sekilas.
+Keduanya dari Fontshare, lisensi ITF Free Font License, **di-host sendiri** di
+`frontend/app/fonts/` lewat `next/font/local`. Bukan lewat CDN: deployment lomba wajib
+tetap bisa diakses juri, dan satu dependency jaringan pihak ketiga adalah satu cara lagi
+ia bisa mati.
 
-## Motif identitas
+| Peran | Ukuran | Bobot | Leading |
+| --- | --- | --- | --- |
+| Judul halaman | `clamp(2.75rem, 6vw, 4.5rem)` | 700 | **1,10** |
+| Judul section | `clamp(2rem, 4vw, 2.75rem)` | 700 | **1,10** |
+| Nominal utama | `clamp(3rem, 7vw, 5rem)` | 800 | 1,00 |
+| Nominal pendukung | 1,75rem | 700 | 1,10 |
+| Judul kartu | 1,25rem | 600 | 1,30 |
+| Teks | 1rem | 400 | 1,60 |
+| Label, satuan, caption | 0,8125rem | 500 | 1,40 |
 
-Nominal rupiah adalah tokoh utama tiap kartu proposal: ditulis besar (1.75rem ke atas), tabular,
-rata kiri, dengan label kecil di atasnya, bukan diselipkan sebagai teks biasa di dalam paragraf.
+**Leading 1,10 pada judul adalah separuh dari efeknya.** Judul lama berukuran 64px dengan
+leading 1,25 terasa lebih lemah daripada judul referensi yang hanya 50px dengan leading
+1,10. Ukuran saja tidak cukup; yang membuat judul terasa padat adalah barisnya rapat dan
+bobotnya berat.
 
-Kenapa: ini produk tentang uang yang berpindah. Angkanya yang harus dibaca lebih dulu, dan
-pengulangan perlakuan ini di seluruh aplikasi yang membuatnya terasa satu produk.
+**Judul section sebesar judul halaman.** Di referensi keduanya 50px. Judul section lama
+28px, dan itu sebabnya setiap section terasa seperti catatan kaki. Angka di tabel atas
+sudah mencerminkan ini.
 
-(Motif ini adalah rumusan dari pilihan "editorial & naratif". Kalau tidak cocok, ganti.)
+**Angka rupiah wajib `font-variant-numeric: tabular-nums`.** Tanpa itu kolom nominal tidak
+sejajar per digit dan angka sulit dibandingkan sekilas.
+
+## Komposisi
+
+- **Asimetris, bukan terpusat.** Judul dan teks di kiri dengan lebar terbatas, konten
+  pendukung di kanan yang boleh menembus tepi layar. Judul terpusat dipakai sesekali
+  sebagai variasi, bukan sebagai default.
+- **Section bergantian gelap dan panel.** `--paper` lalu `--panel` lalu `--paper`,
+  sehingga batas antar-section terbaca tanpa garis.
+- **RHYTHM 3 tetap berlaku.** Variasi yang tersedia: lebar penuh lawan terbatas, rata kiri
+  lawan tengah, satu kolom lawan dua kolom asimetris, kartu lawan daftar bernomor.
+- Lebar baris teks naratif 62 sampai 68 karakter lewat `--measure`. Form dan tabel boleh
+  lebih lebar.
+- Skala spasi 4, 8, 16, 24, 40, 64, 96. Bukan 16 di mana-mana.
 
 ## Radius dan elevasi
 
-- Radius: `4px` untuk input dan badge, `8px` untuk kartu, `12px` untuk panel besar. Variasi ini
-  disengaja sebagai penanda hierarki. Tidak ada yang berbentuk pil.
-- Bayangan dipakai hanya untuk elemen yang benar-benar melayang di atas halaman: dropdown, modal,
-  toast. Kartu dibatasi oleh `--line`, bukan oleh bayangan.
+| Token | Nilai | Dipakai untuk |
+| --- | --- | --- |
+| `--radius-sm` | 8px | Input, lencana |
+| `--radius-card` | 16px | Kartu |
+| `--radius-panel` | 24px | Panel besar |
+| `--radius-feature` | 35px | Blok sorotan, satu atau dua per halaman |
+| `--radius-pill` | 9999px | **Tombol** |
+
+Bentuk pil **diizinkan di tombol**, dan ini pembalikan sadar dari arah sebelumnya yang
+melarangnya sepenuhnya. Alasannya: pil di referensi dipakai konsisten pada tombol saja,
+bukan pada setiap elemen, sehingga ia menjadi bahasa tombol dan bukan dekorasi. Larangan
+R-11 menyasar pil **di mana-mana**; pil hanya di tombol tetap merupakan keputusan hierarki.
+
+Kartu tetap dibatasi `--line`, bukan bayangan. Bayangan hanya untuk elemen yang benar-benar
+melayang: dropdown, modal, toast.
+
+## Kontras yang sudah diukur
+
+Diukur dengan pemeriksa antislop dan dihitung ulang mandiri, bukan ditaksir. Ambang WCAG
+AA: 4,5:1 teks normal, 3:1 teks besar dan batas kontrol.
+
+| Teks | Latar | Rasio | Verdict |
+| --- | --- | --- | --- |
+| `--ink` putih | `--paper` `#100F0F` | 19,14:1 | lolos |
+| `--muted` `#A3A09B` | `--paper` | 7,34:1 | lolos |
+| `--muted` | `--panel` `#1A1918` | 6,74:1 | lolos |
+| `--on-accent` | `--accent` lime | **16,72:1** | lolos |
+| putih | `--accent` lime | **1,14:1** | **gagal, dilarang** |
+| `--on-accent` | `--accent-2` periwinkle | **9,59:1** | lolos |
+| putih | `--accent-2` | **2,00:1** | **gagal, dilarang** |
+| `--accent` sebagai teks | `--paper` | 16,72:1 | lolos |
+| `--accent-2` sebagai teks | `--paper` | 9,59:1 | lolos |
+| `--ok` `#7FCB8C` | `--paper` | 9,86:1 | lolos |
+| `--warn` `#E8A765` | `--paper` | 9,25:1 | lolos |
+| `--danger` `#F08C7E` | `--paper` | 7,98:1 | lolos |
+| `--line-strong` `#767166` | `--paper` | 3,94:1 | lolos ambang 3:1 |
+| `--line-strong` | `--panel` | 3,62:1 | lolos ambang 3:1 |
+| `--line` `#32302E` | `--paper` | 1,46:1 | **hanya untuk pemisah dekoratif** |
+
+`--line` sengaja di bawah 3:1 dan karena itu **tidak boleh dipakai pada batas kontrol yang
+bisa diklik atau difokus**. Batas interaktif memakai `--line-strong`. Pemisahan ini ada
+karena satu tombol pernah lolos review dengan border 1,27:1.
 
 ## Yang harus ada di setiap layar data
 
 Bukan bonus, melainkan bagian dari desain:
 
-- **Empty state** dengan satu aksi yang jelas ("Belum ada proposal masuk. Bagikan link campaign.")
-- **Loading state** yang tidak memindahkan layout saat data datang.
+- **Empty state** dengan penyebab dan satu aksi yang jelas.
+- **Loading state** yang tidak memindahkan layout saat data datang, termasuk tidak
+  memindahkan judul halaman.
 - **Error state** dengan penyebab dan satu tombol coba lagi.
 
-## Tema terang dan gelap
+## Tema
 
-Produk ini tidak punya alasan kuat untuk mengunci satu tema, jadi toggle terang/gelap **dibangun**,
-bukan ditunda. Kedua mode harus diperiksa: kontras, warna status, dan layout. Mode yang rusak
-adalah cacat, bukan fitur yang belum selesai.
+**Gelap adalah default dan keadaan yang dirancang.** Tema terang tetap dibangun dan tetap
+harus bekerja penuh, karena ia sudah ada, teruji, dan menguntungkan sebagian pembaca.
+Mode yang rusak adalah cacat, bukan fitur yang belum selesai.
+
+Yang tidak boleh ikut berbalik saat tema berganti: `--accent`, `--accent-2`, dan
+`--on-accent`.
 
 ## Bahasa
 
-Antarmuka berbahasa Indonesia. Istilah teknis yang sudah lazim dipakai apa adanya (campaign,
-pledge, milestone, dashboard). Jangan diterjemahkan paksa menjadi "kampanye penggalangan" atau
-"tonggak pencapaian".
+Antarmuka berbahasa Indonesia. Istilah teknis yang sudah lazim dipakai apa adanya
+(campaign, pledge, milestone, dashboard). Jangan diterjemahkan paksa.
 
 Tidak ada tanda pisah em (`—`) di teks antarmuka. Pakai koma, titik, titik dua, atau kurung.
 
-## Kontras yang sudah diukur
+## Yang tetap dilarang meski arahnya berubah
 
-Diukur dengan pemeriksa kontras antislop, bukan ditaksir. Ambang WCAG AA: 4.5:1 teks normal,
-3:1 teks besar.
+Arah baru menaikkan energi, bukan membuka pintu untuk slop. Semua ini tetap berlaku:
 
-| Teks | Latar | Rasio | Verdict |
-| --- | --- | --- | --- |
-| `--ink` `#1A1917` | `--paper` `#FBF9F4` | 16.7:1 | lolos |
-| `--muted` `#5C574E` | `--paper` `#FBF9F4` | 6.82:1 | lolos |
-| `--muted` `#5C574E` | `--surface` `#F3EFE6` | 6.25:1 | lolos |
-| `--ink` `#1A1917` | `--accent` `#FFC94A` | 11.47:1 | lolos |
-| putih `#FFFFFF` | `--accent` `#FFC94A` | 1.53:1 | **gagal, dilarang** |
-| `--ok` `#2F6B3A` | `--paper` `#FBF9F4` | 6.08:1 | lolos |
-| `--warn` `#A3561F` | `--paper` `#FBF9F4` | 5.11:1 | lolos |
-| `--danger` `#A32C1F` | `--paper` `#FBF9F4` | 6.79:1 | lolos |
-| `--ink` gelap `#F2EEE6` | `--paper` gelap `#141310` | 16.05:1 | lolos |
-| `--muted` gelap `#A8A196` | `--paper` gelap `#141310` | 7.26:1 | lolos |
-| `--ok` gelap `#7FCB8C` | `--paper` gelap `#141310` | 9.58:1 | lolos |
-| `--warn` gelap `#E8A765` | `--paper` gelap `#141310` | 8.98:1 | lolos |
-| `--danger` gelap `#F08C7E` | `--paper` gelap `#141310` | 7.75:1 | lolos |
-
-Kalau ada nilai hex yang digeser, ukur ulang pasangannya sebelum dipakai.
+- Gradien sebagai perlakuan warna default, glassmorphism di lebih dari satu atau dua
+  elemen, bayangan di setiap komponen, grid atau titik di latar.
+- Ikon sparkle, petir, robot, atau orb AI.
+- Badge kapsul di atas H1, titik status dekoratif, emoji di teks antarmuka.
+- **Angka statistik, testimoni, avatar, dan baris logo yang dikarang.** Produk ini tidak
+  punya satu pun, dan mengarangnya melanggar aturan lomba.
+- H1 berisi nama merek. Nama produk sudah ada di header.

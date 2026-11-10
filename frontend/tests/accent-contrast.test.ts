@@ -31,32 +31,37 @@ function berkas(dir: string): string[] {
 
 const css = readFileSync("app/globals.css", "utf8");
 
-function nilaiToken(nama: string, gelap: boolean): string | null {
-  const sumber = gelap ? css.slice(css.indexOf('[data-theme="dark"]')) : css;
+function nilaiToken(nama: string, temaInversi: boolean): string | null {
+  // Gelap adalah default di :root; blok inversinya sekarang [data-theme="light"].
+  const sumber = temaInversi ? css.slice(css.indexOf('[data-theme="light"]')) : css;
   const m = new RegExp(`--${nama}:\\s*(#[0-9A-Fa-f]{6})`).exec(sumber);
   return m?.[1] ?? null;
 }
 
 describe("kontras teks di atas aksen", () => {
   it("keeps the on-accent token stable across both themes", () => {
-    const terang = nilaiToken("on-accent", false);
-    const gelap = nilaiToken("on-accent", true);
-    expect(terang).not.toBeNull();
-    // Tidak didefinisikan ulang di blok gelap: itu seluruh maksud tokennya.
-    expect(gelap).toBe(terang);
+    const dasar = nilaiToken("on-accent", false);
+    const inversi = nilaiToken("on-accent", true);
+    expect(dasar).not.toBeNull();
+    // Tidak didefinisikan ulang di blok inversi: itu seluruh maksud tokennya.
+    // Berlaku untuk kedua aksen, karena keduanya tidak pernah berbalik.
+    expect(inversi).toBe(dasar);
+    expect(nilaiToken("accent", true)).toBe(nilaiToken("accent", false));
+    expect(nilaiToken("accent-2", true)).toBe(nilaiToken("accent-2", false));
   });
 
-  it("measures the on-accent pair above the WCAG AA threshold in both themes", () => {
-    const aksen = nilaiToken("accent", false)!;
+  it("measures both accent pairs above the WCAG AA threshold", () => {
     const teks = nilaiToken("on-accent", false)!;
-    expect(ratio(teks, aksen)).toBeGreaterThanOrEqual(4.5);
+    for (const nama of ["accent", "accent-2"]) {
+      expect(ratio(teks, nilaiToken(nama, false)!)).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("rejects pairing an accent surface with a token that flips per theme", () => {
     const pelanggar: string[] = [];
     for (const p of [...berkas("app"), ...berkas("components")]) {
       for (const baris of readFileSync(p, "utf8").split("\n")) {
-        if (!baris.includes("bg-accent")) continue;
+        if (!baris.includes("bg-accent") && !baris.includes("bg-accent-2")) continue;
         if (/\btext-(ink|paper|white)\b/.test(baris)) pelanggar.push(`${p}: ${baris.trim()}`);
       }
     }
@@ -64,9 +69,11 @@ describe("kontras teks di atas aksen", () => {
   });
 
   it("proves the flipping token would actually have failed", () => {
-    // Nilai yang sempat terkirim ke produksi, dihitung ulang di sini supaya
-    // angkanya tidak hanya ada di komentar.
-    expect(ratio("#F2EEE6", "#FFC94A")).toBeLessThan(1.53);
-    expect(ratio("#1A1917", "#FFC94A")).toBeGreaterThan(11);
+    // Nilai yang dilarang DESIGN.md, dihitung ulang di sini supaya angkanya
+    // tidak hanya ada di komentar. Putih di atas kedua aksen lebih buruk
+    // daripada putih-pada-kuning 1.53:1 yang arah sebelumnya sudah melarang.
+    expect(ratio("#FFFFFF", "#DDFD6C")).toBeLessThan(1.53);
+    expect(ratio("#FFFFFF", "#AAB2FF")).toBeLessThan(2.1);
+    expect(ratio("#100F0F", "#DDFD6C")).toBeGreaterThan(16);
   });
 });

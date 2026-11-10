@@ -97,7 +97,7 @@ export default function ProposalBaru() {
     <div className="mx-auto flex flex-col gap-space-5 px-space-3 py-space-6">
       <div className="max-w-measure">
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold text-ink">Ajukan proposal</h1>
-        <p className="mt-space-2 text-base leading-[1.6] text-muted">
+        <p className="mt-space-2 text-body text-muted">
           Isi selengkap dan sespesifik mungkin. AI menilai berdasarkan isian field-field ini.
         </p>
       </div>
@@ -114,7 +114,7 @@ export default function ProposalBaru() {
       {submitError && (
         <p
           role="alert"
-          className="rounded-sm border border-danger bg-surface px-space-3 py-space-2 text-base leading-[1.6] text-danger"
+          className="rounded-sm border border-danger bg-panel px-space-3 py-space-2 text-body text-danger"
         >
           {submitError}
         </p>

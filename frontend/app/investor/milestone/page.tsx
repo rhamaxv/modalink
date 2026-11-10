@@ -15,7 +15,7 @@ export default function InvestorMilestonePage() {
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">
           Milestone menunggu persetujuan
         </h1>
-        <p className="mt-space-2 max-w-measure text-base leading-[1.6] text-muted">
+        <p className="mt-space-2 max-w-measure text-body text-muted">
           Hanya proposal yang Anda danai sebagai lead investor dan sedang menunggu keputusan yang
           tampil di sini.
         </p>

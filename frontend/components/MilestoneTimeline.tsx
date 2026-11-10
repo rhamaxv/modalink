@@ -81,9 +81,9 @@ function StageActions({ milestone, onApprove, onReject }: StageActionsProps) {
   const catatanCukup = note.trim().length >= CATATAN_MINIMAL;
 
   return (
-    <div className="flex flex-col gap-space-2 rounded-card border border-line bg-surface px-space-3 py-space-3">
+    <div className="flex flex-col gap-space-2 rounded-card border border-line bg-panel px-space-3 py-space-3">
       <Field label="Catatan untuk UMKM" value={note} onChange={setNote} multiline required />
-      <p className="text-[0.8125rem] text-muted">
+      <p className="text-label text-muted">
         Minimal {CATATAN_MINIMAL} karakter. Catatan ini yang dibaca UMKM untuk merevisi laporannya
         (BR-45).
       </p>
@@ -171,25 +171,25 @@ export function MilestoneTimeline({
             <div className="flex flex-wrap items-center gap-space-2">
               <p className="text-[1.125rem] font-semibold text-ink">{milestone.title}</p>
               {aktif && (
-                <span className="inline-flex w-fit items-center rounded-sm bg-accent px-space-2 py-space-1 text-[0.8125rem] font-semibold text-on-accent">
+                <span className="inline-flex w-fit items-center rounded-sm bg-accent px-space-2 py-space-1 text-label font-semibold text-on-accent">
                   Tahap berjalan
                 </span>
               )}
             </div>
             {milestone.description && (
-              <p className="max-w-measure text-base leading-[1.6] text-muted">{milestone.description}</p>
+              <p className="max-w-measure text-body text-muted">{milestone.description}</p>
             )}
-            <p className="text-base leading-[1.6] text-ink">{teksTahap}</p>
+            <p className="text-body text-ink">{teksTahap}</p>
 
             {milestone.reports && milestone.reports.length > 0 && (
               <ol className="flex flex-col gap-space-2 border-t border-line pt-space-2">
                 {[...milestone.reports].reverse().map((report, i) => (
-                  <li key={i} className="text-base leading-[1.6] text-ink">
+                  <li key={i} className="text-body text-ink">
                     <p className={report.review_status === "rejected" ? "text-danger" : "text-ink"}>
                       {reviewLabel(report.review_status)}: {report.narrative}
                     </p>
                     {report.review_status === "rejected" && report.reviewer_note && (
-                      <p className="mt-space-1 text-[0.8125rem] text-muted">
+                      <p className="mt-space-1 text-label text-muted">
                         Catatan revisi: {report.reviewer_note}
                       </p>
                     )}

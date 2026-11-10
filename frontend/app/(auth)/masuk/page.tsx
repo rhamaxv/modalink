@@ -13,12 +13,12 @@ export default function Masuk() {
     <div className="mx-auto flex max-w-measure flex-col gap-space-5 px-space-3 py-space-6">
       <div>
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold text-ink">Masuk</h1>
-        <p className="mt-space-2 text-base leading-[1.6] text-muted">
+        <p className="mt-space-2 text-body text-muted">
           Masuk untuk melihat proposal, pledge, dan dashboard Anda.
         </p>
       </div>
       <SignInForm />
-      <p className="text-base leading-[1.6] text-muted">
+      <p className="text-body text-muted">
         Belum punya akun?{" "}
         <Link href="/daftar" className="font-medium text-ink underline">
           Daftar di sini

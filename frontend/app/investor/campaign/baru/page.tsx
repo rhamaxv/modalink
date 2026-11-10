@@ -16,7 +16,7 @@ export default function NewCampaignPage() {
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">
           Buat campaign baru
         </h1>
-        <p className="mt-space-2 text-base leading-[1.6] text-muted">
+        <p className="mt-space-2 text-body text-muted">
           Ambang skor menentukan proposal mana yang otomatis terbuka untuk didanai. Setelah ada
           proposal masuk, ambang ini terkunci dan tidak bisa diubah lagi.
         </p>

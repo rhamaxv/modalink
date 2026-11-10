@@ -41,7 +41,7 @@ export default function Beranda() {
         <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">
           Usaha lokal didanai bersama, dicairkan selangkah demi selangkah.
         </h1>
-        <p className="mt-space-4 text-base leading-[1.6] text-muted">
+        <p className="mt-space-4 text-body text-muted">
           Modalink menghubungkan investor dengan UMKM. Proposal dinilai AI lebih dulu, investor
           patungan mendanainya, dan dananya cair bertahap setelah tiap milestone disetujui.
         </p>
@@ -55,7 +55,7 @@ export default function Beranda() {
         </div>
       </section>
 
-      <section data-pola="daftar-bernomor" className="w-full border-t border-line bg-surface px-space-3 py-space-7">
+      <section data-pola="daftar-bernomor" className="w-full border-t border-line bg-panel px-space-3 py-space-7">
         <div className="mx-auto w-full max-w-[72rem]">
           <h2 className="text-[1.75rem] font-semibold text-ink">Bagaimana dananya bergerak</h2>
           <ol className="mt-space-5 flex flex-col gap-space-5">
@@ -66,7 +66,7 @@ export default function Beranda() {
                 </span>
                 <div className="flex max-w-measure flex-col gap-space-1">
                   <p className="text-[1.125rem] font-semibold text-ink">{langkah.judul}</p>
-                  <p className="text-base leading-[1.6] text-muted">{langkah.teks}</p>
+                  <p className="text-body text-muted">{langkah.teks}</p>
                 </div>
               </li>
             ))}
@@ -78,7 +78,7 @@ export default function Beranda() {
         <div className="grid gap-space-6 md:grid-cols-2">
           <div className="flex flex-col gap-space-2">
             <h2 className="text-[1.75rem] font-semibold text-ink">Untuk investor</h2>
-            <p className="max-w-measure text-base leading-[1.6] text-muted">
+            <p className="max-w-measure text-body text-muted">
               Baca brief AI dan bukan hanya skornya, ikut patungan mendanai proposal yang Anda
               percayai, dan setujui pencairan tiap milestone berdasarkan laporan kemajuan nyata.
             </p>
@@ -88,7 +88,7 @@ export default function Beranda() {
           </div>
           <div className="flex flex-col gap-space-2 border-t border-line pt-space-5 md:border-t-0 md:border-l md:pl-space-6 md:pt-0">
             <h2 className="text-[1.75rem] font-semibold text-ink">Untuk UMKM</h2>
-            <p className="max-w-measure text-base leading-[1.6] text-muted">
+            <p className="max-w-measure text-body text-muted">
               Ajukan proposal lengkap dengan rencana milestone, lalu laporkan kemajuan usaha
               Anda setiap tahap selesai untuk mencairkan dana ke tahap berikutnya.
             </p>
@@ -99,10 +99,10 @@ export default function Beranda() {
         </div>
       </section>
 
-      <section data-pola="lebar-penuh-cta" className="w-full border-t border-line bg-surface px-space-3 py-space-7">
+      <section data-pola="lebar-penuh-cta" className="w-full border-t border-line bg-panel px-space-3 py-space-7">
         <div className="mx-auto flex max-w-measure flex-col items-start gap-space-3">
           <h2 className="text-[1.75rem] font-semibold text-ink">Siap mulai?</h2>
-          <p className="text-base leading-[1.6] text-muted">
+          <p className="text-body text-muted">
             Daftar sebagai investor untuk mulai mendanai, atau sebagai UMKM untuk mengajukan
             proposal usaha Anda.
           </p>

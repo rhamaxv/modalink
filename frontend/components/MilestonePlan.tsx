@@ -70,11 +70,11 @@ export function MilestonePlan({ requestedAmount, milestones, onChange }: Milesto
       <button
         type="button"
         onClick={addRow}
-        className="min-h-[44px] self-start rounded-sm border border-ink px-space-3 py-space-2 text-base leading-[1.6] font-semibold text-ink"
+        className="min-h-[44px] self-start rounded-sm border border-ink px-space-3 py-space-2 text-body font-semibold text-ink"
       >
         Tambah tahap
       </button>
-      <p role="status" aria-live="polite" className="tabular text-base leading-[1.6] font-medium text-ink">
+      <p role="status" aria-live="polite" className="tabular text-body font-medium text-ink">
         {selisih === 0
           ? "Jumlah sudah pas dengan dana yang diminta."
           : selisih > 0
@@ -119,10 +119,10 @@ function MilestoneRow({ index, milestone, onChange, onRemove }: MilestoneRowProp
 
   return (
     <div
-      className="flex flex-col gap-space-3 rounded-card border border-line bg-surface p-space-4"
+      className="flex flex-col gap-space-3 rounded-card border border-line bg-panel p-space-4"
       data-pola="tabel-padat"
     >
-      <p className="text-[0.8125rem] font-medium text-muted">Tahap {index + 1}</p>
+      <p className="text-label font-medium text-muted">Tahap {index + 1}</p>
       <Field
         label={`Judul tahap ${index + 1}`}
         value={milestone.title}
@@ -145,7 +145,7 @@ function MilestoneRow({ index, milestone, onChange, onRemove }: MilestoneRowProp
         <button
           type="button"
           onClick={onRemove}
-          className="min-h-[44px] self-start rounded-sm border border-line px-space-3 py-space-2 text-base leading-[1.6] font-medium text-muted"
+          className="min-h-[44px] self-start rounded-sm border border-line px-space-3 py-space-2 text-body font-medium text-muted"
         >
           Hapus tahap {index + 1}
         </button>

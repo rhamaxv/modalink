@@ -217,12 +217,22 @@ describe("public proposal list on the explore page", () => {
   });
 
   it("gives the first proposal a larger nominal than the following ones", async () => {
+    // Versi sebelumnya mengassert kartu biasa TIDAK memakai 1.75rem, yang
+    // mengunci pelanggaran DESIGN.md: dokumen itu menetapkan 1.75rem sebagai
+    // batas BAWAH nominal di setiap kartu, bukan sebagai hak istimewa kartu
+    // pertama. Yang dijamin di sini adalah hierarkinya, bukan satu nilai rem
+    // tertentu, sehingga skala boleh berubah tanpa test ini ikut berbohong.
     stubFetchWithProposals();
     render(<ExplorePage />);
     await screen.findByText("Kopi Senja");
-    const featuredAmount = screen.getByText("Rp25.000.000");
-    const standardAmount = screen.getByText("Rp15.000.000");
-    expect(featuredAmount.className).toContain("1.75rem");
-    expect(standardAmount.className).not.toContain("1.75rem");
+    const urutan = ["text-amount", "text-amount-sm", "text-card-title"];
+    const tingkat = (el: HTMLElement) =>
+      urutan.findIndex((k) => el.className.split(" ").includes(k));
+
+    const utama = tingkat(screen.getByText("Rp25.000.000"));
+    const biasa = tingkat(screen.getByText("Rp15.000.000"));
+    expect(utama, "nominal kartu pertama tidak memakai token skala").toBeGreaterThanOrEqual(0);
+    expect(biasa, "nominal kartu kedua tidak memakai token skala").toBeGreaterThanOrEqual(0);
+    expect(utama, "kartu pertama harus lebih besar, bukan sama").toBeLessThan(biasa);
   });
 });

@@ -63,7 +63,7 @@ export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
   return (
     <span
       data-status={status}
-      className={`inline-flex items-center rounded-sm border border-line bg-surface px-space-2 py-space-1 text-[0.8125rem] font-medium ${TONE_CLASS[tone]} ${className}`}
+      className={`inline-flex items-center rounded-pill border border-line bg-panel-raised px-space-3 py-space-1 text-label font-medium ${TONE_CLASS[tone]} ${className}`}
     >
       {label}
     </span>

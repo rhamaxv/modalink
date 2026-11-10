@@ -92,7 +92,7 @@ export function CampaignList() {
             <Link
               href={`/investor/campaign/${campaign.id}`}
               className={`block rounded-card border px-space-4 py-space-4 ${
-                featured ? "border-ink bg-paper" : "border-line bg-surface"
+                featured ? "border-ink bg-paper" : "border-line bg-panel"
               }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-space-2">
@@ -102,7 +102,7 @@ export function CampaignList() {
                 <StatusBadge status={campaign.status} />
               </div>
               <Amount label="Dana target" amount={campaign.target_amount} size={featured ? "large" : "medium"} />
-              <p className="mt-space-2 text-[0.8125rem] text-muted">
+              <p className="mt-space-2 text-label text-muted">
                 Tenggat pengajuan {formatDate(campaign.apply_deadline)}, tenggat funding{" "}
                 {formatDate(campaign.funding_deadline)}
               </p>

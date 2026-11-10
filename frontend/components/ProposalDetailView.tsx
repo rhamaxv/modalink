@@ -268,7 +268,7 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
       <section data-pola="bilah-lebar-penuh" className="flex flex-col gap-space-4 border-t border-line pt-space-4">
         {pledges.status === "loading" && <LoadingState label="Memuat progres funding" minHeight={120} />}
         {pledges.status === "forbidden" && (
-          <p className="max-w-measure text-base leading-[1.6] text-muted">
+          <p className="max-w-measure text-body text-muted">
             Masuk sebagai investor, atau sebagai UMKM pemilik proposal ini, untuk melihat progres
             pendanaan dan daftar pendana.
           </p>
@@ -280,11 +280,11 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
             {pledges.data.length > 0 && (
               <ul className="flex flex-col gap-space-2 border-t border-line pt-space-3">
                 {pledges.data.map((pledge) => (
-                  <li key={pledge.id} className="flex items-center justify-between gap-space-3 text-base leading-[1.6] text-ink">
+                  <li key={pledge.id} className="flex items-center justify-between gap-space-3 text-body text-ink">
                     <span>
                       Investor &hellip;{pledge.investor_id.slice(-4)}
                       {pledge.investor_id === data.lead_investor_id && (
-                        <span className="ml-space-2 text-[0.8125rem] font-medium text-muted">(investor utama)</span>
+                        <span className="ml-space-2 text-label font-medium text-muted">(investor utama)</span>
                       )}
                     </span>
                     <Amount label="" amount={pledge.amount} size="medium" />
@@ -302,15 +302,15 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
       <section data-pola="naratif-kiri" className="flex max-w-measure flex-col gap-space-4">
         <div className="flex flex-col gap-space-1">
           <h2 className="text-[1.75rem] font-semibold text-ink">Profil usaha</h2>
-          <p className="text-base leading-[1.6] text-ink">{data.business_profile}</p>
+          <p className="text-body text-ink">{data.business_profile}</p>
         </div>
         <div className="flex flex-col gap-space-1">
           <h2 className="text-[1.75rem] font-semibold text-ink">Rencana pemakaian dana</h2>
-          <p className="text-base leading-[1.6] text-ink">{data.fund_usage_plan}</p>
+          <p className="text-body text-ink">{data.fund_usage_plan}</p>
         </div>
         <div className="flex flex-col gap-space-1">
           <h2 className="text-[1.75rem] font-semibold text-ink">Proyeksi usaha</h2>
-          <p className="text-base leading-[1.6] text-ink">{data.business_projection}</p>
+          <p className="text-body text-ink">{data.business_projection}</p>
         </div>
       </section>
 
@@ -323,7 +323,7 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
         <h2 className="text-[1.75rem] font-semibold text-ink">Penilaian AI</h2>
         {score === null && <LoadingState label="Memuat hasil penilaian" minHeight={160} />}
         {score?.status === "forbidden" && (
-          <p className="max-w-measure text-base leading-[1.6] text-muted">
+          <p className="max-w-measure text-body text-muted">
             Panel skor hanya terlihat oleh investor dan pemilik proposal.
           </p>
         )}
@@ -338,14 +338,14 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
           rule, dibungkus kartu. Beda dari section 4 lewat lebar (terbatas)
           dan rata tengah (section 4 rata kiri). */}
       <section data-pola="kartu-tengah" className="flex flex-col items-center">
-        <div className="w-full max-w-[28rem] rounded-panel border border-line bg-surface px-space-4 py-space-5 text-center">
+        <div className="w-full max-w-[28rem] rounded-panel border border-line bg-panel px-space-4 py-space-5 text-center">
           <h2 className="text-[1.125rem] font-semibold text-ink">Danai proposal ini</h2>
           {tampilkanFormPledge ? (
             <div className="mt-space-3 text-left">
               <PledgeForm proposalId={proposalId} sisa={sisa} onSukses={() => { muatPledges(); muatProposal(); }} />
             </div>
           ) : (
-            <p className="mt-space-2 text-base leading-[1.6] text-muted">{alasanPledgeDisembunyikan}</p>
+            <p className="mt-space-2 text-body text-muted">{alasanPledgeDisembunyikan}</p>
           )}
         </div>
       </section>
@@ -369,12 +369,12 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
                   }`}
                 >
                   <div className="flex items-baseline gap-space-2">
-                    <span className="tabular text-[0.8125rem] font-medium text-muted">
+                    <span className="tabular text-label font-medium text-muted">
                       Tahap {index + 1}
                     </span>
                     <p className="text-base font-semibold leading-[1.6] text-ink">{milestone.title}</p>
                     {milestone.id === milestoneAktifId && (
-                      <span className="rounded-sm bg-accent px-space-2 py-space-1 text-[0.8125rem] font-semibold text-on-accent">
+                      <span className="rounded-sm bg-accent px-space-2 py-space-1 text-label font-semibold text-on-accent">
                         Tahap aktif
                       </span>
                     )}
@@ -430,7 +430,7 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
         </div>
       </section>
 
-      <p className="text-[0.8125rem] text-muted">
+      <p className="text-label text-muted">
         Diajukan pada {formatTanggalSingkat(data.created_at)}.
       </p>
     </div>

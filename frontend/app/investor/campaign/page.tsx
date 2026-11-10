@@ -17,7 +17,7 @@ export default function MyCampaignsPage() {
           <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-semibold leading-tight text-ink">
             Campaign saya
           </h1>
-          <p className="mt-space-2 max-w-measure text-base leading-[1.6] text-muted">
+          <p className="mt-space-2 max-w-measure text-body text-muted">
             Campaign dengan tenggat pengajuan paling dekat ditandai lebih menonjol.
           </p>
         </div>

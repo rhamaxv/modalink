@@ -128,7 +128,7 @@ export default function MilestoneLapor() {
         // D-13: tahap pertama cair tanpa laporan, tapi tetap butuh approve
         // lead investor. Halaman ini tidak boleh menyiratkan pencairan
         // otomatis, jadi kalimatnya menyebut persetujuan secara eksplisit.
-        <p className="rounded-card border border-line bg-surface px-space-4 py-space-4 text-base leading-[1.6] text-ink">
+        <p className="rounded-card border border-line bg-panel px-space-4 py-space-4 text-body text-ink">
           Tahap pertama tidak memerlukan laporan progres. Tahap ini menunggu persetujuan lead
           investor sebelum dana cair, bukan cair secara otomatis.
         </p>
@@ -137,7 +137,7 @@ export default function MilestoneLapor() {
       {milestone.seq > 1 && !prasyaratTerpenuhi && (
         <p
           role="alert"
-          className="rounded-card border border-warn bg-surface px-space-4 py-space-4 text-base leading-[1.6] text-ink"
+          className="rounded-card border border-warn bg-panel px-space-4 py-space-4 text-body text-ink"
         >
           Tahap {milestone.seq - 1} belum cair. Laporan untuk tahap ini baru bisa dikirim setelah
           tahap {milestone.seq - 1} disetujui lead investor dan dananya cair.
@@ -145,9 +145,9 @@ export default function MilestoneLapor() {
       )}
 
       {milestone.seq > 1 && prasyaratTerpenuhi && milestone.status === "reported" && (
-        <div className="rounded-card border border-warn bg-surface px-space-4 py-space-4">
+        <div className="rounded-card border border-warn bg-panel px-space-4 py-space-4">
           <StatusBadge status="reported" />
-          <p className="mt-space-2 text-base leading-[1.6] text-ink">
+          <p className="mt-space-2 text-body text-ink">
             Laporan sudah dikirim dan sedang menunggu review lead investor. Laporan baru hanya
             bisa dikirim lagi setelah laporan ini disetujui atau ditolak.
           </p>
@@ -155,7 +155,7 @@ export default function MilestoneLapor() {
       )}
 
       {milestone.last_report?.status === "rejected" && milestone.last_report.rejection_note && (
-        <p className="rounded-card border border-danger bg-surface px-space-4 py-space-4 text-base leading-[1.6] text-ink">
+        <p className="rounded-card border border-danger bg-panel px-space-4 py-space-4 text-body text-ink">
           Laporan sebelumnya ditolak dengan catatan: &quot;{milestone.last_report.rejection_note}&quot;
         </p>
       )}
@@ -168,7 +168,7 @@ export default function MilestoneLapor() {
             error={narrative.length > 0 && kurangNarasi > 0 ? `Laporan progres masih kurang ${kurangNarasi} karakter dari minimum ${MIN_NARRATIVE}.` : undefined}
           />
           {submitError && (
-            <p role="alert" className="text-[0.8125rem] text-danger">
+            <p role="alert" className="text-label text-danger">
               {submitError}
             </p>
           )}
@@ -176,7 +176,7 @@ export default function MilestoneLapor() {
             type="submit"
             disabled={submitting || narrative.trim().length < MIN_NARRATIVE}
             aria-busy={submitting}
-            className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-base leading-[1.6] font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-surface disabled:text-muted"
+            className="min-h-[44px] self-start rounded-sm bg-accent px-space-4 py-space-2 text-body font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-panel disabled:text-muted"
           >
             Kirim laporan
           </button>
@@ -197,7 +197,7 @@ function NarrativeField({ value, onChange, error }: NarrativeFieldProps) {
   const errorId = `${id}-error`;
   return (
     <div className="flex flex-col gap-space-1">
-      <label htmlFor={id} className="text-[0.8125rem] font-medium text-muted">
+      <label htmlFor={id} className="text-label font-medium text-muted">
         Laporan progres <span aria-hidden="true">*</span>
       </label>
       <textarea
@@ -208,10 +208,10 @@ function NarrativeField({ value, onChange, error }: NarrativeFieldProps) {
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         rows={5}
-        className="min-h-[112px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink"
+        className="min-h-[112px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink"
       />
       {error && (
-        <p id={errorId} role="alert" className="text-[0.8125rem] text-danger">
+        <p id={errorId} role="alert" className="text-label text-danger">
           {error}
         </p>
       )}

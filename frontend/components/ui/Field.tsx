@@ -42,11 +42,11 @@ export function Field({
   const id = useId();
   const errorId = `${id}-error`;
   const controlClassName =
-    "min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-base leading-[1.6] text-ink";
+    "min-h-[44px] rounded-sm border border-ink bg-paper px-space-3 py-space-2 text-body text-ink";
 
   return (
     <div className="flex flex-col gap-space-1">
-      <label htmlFor={id} className="text-[0.8125rem] font-medium text-muted">
+      <label htmlFor={id} className="text-label font-medium text-muted">
         {label}
         {/* Tanda bintang hanya dekorasi visual; status wajib yang sungguh
             terbaca pembaca layar datang dari atribut required di bawah. */}
@@ -94,7 +94,7 @@ export function Field({
         />
       )}
       {error && (
-        <p id={errorId} role="alert" className="text-[0.8125rem] text-danger">
+        <p id={errorId} role="alert" className="text-label text-danger">
           {error}
         </p>
       )}
