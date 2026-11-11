@@ -71,6 +71,7 @@ Setiap error mengembalikan bentuk yang sama, sehingga frontend hanya perlu satu 
 | `POST /proposals/{id}/pledges` | investor | Body: `amount`. Mencatat `pledge_in`, menghitung ulang lead investor dan status funding. `409` bila melebihi sisa, dengan `remaining_amount` di `detail`. |
 | `DELETE /pledges/{id}` | pemilik pledge | Menandai `cancelled`, mencatat `refund_out`, menghitung ulang. `409` bila proposal sudah `funded`. |
 | `GET /proposals/{id}/pledges` | investor, pemilik proposal | Daftar pledge aktif beserta nominal dan penanda lead investor. |
+| `GET /proposals/{id}/ledger` | investor, pemilik proposal | Riwayat pergerakan dana append-only beserta saldo, total masuk, dan total cair. Identitas pelaku tiap baris tidak dikirim; baris milik pemanggil ditandai `milik_saya`. |
 
 ## Milestone
 

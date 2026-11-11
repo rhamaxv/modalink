@@ -9,6 +9,7 @@ import { PledgeForm } from "@/components/PledgeForm";
 import { ScorePanel, type ProposalScore, type ScoringStatus } from "@/components/ScorePanel";
 import type { CurrentUser } from "@/lib/auth";
 import { CoverImage } from "@/components/ui/CoverImage";
+import { LedgerTrail } from "@/components/LedgerTrail";
 import { CoverUpload } from "@/components/CoverUpload";
 import { SECTOR_ICON } from "@/components/CampaignBrowseCard";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -659,6 +660,21 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
           sudah membawa jarak internalnya sendiri, dan class wrapper yang
           identik dengan section 3 ("naratif-kiri") persis pola yang
           ditemukan audit browser minggu ini di dua label berbeda. */}
+      {/* Riwayat dana. Hanya dirender untuk akun yang sudah masuk: endpoint
+          di baliknya menolak pengunjung anonim, dan menampilkan judul yang
+          isinya selalu "hanya bisa dilihat investor dan pemilik" kepada
+          setiap pengunjung hanya menambah kebisingan di halaman publik. */}
+      {currentUser !== null && (
+        <section data-pola="riwayat-dana" className="flex w-full flex-col gap-space-3">
+          <h2 className="text-section font-display text-ink">Riwayat dana</h2>
+          <p className="max-w-measure text-body text-muted">
+            Setiap pergerakan dana tercatat sebagai baris baru dan tidak pernah diubah.
+            Dana cair bertahap per milestone, bukan sekaligus.
+          </p>
+          <LedgerTrail proposalId={proposalId} />
+        </section>
+      )}
+
       <section data-pola="utas-komentar" className="flex max-w-measure flex-col gap-space-3">
         <h2 className="text-section font-display text-ink">Komentar</h2>
         {/* key berubah memaksa CommentList remount lalu memuat ulang

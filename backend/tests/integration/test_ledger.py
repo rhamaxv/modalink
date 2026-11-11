@@ -107,3 +107,100 @@ async def test_br55_next_entry_after_duplicate_still_persists(
     )
     assert berikutnya is not None
     await db.flush()
+
+
+async def test_investor_can_read_the_money_trail_of_a_proposal_they_funded(
+    client, listed_proposal, investor
+):
+    """Catatan ledger sudah ada sejak awal, tapi satu-satunya jalan membacanya
+    adalah endpoint internal yang hanya hidup saat ENV=dev. Di produksi,
+    investor yang menaruh uang tidak bisa melihat apa pun."""
+    await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges",
+        json={"amount": 3_000_000},
+        headers=investor.headers,
+    )
+    body = (
+        await client.get(
+            f"/api/v1/proposals/{listed_proposal.id}/ledger",
+            headers=investor.headers,
+        )
+    ).json()
+
+    assert body["total_masuk"] == 3_000_000
+    assert body["total_cair"] == 0
+    assert body["balance"] == 3_000_000
+    assert [e["entry_type"] for e in body["entries"]] == ["pledge_in"]
+    # Baris yang dicatat pemanggil sendiri ditandai, supaya investor bisa
+    # menemukan pledge-nya di antara pledge orang lain.
+    assert body["entries"][0]["milik_saya"] is True
+
+
+async def test_the_money_trail_never_names_who_made_each_entry(
+    client, listed_proposal, investor, investor_lain
+):
+    """Penyamaran identitas investor (10-api-contract.md:106-107) tidak boleh
+    dibatalkan lewat pintu belakang ini: actor_id setiap baris akan membuat
+    siapa pun yang berhak membaca daftar ini bisa mencocokkan nominal dengan
+    orangnya, persis yang dilarang pada daftar pledge."""
+    await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges",
+        json={"amount": 3_000_000},
+        headers=investor.headers,
+    )
+    body = (
+        await client.get(
+            f"/api/v1/proposals/{listed_proposal.id}/ledger",
+            headers=investor_lain.headers,
+        )
+    ).json()
+
+    for entri in body["entries"]:
+        assert "actor_id" not in entri
+        assert "idempotency_key" not in entri
+        # Baris milik orang lain tidak pernah ditandai sebagai milik sendiri.
+        assert entri["milik_saya"] is False
+
+
+async def test_a_cancelled_pledge_shows_as_a_refund_line_not_a_deleted_one(
+    client, listed_proposal, investor
+):
+    """Ledger append-only: pembatalan menambah baris refund_out, tidak pernah
+    menghapus baris pledge_in. Riwayatnya harus memperlihatkan keduanya."""
+    pledge = (
+        await client.post(
+            f"/api/v1/proposals/{listed_proposal.id}/pledges",
+            json={"amount": 3_000_000},
+            headers=investor.headers,
+        )
+    ).json()
+    await client.delete(f"/api/v1/pledges/{pledge['id']}", headers=investor.headers)
+
+    body = (
+        await client.get(
+            f"/api/v1/proposals/{listed_proposal.id}/ledger",
+            headers=investor.headers,
+        )
+    ).json()
+    assert [e["entry_type"] for e in body["entries"]] == ["pledge_in", "refund_out"]
+    assert body["balance"] == 0
+    assert body["total_masuk"] == 0
+
+
+async def test_an_unrelated_umkm_cannot_read_someone_elses_money_trail(
+    client, listed_proposal, umkm
+):
+    """404, bukan 403: UMKM lain tidak boleh sekaligus mengonfirmasi bahwa
+    proposal ini ada. listed_proposal dimiliki umkm_lain (tests/conftest.py)."""
+    r = await client.get(
+        f"/api/v1/proposals/{listed_proposal.id}/ledger", headers=umkm.headers
+    )
+    assert r.status_code == 404
+
+
+async def test_an_anonymous_visitor_cannot_read_the_money_trail(
+    client, listed_proposal
+):
+    assert (
+        await client.get(f"/api/v1/proposals/{listed_proposal.id}/ledger")
+    ).status_code == 401

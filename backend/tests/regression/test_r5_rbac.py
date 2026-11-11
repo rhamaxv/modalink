@@ -231,6 +231,15 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     ("DELETE", "/api/v1/campaigns/{campaign_id}/cover", "umkm", 403),
     ("DELETE", "/api/v1/campaigns/{campaign_id}/cover", "investor_lain", 403),
     ("GET", "/api/v1/campaigns/{campaign_id}/cover", None, 404),
+    # Riwayat dana. Pagar aksesnya sama persis dengan daftar pledge: peran
+    # publik dan komunitas tidak punya uang di dalamnya, jadi tidak berhak
+    # membacanya sama sekali. 422 untuk investor karena {proposal_id} tidak
+    # disubstitusi harness ini (lihat komentar di baris /cover di atas);
+    # angka itu justru membuktikan pagar perannya lolos.
+    ("GET", "/api/v1/proposals/{proposal_id}/ledger", None, 401),
+    ("GET", "/api/v1/proposals/{proposal_id}/ledger", "community", 403),
+    ("GET", "/api/v1/proposals/{proposal_id}/ledger", "investor", 422),
+    ("GET", "/api/v1/proposals/{proposal_id}/ledger", "umkm", 422),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

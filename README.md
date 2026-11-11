@@ -71,6 +71,49 @@ Produk ini bukan payment gateway. Tidak ada uang sungguhan yang berpindah tangan
 pergerakan dana adalah baris baru di tabel `ledger_entries`, dan ini disebutkan terus
 terang, bukan disamarkan sebagai transaksi nyata.
 
+### Model kepercayaan dan batasannya
+
+Pertanyaan yang paling wajar diajukan ke produk semacam ini: kalau dana sudah cair, apa
+yang mencegah penerimanya membawanya pergi? Jawabannya ada di desain, dan batasannya
+disebut apa adanya.
+
+**Yang dilindungi desain ini:**
+
+- **Dana tidak pernah cair sekaligus.** Hanya sebesar milestone yang disetujui, sehingga
+  kerugian maksimum terbatas pada satu tahap, bukan seluruh dana.
+- **Tahap kedua dan seterusnya wajib didahului laporan progres** dari UMKM, yang bisa
+  disetujui atau **ditolak** lead investor (BR-44).
+- **Urutan tahap dikunci.** Tahap berikutnya tidak bisa cair sebelum tahap sebelumnya cair
+  (BR-43), jadi tidak ada jalan melompati pemeriksaan.
+- **Hanya lead investor** (pemberi dana terbesar) yang berwenang menyetujui pencairan.
+- **Catatan dananya append-only.** Tidak ada endpoint, service, atau migrasi yang boleh
+  meng-`UPDATE` atau menghapus baris `ledger_entries`, dan ini ditegakkan trigger di
+  Postgres, bukan sekadar disiplin kode. Pembatalan muncul sebagai baris `refund_out`
+  baru, bukan sebagai baris yang hilang.
+- **Pencairan ganda tidak mungkin.** Setiap baris punya `idempotency_key` unik yang
+  diturunkan dari milestone-nya, jadi menyetujui dua kali, berurutan maupun bersamaan,
+  tetap menghasilkan satu pencairan.
+- **Riwayatnya bisa dilihat pihak yang uangnya ada di dalamnya** lewat
+  `GET /proposals/{id}/ledger` dan bagian "Riwayat dana" di halaman proposal.
+
+**Yang belum ada, dan ini yang membuatnya belum layak memegang uang sungguhan:**
+
+- **Tidak ada verifikasi identitas (KYC).** Siapa pun bisa mendaftar dengan email apa pun.
+  Ini lubang terbesar: tanpa identitas yang terverifikasi, "kabur" tidak punya konsekuensi
+  apa pun di luar aplikasi.
+- **Laporan progres hanya berupa teks.** Tidak ada lampiran foto, nota, atau bukti
+  transaksi, sehingga penilaian lead investor bersandar pada narasi.
+- **Tidak ada mekanisme menarik kembali** dana yang sudah terlanjur cair.
+- **Tidak ada perjanjian hukum** antara investor dan UMKM yang bisa ditegakkan di luar
+  aplikasi.
+- **Tidak ada rekening escrow sungguhan.** Saldo yang "tertahan" adalah hasil penjumlahan
+  baris, bukan uang di rekening pihak ketiga.
+
+Urutannya disengaja: perlindungan yang ada bersifat **struktural** (uang bergerak hanya
+lewat jalur yang dipagari aturan dan dicatat permanen), sedangkan yang belum ada bersifat
+**identitas dan hukum**. Keduanya dibutuhkan produk sungguhan; yang kedua berada di luar
+jangkauan sebuah karya lomba.
+
 ## Masalah dan target pengguna
 
 UMKM kesulitan mendapat modal karena investor sulit melakukan screening manual terhadap
@@ -83,7 +126,7 @@ pernah dijelaskan.
 | --- | --- | --- |
 | Investor | Individu atau institusi yang punya dana dan kriteria sektor tertentu | Proposal relevan tanpa harus membaca semuanya, dan kepastian dana dipakai sesuai rencana |
 | UMKM | Pemilik usaha yang butuh modal | Akses ke investor, dan penilaian yang adil serta bisa dijelaskan |
-| Komunitas | Publik yang peduli pada usaha lokal | Cara memberi dukungan tanpa harus punya uang (lihat catatan di [Yang belum dibangun](#yang-belum-dibangun): peran ini sudah ada sebagai role, tampilan komentar dan vote sudah dirancang di frontend, tapi endpoint backend-nya belum berjalan) |
+| Komunitas | Publik yang peduli pada usaha lokal | Cara memberi dukungan tanpa harus punya uang: vote dan komentar, keduanya berjalan ujung ke ujung (`backend/app/api/v1/community.py`) |
 
 ## Fitur utama yang berhasil diimplementasikan
 
