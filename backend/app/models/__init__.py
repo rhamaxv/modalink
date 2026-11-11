@@ -3,6 +3,7 @@
 from app.models.campaign import Campaign, CampaignStatus, Sector
 from app.models.comment import Comment
 from app.models.cover import CoverImage
+from app.models.kyc import BankCode, KycStatus, KycSubmission
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.milestone_report import MilestoneReport
 from app.models.milestone_report import ReportStatus as MilestoneReportStatus
@@ -20,11 +21,14 @@ from app.models.user import Role, User
 from app.models.vote import Vote
 
 __all__ = [
+    "BankCode",
     "Campaign",
     "CampaignStatus",
     "Comment",
     "CoverImage",
     "EntryType",
+    "KycStatus",
+    "KycSubmission",
     "LedgerEntry",
     "MilestoneReport",
     "MilestoneReportStatus",

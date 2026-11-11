@@ -240,6 +240,20 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     ("GET", "/api/v1/proposals/{proposal_id}/ledger", "community", 403),
     ("GET", "/api/v1/proposals/{proposal_id}/ledger", "investor", 422),
     ("GET", "/api/v1/proposals/{proposal_id}/ledger", "umkm", 422),
+    # Verifikasi identitas. Peran komunitas sengaja TIDAK berhak mengajukan:
+    # ia tidak pernah menyentuh uang, dan meminta NIK dari orang yang hanya
+    # ingin berkomentar adalah mengumpulkan data pribadi tanpa alasan.
+    ("POST", "/api/v1/kyc", None, 401),
+    ("POST", "/api/v1/kyc", "community", 403),
+    # 422 karena body kosong: angka itu justru membuktikan pagar perannya
+    # lolos lebih dulu.
+    ("POST", "/api/v1/kyc", "investor", 422),
+    ("POST", "/api/v1/kyc", "umkm", 422),
+    # GET terbuka untuk setiap akun yang sudah masuk, termasuk komunitas:
+    # yang dikembalikan hanya status miliknya sendiri. Fixture peran di
+    # harness ini belum pernah mengajukan, jadi 404.
+    ("GET", "/api/v1/kyc/me", None, 401),
+    ("GET", "/api/v1/kyc/me", "community", 404),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

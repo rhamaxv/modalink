@@ -36,6 +36,37 @@ Setiap error mengembalikan bentuk yang sama, sehingga frontend hanya perlu satu 
 | `POST /auth/login` | publik | Mengembalikan `access_token` berisi `sub` dan `role`. |
 | `GET /auth/me` | terautentikasi | Profil singkat pengguna saat ini. |
 
+## Verifikasi identitas (KYC)
+
+| Endpoint | Peran | Efek |
+| --- | --- | --- |
+| `POST /kyc` | investor, umkm | Mengajukan verifikasi identitas dan rekening tujuan pencairan. Body: `full_name`, `nik`, `bank_code`, `account_holder_name`, `account_number`. Satu akun punya paling banyak satu pengajuan, jadi pengajuan baru **menimpa** yang lama. `422` dengan kode `identitas_tidak_sah` bila bentuk NIK atau nomor rekening tidak sah; `409` dengan kode `nik_sudah_dipakai` bila NIK itu sudah dipakai akun lain. |
+| `GET /kyc/me` | akun yang sedang masuk | Status verifikasi milik sendiri. `404` bila akun itu belum pernah mengajukan. |
+
+Verifikasinya **simulasi**, dan responsnya menyebut itu sendiri lewat field `verifikasi_simulasi`.
+Yang diperiksa hanya bentuk data: panjang dan pola NIK (kode wilayah, tanggal lahir, nomor
+urut), usia minimal 17 tahun, nama bank dari daftar tertutup `bank_code`, dan panjang nomor
+rekening. Tidak ada pemeriksaan ke Dukcapil maupun ke bank mana pun, sehingga NIK yang lolos
+tetap bisa milik orang lain atau dikarang.
+
+Karena pemeriksaan bentuk selesai seketika, tidak ada status menunggu: satu pengajuan langsung
+berakhir `verified` atau ditolak di tempat dengan `422`.
+
+NIK dan nomor rekening **tidak pernah disimpan utuh**. Yang disimpan hanya hash NIK (untuk
+mendeteksi satu NIK dipakai dua akun) dan empat digit terakhir keduanya, dan itu pula yang
+dikirim balik sebagai `nik_last4` dan `account_last4`. Tidak ada endpoint yang bisa
+mengembalikan nomor penuhnya, karena nomor penuhnya tidak ada di database.
+
+Kedua endpoint ini memagari tindakan yang menyentuh uang: `POST /campaigns/{id}/proposals` dan
+`POST /proposals/{id}/pledges` menolak dengan `403` berkode `belum_terverifikasi` selama akun
+pemanggilnya belum terverifikasi. `403` di dua tempat itu berarti akun yang belum terverifikasi,
+bukan peran yang salah, dan pesan penolakannya menyebut halaman verifikasi supaya pemanggil tahu
+apa yang harus dilakukan.
+
+Peran `community` tidak diminta verifikasi dan tidak boleh memanggil `POST /kyc`: ia tidak
+pernah menyentuh uang, dan meminta NIK dari orang yang hanya ingin memberi vote atau komentar
+berarti mengumpulkan data pribadi tanpa alasan.
+
 ## Campaign
 
 | Endpoint | Peran | Efek |

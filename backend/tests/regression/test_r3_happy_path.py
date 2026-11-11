@@ -12,11 +12,20 @@ funding_deadline campaign) karena yang diuji adalah jalur sukses, bukan
 kedaluwarsa -- itu cakupan R4.
 """
 
+import itertools
+
 from app.models.ledger import EntryType
 
 AMOUNT_MILESTONE_1 = 5_000_000
 AMOUNT_MILESTONE_2 = 5_000_000
 REQUESTED_AMOUNT = AMOUNT_MILESTONE_1 + AMOUNT_MILESTONE_2
+
+
+# Satu NIK hanya boleh dipakai satu akun, jadi tiap pendaftaran butuh nomor
+# urut sendiri. Kode wilayahnya (327102) berbeda dari yang dipakai seed demo
+# maupun fixture di conftest, karena ketiganya bisa hidup berdampingan di
+# database test yang sama.
+_URUT_NIK = itertools.count(1)
 
 
 async def _daftar(client, email: str, role: str) -> dict:
@@ -32,7 +41,27 @@ async def _daftar(client, email: str, role: str) -> dict:
     )
     assert masuk.status_code == 200, masuk.text
     token = masuk.json()["access_token"]
-    return {"user_id": user_id, "headers": {"Authorization": f"Bearer {token}"}}
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Verifikasi identitas lewat endpoint sungguhan, bukan baris yang
+    # ditulis langsung ke tabel: investor dan UMKM tidak bisa menyentuh uang
+    # tanpa itu, dan jalur R3 ini memang harus menjalankan produk apa adanya.
+    if role in {"investor", "umkm"}:
+        urut = next(_URUT_NIK)
+        kyc = await client.post(
+            "/api/v1/kyc",
+            headers=headers,
+            json={
+                "full_name": "Peserta Uji R3",
+                "nik": f"327102010190{urut:04d}",
+                "bank_code": "bca",
+                "account_holder_name": "Peserta Uji R3",
+                "account_number": "1234567890",
+            },
+        )
+        assert kyc.status_code == 200, kyc.text
+
+    return {"user_id": user_id, "headers": headers}
 
 
 async def _buat_campaign(client, investor: dict, mulai, title: str) -> dict:

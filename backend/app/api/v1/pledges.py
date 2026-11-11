@@ -19,6 +19,7 @@ from app.models.proposal import Proposal
 from app.models.user import Role, User
 from app.schemas.ledger import LedgerEntryPublicOut, LedgerPublicOut
 from app.schemas.pledge import PledgeIn, PledgeListOut, PledgeOut
+from app.services.kyc import require_verified
 from app.services.ledger import (
     EntryType,
     LedgerEntrySummary,
@@ -47,6 +48,10 @@ async def create_pledge_endpoint(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
 ) -> Pledge:
+    # Gerbang identitas sebelum baris proposal dikunci: menguncinya lebih
+    # dulu untuk permintaan yang pasti ditolak hanya menahan investor lain
+    # yang sedang mendanai proposal yang sama.
+    await require_verified(session, investor, "mendanai proposal")
     proposal = await get_locked_proposal(session, proposal_id)
     return await create_pledge(session, investor, proposal, body.amount, clock)
 

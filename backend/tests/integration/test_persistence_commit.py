@@ -107,6 +107,25 @@ async def test_c31_background_scoring_job_really_commits_to_database() -> None:
                 )
             ).json()["access_token"]
 
+            # Investor dan UMKM tidak bisa menyentuh uang tanpa verifikasi
+            # identitas (gerbang di api/v1/proposals.py dan pledges.py).
+            # NIK-nya diturunkan dari email yang sudah unik per jalannya test
+            # ini, supaya dua akun di sini tidak pernah memakai NIK yang sama.
+            for token, nama in ((token_investor, "Investor"), (token_umkm, "UMKM")):
+                urut = abs(hash(f"{email_investor}{nama}")) % 9000 + 1000
+                kyc = await client.post(
+                    "/api/v1/kyc",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json={
+                        "full_name": f"{nama} Uji Persistence",
+                        "nik": f"3271030101900{urut % 1000:03d}",
+                        "bank_code": "bca",
+                        "account_holder_name": f"{nama} Uji Persistence",
+                        "account_number": "1234567890",
+                    },
+                )
+                assert kyc.status_code == 200, kyc.text
+
             res_campaign = await client.post(
                 "/api/v1/campaigns",
                 headers={"Authorization": f"Bearer {token_investor}"},

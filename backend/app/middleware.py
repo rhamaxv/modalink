@@ -69,6 +69,20 @@ DEFAULT_RATE_RULES: tuple[RateRule, ...] = (
         ip_limit=10,
         window_s=60,
     ),
+    # Pengajuan verifikasi identitas. Bukan untuk mencegah beban, melainkan
+    # untuk menutup ORACLE: endpoint ini membalas 409 "nik_sudah_dipakai"
+    # untuk NIK yang sudah terdaftar dan 200 untuk yang belum, sehingga
+    # tanpa batas apa pun ia bisa dipakai menebak NIK satu per satu dan
+    # mengetahui siapa saja yang punya akun di sini. Tiga per menit cukup
+    # longgar untuk orang yang salah mengetik nomornya sendiri, dan terlalu
+    # sempit untuk menyisir ruang NIK yang berarti.
+    RateRule(
+        name="kyc",
+        method="POST",
+        path=re.compile(r"^/api/v1/kyc$"),
+        ip_limit=3,
+        window_s=60,
+    ),
     RateRule(
         name="proposal_submit",
         method="POST",

@@ -61,10 +61,58 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
     await page.getByLabel("Password").fill(akun.password);
     await page.getByLabel("Peran").selectOption(peran);
     await page.getByRole("button", { name: "Daftar" }).click();
+    if (await tungguKalauDibatasi(page)) {
+      await page.getByRole("button", { name: "Daftar" }).click();
+    }
     // SignUpForm mendaftar lalu auto-masuk dan mendorong ke "/" (lib/
     // components/SignUpForm.tsx); menunggu URL ini memastikan daftar
     // sungguhan selesai, bukan menebak lewat waktu tunggu tetap.
     await page.waitForURL((url) => url.pathname === "/");
+  }
+
+
+  // Rate limiter backend membatasi pendaftaran 5 per menit dan login 10 per
+  // menit per IP (app/middleware.py). Dua spec alur panjang di folder ini
+  // berjalan berurutan dalam menit yang sama dan bersama-sama melewatinya.
+  // Pagarnya benar dan tidak boleh dilemahkan demi test, jadi yang menunggu
+  // adalah test-nya, persis seperti yang dilakukan pengguna sungguhan.
+  async function tungguKalauDibatasi(page: Page): Promise<boolean> {
+    const dibatasi = page.getByText(/terlalu banyak permintaan/i);
+    if (!(await dibatasi.isVisible().catch(() => false))) return false;
+    await page.waitForTimeout(61_000);
+    return true;
+  }
+
+  // NIK per akun. Satu NIK hanya boleh dipakai satu akun (409 dari backend),
+  // jadi dua hal harus dijaga sekaligus: unik antar akun DI DALAM satu
+  // jalannya test, dan tidak pernah bentrok dengan NIK akun demo yang
+  // disemai `python -m app.seed`.
+  //
+  // Kode wilayahnya karena itu 327101, bukan 320101 yang dipakai seed. Empat
+  // digit terakhirnya diturunkan dari waktu mulai, supaya menjalankan ulang
+  // test ini terhadap database yang belum direset juga tidak bentrok dengan
+  // jalannya sendiri yang sebelumnya.
+  const NIK_WILAYAH = "327101";
+  const NIK_LAHIR = "010190";
+  let urutNik = Date.now() % 9000;
+
+  async function verifikasiIdentitas(page: Page, nama: string) {
+    // Lewat HALAMAN verifikasi sungguhan, bukan lewat panggilan API yang
+    // menyamar jadi klik: investor dan UMKM tidak bisa menyentuh uang tanpa
+    // verifikasi, jadi langkah ini memang bagian dari alur yang sedang
+    // dibuktikan menyambung dari ujung ke ujung.
+    urutNik += 1;
+    const nik = `${NIK_WILAYAH}${NIK_LAHIR}${String((urutNik % 9000) + 1000).padStart(4, "0")}`;
+    await page.goto("/akun/verifikasi");
+    await page.getByLabel("Nama sesuai identitas").fill(nama);
+    await page.getByLabel("NIK").fill(nik);
+    await page.getByLabel("Bank").selectOption("bca");
+    await page.getByLabel("Nama pemilik rekening").fill(nama);
+    await page.getByLabel("Nomor rekening").fill(`9${String(urutNik).padStart(9, "0")}`);
+    await page.getByRole("button", { name: /kirim pengajuan|ganti data verifikasi/i }).click();
+    await expect(page.getByText(/identitas terverifikasi/i)).toBeVisible({
+      timeout: 20_000,
+    });
   }
 
   // Dipakai berkali-kali untuk berganti akun di tengah skenario: menu
@@ -105,6 +153,9 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
     await page.getByLabel("Email").fill(akun.email);
     await page.getByLabel("Password").fill(akun.password);
     await page.getByRole("button", { name: "Masuk", exact: true }).click();
+    if (await tungguKalauDibatasi(page)) {
+      await page.getByRole("button", { name: "Masuk", exact: true }).click();
+    }
     await page.waitForURL((url) => url.pathname !== "/masuk");
     const token = await page.evaluate(() => localStorage.getItem("modalink_token"));
     if (token) sesi.set(akun.email, token);
@@ -160,17 +211,22 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
     // frontend lambat (curl ke keduanya tetap instan saat itu terjadi),
     // melainkan karena render/hidrasi Chromium sendiri melambat di bawah
     // tekanan CPU bersama.
-    testInfo.setTimeout(90_000);
+    testInfo.setTimeout(400_000);
     const page = await browser.newPage();
+    // daftarSebagai mengakhiri dengan akun itu dalam keadaan masuk, jadi
+    // verifikasi dikerjakan tepat setelahnya, selagi sesinya masih yang itu.
     await daftarSebagai(page, investorA, "investor");
+    await verifikasiIdentitas(page, investorA.name);
     await daftarSebagai(page, investorB, "investor");
+    await verifikasiIdentitas(page, investorB.name);
     await daftarSebagai(page, umkm, "umkm");
+    await verifikasiIdentitas(page, umkm.name);
     await daftarSebagai(page, warga, "community");
     await page.close();
   });
 
   test("dari campaign dibuat sampai milestone terakhir cair", async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(400_000);
     // 1. Investor A membuat campaign.
     await masukSebagai(page, investorA);
     await page.goto("/investor/campaign/baru");
@@ -322,7 +378,7 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
   // mentah ("Token tidak ada.") tepat di tempat bilah funding dan panel
   // skor seharusnya berada.
   test("seorang pengunjung tanpa akun tidak pernah melihat galat 401 mentah di halaman proposal", async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(400_000);
     const galatKonsol: string[] = [];
     page.on("console", (m) => {
       if (m.type() === "error" && bukanCatatanJaringanBiasa(m.text())) galatKonsol.push(m.text());
@@ -340,7 +396,7 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
   });
 
   test("tidak ada galat konsol menjelajahi seluruh dua belas rute produk", async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(400_000);
     const galat: string[] = [];
     page.on("console", (m) => {
       if (m.type() === "error" && bukanCatatanJaringanBiasa(m.text())) galat.push(`[konsol] ${m.text()}`);
@@ -375,7 +431,7 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
   });
 
   test("seluruh alur masuk bisa dijalankan tanpa menyentuh tetikus", async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(400_000);
     // Dimulai dari rute terlindungi investor, bukan langsung /masuk: tanpa
     // token, RouteGuard mengarahkan ke /masuk?next=/investor/campaign
     // (lib/auth.ts, components/RouteGuard.tsx), dan ini membuktikan dua hal

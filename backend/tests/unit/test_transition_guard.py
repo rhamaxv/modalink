@@ -34,7 +34,15 @@ ALLOWED = {"services/status.py"}
 # dikecualikan secara eksplisit di bawah, bukan lewat nama variabel yang
 # mudah luput kalau pemanggilnya diganti nama.
 GOVERNED_STATUS_ATTRS = {"status", "scoring_status", "review_status"}
-EXEMPT_ENUM_CLASS = "PledgeStatus"
+# Enum status yang TIDAK punya matriks transisi, jadi assignment literal ke
+# anggotanya memang bukan pelanggaran. Dua-duanya sekelas: PledgeStatus cuma
+# active/cancelled (lihat docstring cancel_pledge di services/pledge.py), dan
+# KycStatus cuma verified/rejected yang ditentukan sekali dari hasil
+# pemeriksaan bentuk, tanpa perpindahan antar keadaan (services/kyc.py).
+# Dikecualikan lewat nama enumnya, bukan lewat nama berkas: berkas yang
+# dikecualikan akan ikut melewatkan status yang SUNGGUH dikuasai mesin
+# transisi kalau suatu saat ditulis di sana.
+EXEMPT_ENUM_CLASSES = {"PledgeStatus", "KycStatus"}
 
 
 def _callers(tree: ast.AST) -> set[str]:
@@ -53,7 +61,7 @@ def _is_exempt_pledge_assignment(value: ast.AST) -> bool:
     return (
         isinstance(value, ast.Attribute)
         and isinstance(value.value, ast.Name)
-        and value.value.id == EXEMPT_ENUM_CLASS
+        and value.value.id in EXEMPT_ENUM_CLASSES
     )
 
 

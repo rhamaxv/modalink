@@ -68,6 +68,19 @@ test.describe("alur pasar: dua UMKM bersaing, satu dibatalkan, dua tahap cair", 
     return d.toISOString().slice(0, 10);
   }
 
+
+  // Rate limiter backend membatasi pendaftaran 5 per menit dan login 10 per
+  // menit per IP (app/middleware.py). Dua spec alur panjang di folder ini
+  // berjalan berurutan dalam menit yang sama dan bersama-sama melewatinya.
+  // Pagarnya benar dan tidak boleh dilemahkan demi test, jadi yang menunggu
+  // adalah test-nya, persis seperti yang dilakukan pengguna sungguhan.
+  async function tungguKalauDibatasi(page: Page): Promise<boolean> {
+    const dibatasi = page.getByText(/terlalu banyak permintaan/i);
+    if (!(await dibatasi.isVisible().catch(() => false))) return false;
+    await page.waitForTimeout(61_000);
+    return true;
+  }
+
   async function daftar(page: Page, akun: { email: string; password: string; name: string }, peran: string) {
     await page.goto("/daftar");
     await page.getByLabel("Nama").fill(akun.name);
@@ -75,6 +88,9 @@ test.describe("alur pasar: dua UMKM bersaing, satu dibatalkan, dua tahap cair", 
     await page.getByLabel("Password").fill(akun.password);
     await page.getByLabel("Peran").selectOption(peran);
     await page.getByRole("button", { name: "Daftar" }).click();
+    if (await tungguKalauDibatasi(page)) {
+      await page.getByRole("button", { name: "Daftar" }).click();
+    }
     await page.waitForURL((url) => url.pathname === "/");
   }
 
@@ -89,6 +105,9 @@ test.describe("alur pasar: dua UMKM bersaing, satu dibatalkan, dua tahap cair", 
     await page.getByLabel("Email").fill(akun.email);
     await page.getByLabel("Password").fill(akun.password);
     await page.getByRole("button", { name: "Masuk", exact: true }).click();
+    if (await tungguKalauDibatasi(page)) {
+      await page.getByRole("button", { name: "Masuk", exact: true }).click();
+    }
     await page.waitForURL((url) => url.pathname !== "/masuk");
   }
 
@@ -140,7 +159,7 @@ test.describe("alur pasar: dua UMKM bersaing, satu dibatalkan, dua tahap cair", 
   }
 
   test.beforeAll(async ({ browser }, testInfo) => {
-    testInfo.setTimeout(180_000);
+    testInfo.setTimeout(400_000);
     const aktor: [string, { email: string; password: string; name: string }, boolean][] = [
       ["investorA", investorA, false],
       ["investorB", investorB, false],

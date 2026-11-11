@@ -38,6 +38,7 @@ from app.schemas.scoring import ScoringResultOut
 from app.services.campaign import get_campaign
 from app.services.cover import ambil_cover, cover_versions
 from app.services.expiry import evaluate_expiry
+from app.services.kyc import require_verified
 from app.services.ledger import collected_amount_for_proposal
 from app.services.proposal import (
     PROPOSAL_PAGE_SIZE_DEFAULT,
@@ -75,6 +76,10 @@ async def submit_proposal_endpoint(
     engine: ScoringEngine = Depends(get_scoring_engine),
     session_factory: SessionFactory = Depends(get_session_factory),
 ) -> ProposalWithCollectedAmount:
+    # Gerbang identitas SEBELUM apa pun yang lain, termasuk sebelum mencari
+    # campaign-nya: pengaju yang belum terverifikasi tidak perlu diberi tahu
+    # campaign mana yang ada dan mana yang tidak.
+    await require_verified(session, umkm, "mengajukan proposal")
     campaign = await get_campaign(session, campaign_id)
     if campaign is None:
         raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")

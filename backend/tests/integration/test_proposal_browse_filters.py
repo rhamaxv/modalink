@@ -173,18 +173,25 @@ async def test_filters_survive_pagination_without_losing_or_repeating_rows(
     """
     total = await _total(client, "?sort=amount_desc")
     terkumpul: list[str] = []
-    semua: list[str] = []
+    # Dikumpulkan sebagai ID, bukan nama usaha. Versi pertama test ini
+    # memeriksa keunikan nama, dan itu salah: nama usaha tidak unik antar
+    # proposal (dua pengajuan berbeda boleh bernama sama), jadi assertnya
+    # merah karena data yang sah, bukan karena paginasinya bocor.
+    semua_id: list[str] = []
     for halaman in range(1, total + 1):
         body = (
             await client.get(
                 f"/api/v1/proposals?sort=amount_desc&page={halaman}&page_size=1"
             )
         ).json()
-        nama = [p["business_name"] for p in body["items"]]
-        semua += nama
-        terkumpul += [n for n in nama if n in NAMA_PASAR]
+        semua_id += [p["id"] for p in body["items"]]
+        terkumpul += [
+            p["business_name"]
+            for p in body["items"]
+            if p["business_name"] in NAMA_PASAR
+        ]
     assert terkumpul == ["Kopi Senja", "Batik Lereng", "Soto Pagi"]
-    assert len(semua) == len(set(semua)), "ada baris yang muncul di dua halaman"
+    assert len(semua_id) == len(set(semua_id)), "ada baris yang muncul di dua halaman"
 
 
 async def test_campaign_listing_reports_a_total_alongside_its_page(client, pasar):

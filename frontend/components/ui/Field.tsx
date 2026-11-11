@@ -21,6 +21,12 @@ type FieldProps = {
   multiline?: boolean;
   /** Batas bawah untuk type="number" atau type="date" (format sesuai tipe input native). */
   min?: string;
+  /** Papan tombol yang dimunculkan ponsel. Dipakai field yang isinya angka
+   * tapi BUKAN type="number": nomor rekening dan NIK berawalan nol akan
+   * rusak oleh input numerik bawaan, sementara papan tombol angka tetap
+   * dibutuhkan supaya tidak ada yang mengetik enam belas digit di papan
+   * huruf. */
+  inputMode?: "numeric" | "tel";
 };
 
 // Satu komponen dipakai di setiap field di seluruh aplikasi, supaya
@@ -38,6 +44,7 @@ export function Field({
   options,
   multiline,
   min,
+  inputMode,
 }: FieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
@@ -91,6 +98,7 @@ export function Field({
           onChange={(event) => onChange(event.target.value)}
           required={required}
           min={min}
+          inputMode={inputMode}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           autoComplete={autoComplete}

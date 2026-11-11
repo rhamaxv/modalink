@@ -8,11 +8,21 @@ type NavItem = { href: string; label: string };
 // komunitas memakai nav publik yang sama (Jelajahi) seperti pengunjung
 // anonim, tidak ada dashboard khusus untuknya.
 const NAV_BY_ROLE: Record<Role, NavItem[]> = {
+  // "Verifikasi" hanya untuk peran yang menyentuh uang. Keduanya tidak bisa
+  // mengajukan proposal maupun mendanai tanpa itu (gerbang di
+  // backend/app/api/v1/), jadi tanpa tautan ini satu-satunya cara menemukan
+  // halamannya adalah mengetik URL-nya sendiri setelah ditolak.
   investor: [
     { href: "/investor/campaign", label: "Campaign saya" },
     { href: "/investor/milestone", label: "Milestone menunggu" },
+    { href: "/akun/verifikasi", label: "Verifikasi" },
   ],
-  umkm: [{ href: "/umkm/beranda", label: "Beranda saya" }],
+  umkm: [
+    { href: "/umkm/beranda", label: "Beranda saya" },
+    { href: "/akun/verifikasi", label: "Verifikasi" },
+  ],
+  // Komunitas tidak pernah menyentuh uang, jadi ia tidak pernah diminta
+  // memverifikasi identitas dan tidak butuh tautannya.
   community: [],
 };
 

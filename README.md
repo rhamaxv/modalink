@@ -95,12 +95,26 @@ disebut apa adanya.
   tetap menghasilkan satu pencairan.
 - **Riwayatnya bisa dilihat pihak yang uangnya ada di dalamnya** lewat
   `GET /proposals/{id}/ledger` dan bagian "Riwayat dana" di halaman proposal.
+- **Tindakan yang menyentuh uang dipagari verifikasi identitas.** UMKM tidak bisa mengajukan
+  proposal dan investor tidak bisa memberi pledge sebelum akunnya melewati `POST /kyc`: nama
+  sesuai identitas, NIK, dan rekening tujuan pencairan. Satu NIK hanya bisa dipakai satu akun,
+  jadi membuat akun berlapis-lapis tidak lagi bebas biaya. Perlu dibaca apa adanya:
+  **verifikasinya simulasi**, yang diperiksa hanya bentuk datanya, jadi yang ia tutup adalah
+  pendaftaran asal-asalan, bukan penipuan identitas yang sungguh-sungguh.
+- **NIK dan nomor rekening tidak pernah disimpan utuh.** Yang masuk database hanya hash NIK,
+  yang dipakai semata untuk mendeteksi satu NIK dipakai dua akun, ditambah empat digit
+  terakhir masing-masing untuk ditampilkan kembali ke pemiliknya. Salinan database yang bocor
+  karena itu tidak membocorkan nomor identitas siapa pun, dan tidak ada endpoint yang bisa
+  mengembalikan nomor penuhnya karena nomor penuhnya memang tidak ada di sana.
 
-**Yang belum ada, dan ini yang membuatnya belum layak memegang uang sungguhan:**
+**Yang belum ada atau belum cukup, dan ini yang membuatnya belum layak memegang uang
+sungguhan:**
 
-- **Tidak ada verifikasi identitas (KYC).** Siapa pun bisa mendaftar dengan email apa pun.
-  Ini lubang terbesar: tanpa identitas yang terverifikasi, "kabur" tidak punya konsekuensi
-  apa pun di luar aplikasi.
+- **Verifikasi identitasnya tidak memeriksa ke mana pun.** Tidak ada pemanggilan ke Dukcapil,
+  tidak ada pencocokan wajah, dan tidak ada konfirmasi ke bank. NIK yang lolos pemeriksaan
+  bentuk tetap bisa milik orang lain atau dikarang begitu saja, jadi identitas di belakang
+  sebuah akun belum bisa dijadikan pegangan: "kabur" masih belum punya konsekuensi yang jelas
+  di luar aplikasi.
 - **Laporan progres hanya berupa teks.** Tidak ada lampiran foto, nota, atau bukti
   transaksi, sehingga penilaian lead investor bersandar pada narasi.
 - **Tidak ada mekanisme menarik kembali** dana yang sudah terlanjur cair.
@@ -110,9 +124,11 @@ disebut apa adanya.
   baris, bukan uang di rekening pihak ketiga.
 
 Urutannya disengaja: perlindungan yang ada bersifat **struktural** (uang bergerak hanya
-lewat jalur yang dipagari aturan dan dicatat permanen), sedangkan yang belum ada bersifat
-**identitas dan hukum**. Keduanya dibutuhkan produk sungguhan; yang kedua berada di luar
-jangkauan sebuah karya lomba.
+lewat jalur yang dipagari aturan dan dicatat permanen), ditambah satu pagar identitas yang
+baru sejauh memeriksa bentuk data. Yang belum ada adalah **pembuktian identitas ke sumber
+resmi dan pijakan hukum**. Keduanya dibutuhkan produk sungguhan; pembuktian identitas butuh
+akses ke Dukcapil dan ke bank yang tidak dimiliki sebuah karya lomba, dan pijakan hukum
+berada di luar jangkauan perangkat lunak.
 
 ## Masalah dan target pengguna
 

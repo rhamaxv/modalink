@@ -48,3 +48,34 @@ async def test_rf2_login_endpoint_is_rate_limited_per_ip(client):
 
     assert all(k == 401 for k in kode[:10]), "sepuluh percobaan pertama tetap diproses"
     assert kode[10] == 429
+
+
+async def test_rf2_kyc_endpoint_is_rate_limited_to_close_the_nik_oracle(
+    client, investor
+):
+    """POST /kyc membalas 409 untuk NIK yang sudah terdaftar dan 200 untuk
+    yang belum. Tanpa batas, perbedaan itu adalah ORACLE: seseorang bisa
+    menebak NIK satu per satu dan mengetahui siapa saja yang punya akun di
+    sini. Tiga per menit per IP cukup longgar untuk orang yang salah
+    mengetik nomornya sendiri, dan terlalu sempit untuk menyisir.
+    """
+    kode = []
+    for i in range(4):
+        r = await client.post(
+            "/api/v1/kyc",
+            headers=investor.headers,
+            json={
+                "full_name": "Penyisir NIK",
+                "nik": f"32010117089{i:05d}",
+                "bank_code": "bca",
+                "account_holder_name": "Penyisir NIK",
+                "account_number": "1234567890",
+            },
+        )
+        kode.append(r.status_code)
+
+    assert kode[3] == 429, kode
+    # Tiga yang pertama tidak ditolak oleh limiter: yang dijaga di sini
+    # adalah batasnya menyala di percobaan keempat, bukan bahwa seluruhnya
+    # gagal karena sebab lain.
+    assert 429 not in kode[:3], kode

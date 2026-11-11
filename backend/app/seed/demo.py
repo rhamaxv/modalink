@@ -32,6 +32,7 @@ meski skornya sendiri tinggi -- supaya juri melihat AI membedakan kualitas,
 bukan enam baris yang kebetulan semuanya mirip.
 """
 
+import itertools
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
@@ -43,16 +44,19 @@ from sqlmodel import select
 from app.ai.mock_engine import MockScoringEngine
 from app.domain.clock import Clock, SystemClock
 from app.models.campaign import Campaign, Sector
+from app.models.kyc import BankCode
 from app.models.ledger import LedgerEntry
 from app.models.pledge import Pledge
 from app.models.proposal import Proposal, ProposalMilestone
 from app.models.user import Role, User
 from app.schemas.auth import RegisterIn
 from app.schemas.campaign import CampaignIn
+from app.schemas.kyc import KycIn
 from app.schemas.proposal import MilestoneIn, ProposalIn
 from app.services.auth import register_user
 from app.services.campaign import create_campaign
 from app.services.community import create_comment, toggle_vote
+from app.services.kyc import submit_kyc
 from app.services.milestone import approve_milestone
 from app.services.pledge import create_pledge, get_locked_proposal
 from app.services.proposal import submit_proposal
@@ -122,12 +126,42 @@ async def _summarize(session: AsyncSession, *, sudah_pernah: bool) -> SeedResult
     )
 
 
+# Nomor urut NIK demo. Satu NIK hanya boleh dipakai satu akun, jadi tiap
+# akun demo butuh nomornya sendiri. Disusun agar lolos aturan bentuk di
+# domain/identity.py: kode wilayah 320101, lahir 1 Januari 1990.
+_URUT_NIK_DEMO = itertools.count(1)
+
+
 async def _create_user(
-    session: AsyncSession, email: str, name: str, role: Role
+    session: AsyncSession, email: str, name: str, role: Role, clock: Clock
 ) -> User:
-    return await register_user(
+    user = await register_user(
         session, RegisterIn(email=email, password=DEMO_PASSWORD, name=name, role=role)
     )
+    # Investor dan UMKM demo ikut diverifikasi identitasnya, karena keduanya
+    # TIDAK BISA menyentuh uang tanpa itu (gerbang di api/v1/proposals.py dan
+    # api/v1/pledges.py). Tanpa langkah ini, juri yang masuk dengan akun demo
+    # menemukan setiap tombol pendanaan menolaknya, dan demonstrasinya
+    # berhenti di situ.
+    #
+    # Lewat submit_kyc sungguhan, bukan baris yang ditulis langsung ke tabel:
+    # seluruh aturan bentuk ikut berlaku pada data demo, sama seperti data
+    # mana pun.
+    if role in {Role.INVESTOR, Role.UMKM}:
+        urut = next(_URUT_NIK_DEMO)
+        await submit_kyc(
+            session,
+            user,
+            KycIn(
+                full_name=name,
+                nik=f"320101010190{urut:04d}",
+                bank_code=BankCode.BCA,
+                account_holder_name=name,
+                account_number=f"12345{urut:05d}",
+            ),
+            clock,
+        )
+    return user
 
 
 @dataclass(frozen=True, slots=True)
@@ -434,28 +468,37 @@ async def seed_demo_data(
         return await _summarize(session, sudah_pernah=True)
 
     investor1 = await _create_user(
-        session, SEED_SENTINEL_EMAIL, "Hendra Wijaya (Demo)", Role.INVESTOR
+        session, SEED_SENTINEL_EMAIL, "Hendra Wijaya (Demo)", Role.INVESTOR, clock
     )
     investor2 = await _create_user(
         session,
         f"investor2@{DEMO_EMAIL_DOMAIN}",
         "Maria Angelina (Demo)",
         Role.INVESTOR,
+        clock,
     )
     investor3 = await _create_user(
-        session, f"investor3@{DEMO_EMAIL_DOMAIN}", "Fajar Nugroho (Demo)", Role.INVESTOR
+        session,
+        f"investor3@{DEMO_EMAIL_DOMAIN}",
+        "Fajar Nugroho (Demo)",
+        Role.INVESTOR,
+        clock,
     )
     umkm1 = await _create_user(
-        session, f"umkm1@{DEMO_EMAIL_DOMAIN}", "Dian Permata (Demo)", Role.UMKM
+        session, f"umkm1@{DEMO_EMAIL_DOMAIN}", "Dian Permata (Demo)", Role.UMKM, clock
     )
     umkm2 = await _create_user(
-        session, f"umkm2@{DEMO_EMAIL_DOMAIN}", "Agus Setiawan (Demo)", Role.UMKM
+        session, f"umkm2@{DEMO_EMAIL_DOMAIN}", "Agus Setiawan (Demo)", Role.UMKM, clock
     )
     umkm3 = await _create_user(
-        session, f"umkm3@{DEMO_EMAIL_DOMAIN}", "Eka Nurhayati (Demo)", Role.UMKM
+        session, f"umkm3@{DEMO_EMAIL_DOMAIN}", "Eka Nurhayati (Demo)", Role.UMKM, clock
     )
     umkm4 = await _create_user(
-        session, f"umkm4@{DEMO_EMAIL_DOMAIN}", "Bambang Prasetyo (Demo)", Role.UMKM
+        session,
+        f"umkm4@{DEMO_EMAIL_DOMAIN}",
+        "Bambang Prasetyo (Demo)",
+        Role.UMKM,
+        clock,
     )
     # Dua akun komunitas, dan keduanya memang dipakai di bawah untuk memberi
     # dukungan dan komentar.
@@ -468,10 +511,18 @@ async def seed_demo_data(
     # mengisi layar yang sedang dinilai, dan pendaftaran sendiri dibatasi 5
     # per menit per IP.
     warga1 = await _create_user(
-        session, f"warga1@{DEMO_EMAIL_DOMAIN}", "Nadia Safitri (Demo)", Role.COMMUNITY
+        session,
+        f"warga1@{DEMO_EMAIL_DOMAIN}",
+        "Nadia Safitri (Demo)",
+        Role.COMMUNITY,
+        clock,
     )
     warga2 = await _create_user(
-        session, f"warga2@{DEMO_EMAIL_DOMAIN}", "Yoga Kurniawan (Demo)", Role.COMMUNITY
+        session,
+        f"warga2@{DEMO_EMAIL_DOMAIN}",
+        "Yoga Kurniawan (Demo)",
+        Role.COMMUNITY,
+        clock,
     )
 
     sekarang = clock.now()

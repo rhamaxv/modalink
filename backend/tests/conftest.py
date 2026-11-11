@@ -1,3 +1,4 @@
+import itertools
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from app.db.session import engine, get_session
 from app.domain.clock import FrozenClock, SystemClock
 from app.main import create_app
 from app.models.campaign import Campaign, CampaignStatus, Sector
+from app.models.kyc import BankCode, KycStatus, KycSubmission
 from app.models.pledge import Pledge
 from app.models.proposal import (
     Proposal,
@@ -25,6 +27,7 @@ from app.models.user import Role, User
 from app.models.vote import Vote
 from app.schemas.milestone import MilestoneReportIn
 from app.services.auth import hash_password, issue_token
+from app.services.kyc import _sidik_nik
 from app.services.milestone import approve_milestone, submit_report
 from app.services.pledge import create_pledge
 from app.services.scoring import run_scoring
@@ -92,12 +95,52 @@ class Akun:
     headers: dict[str, str]
 
 
+# Penghitung NIK uji. Satu NIK hanya boleh dipakai satu akun (409 di
+# services/kyc.py), jadi tiap akun butuh nomor urut sendiri.
+_URUT_NIK = itertools.count(1)
+
+
+async def _verifikasi_identitas(db: AsyncSession, user: User) -> None:
+    """Menandai satu akun sudah terverifikasi identitasnya.
+
+    Dipanggil otomatis untuk peran investor dan UMKM, karena keduanya tidak
+    bisa menyentuh uang tanpa verifikasi (gerbang di api/v1/proposals.py dan
+    api/v1/pledges.py). Tanpa ini, SELURUH test yang mengajukan proposal atau
+    memberi pledge berubah menjadi test tentang gerbang verifikasi, bukan
+    tentang hal yang sebenarnya ingin diuji. Gerbangnya sendiri diuji
+    tersendiri di tests/integration/test_kyc.py.
+
+    NIK-nya disusun agar lolos aturan di domain/identity.py: lahir 1 Januari
+    1990, nomor urut berjalan. Kode wilayahnya (327100) sengaja BERBEDA dari
+    yang dipakai seed demo (320101) dan dari yang dipakai test lain: satu NIK
+    hanya boleh dipakai satu akun, dan seed sungguhan ikut commit ke database
+    test yang sama.
+    """
+    urut = next(_URUT_NIK)
+    nik = f"327100010190{urut:04d}"
+    db.add(
+        KycSubmission(
+            user_id=user.id,
+            full_name="Test Terverifikasi",
+            nik_hash=_sidik_nik(nik),
+            nik_last4=nik[-4:],
+            bank_code=BankCode.BCA,
+            account_holder_name="Test Terverifikasi",
+            account_last4="4321",
+            status=KycStatus.VERIFIED,
+        )
+    )
+    await db.flush()
+
+
 async def _buat_akun(db: AsyncSession, email: str, role: Role) -> Akun:
     user = User(
         email=email, password_hash=hash_password("rahasia123"), name="Test", role=role
     )
     db.add(user)
     await db.flush()
+    if role in {Role.INVESTOR, Role.UMKM}:
+        await _verifikasi_identitas(db, user)
     return Akun(user, {"Authorization": f"Bearer {issue_token(user.id, role)}"})
 
 
