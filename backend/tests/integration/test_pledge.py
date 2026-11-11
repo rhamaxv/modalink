@@ -279,3 +279,53 @@ async def test_br27_service_layer_rejects_amount_below_minimum_without_http(
     with pytest.raises(UnprocessableError) as exc_info:
         await create_pledge(db, investor.user, listed_proposal, 1, clock)
     assert exc_info.value.code == "pledge_di_bawah_minimum"
+
+
+async def test_investor_sees_own_pledge_identity_even_before_the_proposal_is_funded(
+    client, listed_proposal, investor
+):
+    """Penyamaran identitas berhenti di pledge MILIK PEMANGGIL SENDIRI.
+
+    Aturan privasinya (10-api-contract.md:106-107) melindungi investor dari
+    investor LAIN. Menyembunyikan identitas seseorang dari dirinya sendiri
+    tidak melindungi siapa pun, dan harganya nyata: tanpa ini investor tidak
+    bisa mengenali pledge-nya sendiri di daftar, sehingga DELETE /pledges/{id}
+    -- yang justru hanya sah selama proposal BELUM funded -- tidak punya satu
+    pun jalan dari antarmuka.
+    """
+    await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges",
+        json={"amount": 1_000_000},
+        headers=investor.headers,
+    )
+    body = (
+        await client.get(
+            f"/api/v1/proposals/{listed_proposal.id}/pledges",
+            headers=investor.headers,
+        )
+    ).json()
+    milik_sendiri = [p for p in body["items"] if p["investor_id"] is not None]
+    assert len(milik_sendiri) == 1
+    assert milik_sendiri[0]["investor_id"] == str(investor.user.id)
+
+
+async def test_another_investor_still_cannot_see_who_pledged_before_funded(
+    client, listed_proposal, investor, investor_lain
+):
+    """Sisi sebaliknya, dan ia yang membuktikan aturan privasinya masih
+    berdiri: yang terbuka hanya identitas pemanggil, bukan semuanya."""
+    await client.post(
+        f"/api/v1/proposals/{listed_proposal.id}/pledges",
+        json={"amount": 1_000_000},
+        headers=investor.headers,
+    )
+    body = (
+        await client.get(
+            f"/api/v1/proposals/{listed_proposal.id}/pledges",
+            headers=investor_lain.headers,
+        )
+    ).json()
+    assert [p["investor_id"] for p in body["items"]] == [None]
+    # Nominal dan penanda lead tetap tampil: keduanya informasi publik yang
+    # sah (bilah progres, penanda investor utama), bukan identitas.
+    assert body["items"][0]["amount"] == 1_000_000

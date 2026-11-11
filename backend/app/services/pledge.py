@@ -364,10 +364,25 @@ class ActivePledgeWithLeadMarker:
 
 
 async def list_active_pledges(
-    session: AsyncSession, proposal: Proposal
+    session: AsyncSession,
+    proposal: Proposal,
+    pemanggil: User | None = None,
 ) -> list[ActivePledgeWithLeadMarker]:
     """Hanya pledge aktif (BR-20 sampai BR-26, 10-api-contract.md:67): yang
-    sudah dibatalkan tidak pernah muncul di sini, beda dari riwayat penuh."""
+    sudah dibatalkan tidak pernah muncul di sini, beda dari riwayat penuh.
+
+    `pemanggil` menentukan satu pengecualian pada penyamaran identitas di
+    bawah: pledge MILIK PEMANGGIL SENDIRI tidak pernah disamarkan darinya.
+
+    Aturan privasinya (10-api-contract.md:106-107) melarang identitas
+    investor terlihat sebelum proposal `funded`, dan itu tetap berlaku penuh
+    untuk investor lain. Tapi menyembunyikan identitas seseorang DARI DIRINYA
+    SENDIRI tidak melindungi siapa pun, dan ia punya harga nyata: investor
+    tidak bisa mengenali pledge-nya sendiri di daftar, sehingga
+    `DELETE /pledges/{id}` -- yang justru hanya boleh dipanggil selama
+    proposal BELUM funded -- tidak punya satu pun jalan dari antarmuka.
+    Ditemukan lewat e2e alur pasar, bukan lewat pembacaan dokumen.
+    """
     aktif = (
         await session.scalars(
             select(Pledge)
@@ -389,7 +404,12 @@ async def list_active_pledges(
         ActivePledgeWithLeadMarker(
             id=p.id,
             proposal_id=p.proposal_id,
-            investor_id=p.investor_id if identitas_boleh_tampil else None,
+            investor_id=(
+                p.investor_id
+                if identitas_boleh_tampil
+                or (pemanggil is not None and p.investor_id == pemanggil.id)
+                else None
+            ),
             amount=p.amount,
             status=p.status,
             created_at=p.created_at,

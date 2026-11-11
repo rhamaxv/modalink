@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
+    current_user,
     get_clock,
     get_own_pledge,
     get_proposal_for_pledge_listing,
@@ -46,9 +47,16 @@ async def create_pledge_endpoint(
 @router.get("/api/v1/proposals/{proposal_id}/pledges", response_model=PledgeListOut)
 async def list_pledges_endpoint(
     proposal: Proposal = Depends(get_proposal_for_pledge_listing),
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> PledgeListOut:
-    return PledgeListOut(items=await list_active_pledges(session, proposal))
+    # `user` dioper supaya pledge milik pemanggil sendiri tidak ikut
+    # disamarkan darinya (lihat docstring list_active_pledges). Endpoint ini
+    # memang sudah menuntut autentikasi lewat
+    # get_proposal_for_pledge_listing, jadi tidak ada jalur anonim di sini.
+    return PledgeListOut(
+        items=await list_active_pledges(session, proposal, pemanggil=user)
+    )
 
 
 @router.delete("/api/v1/pledges/{pledge_id}", response_model=PledgeOut)

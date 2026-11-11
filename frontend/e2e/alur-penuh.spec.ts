@@ -71,6 +71,20 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
   // "Keluar" di AppHeader cuma menghapus token di klien (lib/auth.ts), jadi
   // keluar dulu sebelum masuk sebagai akun lain mencegah token lama ikut
   // terbawa ke permintaan berikutnya.
+  // Token per akun, disimpan setelah login UI pertama yang sungguhan.
+  //
+  // Skenario ini berpindah akun sebelas kali, dan POST /auth/login dibatasi
+  // 10 per menit per IP (app/middleware.py). Dijalankan utuh, spec ini
+  // menabrak batasnya sendiri dan gagal dengan "Terlalu banyak permintaan"
+  // yang tidak ada hubungannya dengan apa yang sedang diuji. Pagar itu benar
+  // dan tidak boleh dilemahkan demi test.
+  //
+  // Jadi login lewat FORM tetap terjadi sekali untuk tiap akun -- alur masuk
+  // sungguhan tetap diuji, termasuk oleh test keyboard di bawah file ini --
+  // dan perpindahan berikutnya memulihkan token yang sudah didapat, persis
+  // seperti sesi yang masih hidup di browser yang sama.
+  const sesi = new Map<string, string>();
+
   async function masukSebagai(page: Page, akun: { email: string; password: string }) {
     await page.goto("/");
     const tombolKeluar = page.getByRole("button", { name: /keluar/i });
@@ -78,11 +92,22 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
       await tombolKeluar.click();
       await page.waitForURL("/");
     }
+
+    const tersimpan = sesi.get(akun.email);
+    if (tersimpan) {
+      await page.evaluate((t) => localStorage.setItem("modalink_token", t), tersimpan);
+      await page.goto("/");
+      await expect(page.getByRole("button", { name: /keluar/i })).toBeVisible();
+      return;
+    }
+
     await page.goto("/masuk");
     await page.getByLabel("Email").fill(akun.email);
     await page.getByLabel("Password").fill(akun.password);
     await page.getByRole("button", { name: "Masuk", exact: true }).click();
     await page.waitForURL((url) => url.pathname !== "/masuk");
+    const token = await page.evaluate(() => localStorage.getItem("modalink_token"));
+    if (token) sesi.set(akun.email, token);
   }
 
   // AI scoring berjalan di background task FastAPI, bukan sebelum 201
@@ -115,10 +140,16 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
 
   async function bukaProposalDariJelajah(page: Page) {
     await page.goto("/jelajah");
-    await page
-      .locator("article", { hasText: businessName })
-      .getByRole("link", { name: /baca proposal/i })
-      .click();
+    // Halaman jelajah dirombak dari kartu menjadi baris daftar: tidak ada
+    // lagi <article> per proposal maupun tautan terpisah bertuliskan "Baca
+    // proposal". Sekarang SELURUH baris adalah satu tautan, dan namanya
+    // menyebut usahanya sendiri -- justru supaya daftar dua puluh baris bisa
+    // dinavigasi pembaca layar, yang mustahil kalau dua puluh tautan bernama
+    // sama persis.
+    //
+    // Daftarnya juga berpaginasi 20 per halaman dan default terurut terbaru,
+    // jadi proposal yang baru dibuat test ini ada di halaman pertama.
+    await page.getByRole("link", { name: new RegExp(businessName, "i") }).first().click();
     await page.waitForURL(/\/proposal\//);
   }
 

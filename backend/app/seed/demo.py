@@ -52,6 +52,7 @@ from app.schemas.campaign import CampaignIn
 from app.schemas.proposal import MilestoneIn, ProposalIn
 from app.services.auth import register_user
 from app.services.campaign import create_campaign
+from app.services.community import create_comment, toggle_vote
 from app.services.milestone import approve_milestone
 from app.services.pledge import create_pledge, get_locked_proposal
 from app.services.proposal import submit_proposal
@@ -456,6 +457,22 @@ async def seed_demo_data(
     umkm4 = await _create_user(
         session, f"umkm4@{DEMO_EMAIL_DOMAIN}", "Bambang Prasetyo (Demo)", Role.UMKM
     )
+    # Dua akun komunitas, dan keduanya memang dipakai di bawah untuk memberi
+    # dukungan dan komentar.
+    #
+    # Sebelum ini seed tidak membuat satu pun akun komunitas, vote, maupun
+    # komentar, sehingga juri yang membuka demo melihat SELURUH fitur
+    # komunitas (05-feature-komunitas.md) dalam keadaan kosong: setiap
+    # proposal tertulis "0 dukungan" dan "Belum ada yang berkomentar".
+    # Mendaftar sendiri memang memperlihatkan alur pendaftaran, tapi ia tidak
+    # mengisi layar yang sedang dinilai, dan pendaftaran sendiri dibatasi 5
+    # per menit per IP.
+    warga1 = await _create_user(
+        session, f"warga1@{DEMO_EMAIL_DOMAIN}", "Nadia Safitri (Demo)", Role.COMMUNITY
+    )
+    warga2 = await _create_user(
+        session, f"warga2@{DEMO_EMAIL_DOMAIN}", "Yoga Kurniawan (Demo)", Role.COMMUNITY
+    )
 
     sekarang = clock.now()
     campaign1 = await create_campaign(
@@ -531,5 +548,41 @@ async def seed_demo_data(
     )
     assert milestone_pertama is not None  # dijamin submit_proposal di atas
     await approve_milestone(session, milestone_pertama, investor2, clock)
+
+    # Dukungan dan komentar komunitas. Hanya pada proposal yang memang sudah
+    # terbuka untuk publik (BR-30..BR-34 lewat toggle_vote/create_comment,
+    # bukan baris yang ditulis langsung ke tabel): proposal yang ditolak atau
+    # masih dinilai tidak boleh punya keduanya.
+    for warga in (warga1, warga2):
+        await toggle_vote(session, warga, proposal_rotan)
+    await toggle_vote(session, warga1, proposal_katering)
+
+    await create_comment(
+        session,
+        warga1,
+        proposal_rotan,
+        "Anyaman rotannya rapi dan tahan lama. Kalau kapasitas produksinya "
+        "naik, saya yakin permintaan dari luar kota bisa dilayani. (Komentar "
+        "contoh untuk demonstrasi Logicodix 2026.)",
+        clock,
+    )
+    await create_comment(
+        session,
+        warga2,
+        proposal_rotan,
+        "Sudah beberapa kali pesan di sini dan hasilnya konsisten. Semoga "
+        "pendanaannya segera penuh. (Komentar contoh untuk demonstrasi "
+        "Logicodix 2026.)",
+        clock,
+    )
+    await create_comment(
+        session,
+        warga1,
+        proposal_katering,
+        "Rasa masakannya stabil untuk pesanan besar, itu yang paling sulit "
+        "dijaga katering rumahan. (Komentar contoh untuk demonstrasi "
+        "Logicodix 2026.)",
+        clock,
+    )
 
     return await _summarize(session, sudah_pernah=False)

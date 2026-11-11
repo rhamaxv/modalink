@@ -24,8 +24,19 @@ test("reads the stored theme key before first paint, with no hydration error", a
   await page.goto("/");
 
   // Diperiksa sesegera mungkin setelah goto resolve, bukan menunggu hidrasi
-  // React: ini membuktikan skrip inline sendiri yang menyalakan atributnya.
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  // React: ini membuktikan skrip inline sendiri yang sudah bekerja.
+  //
+  // Yang diperiksa adalah LATAR yang berlaku, bukan ejaan atributnya. Tema
+  // gelap adalah keadaan default di :root dan sengaja TIDAK punya
+  // data-theme="dark" (app/globals.css); skrip no-flash hanya menuliskan
+  // data-theme="light" ketika terang yang diminta. Versi lama pagar ini
+  // menuntut atribut "dark" yang tidak pernah ada di produk ini, jadi ia
+  // merah sejak arah visual ditulis ulang tanpa ada yang menyadarinya --
+  // make check memang tidak menjalankan e2e.
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", "light");
+  expect(
+    await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+  ).toBe("rgb(16, 15, 15)");
 
   await page.waitForTimeout(300);
   expect(consoleErrors.join("\n")).not.toMatch(/Hydration|error #418|did not match/i);
@@ -60,7 +71,10 @@ test("applies dark from the OS preference with no hydration error", async ({ pag
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
 
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", "light");
+  expect(
+    await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+  ).toBe("rgb(16, 15, 15)");
 
   await page.waitForTimeout(300);
   expect(consoleErrors.join("\n")).not.toMatch(/Hydration|error #418|did not match/i);

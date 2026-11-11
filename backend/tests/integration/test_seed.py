@@ -19,12 +19,18 @@ from typing import Any
 from sqlalchemy import desc, func, select
 
 from app.models.campaign import Campaign
+from app.models.comment import Comment
 from app.models.ledger import EntryType, LedgerEntry
 from app.models.pledge import Pledge
 from app.models.proposal import Proposal, ProposalMilestone, ProposalStatus
 from app.models.scoring import ScoringResult
 from app.models.user import Role, User
-from app.seed.demo import DEMO_EMAIL_DOMAIN, SEEDED_BUSINESS_NAMES
+from app.models.vote import Vote
+from app.seed.demo import (
+    DEMO_EMAIL_DOMAIN,
+    SEEDED_BUSINESS_NAMES,
+    SEEDED_CAMPAIGN_TITLES,
+)
 from app.services.ledger import compute_balance, total_raised
 
 
@@ -60,12 +66,27 @@ async def test_seed_creates_three_investors_four_umkm_two_campaigns_and_six_prop
             )
         )
     ).all()
+    komunitas = (
+        await db.scalars(
+            select(User).where(
+                User.role == Role.COMMUNITY,
+                User.email.like(f"%@{DEMO_EMAIL_DOMAIN}"),
+            )
+        )
+    ).all()
     assert len(investor) == 3
     assert len(umkm) == 4
+    assert len(komunitas) == 2
 
+    # Disaring lewat judulnya, bukan lewat kepemilikan investor demo.
+    # Memilih "semua campaign milik investor demo" ikut menghitung campaign
+    # yang dibuat test lain di database yang sama -- e2e alur pasar membuat
+    # campaign sebagai investor1@demo.example.com, dan baris ini mulai
+    # menghitung 5 alih-alih 2. Pola yang sama sudah dipakai untuk proposal
+    # lewat SEEDED_BUSINESS_NAMES; query campaign-nya saja yang terlewat.
     campaign = (
         await db.scalars(
-            select(Campaign).where(Campaign.investor_id.in_([u.id for u in investor]))
+            select(Campaign).where(Campaign.title.in_(SEEDED_CAMPAIGN_TITLES))
         )
     ).all()
     assert len(campaign) == 2
@@ -302,3 +323,42 @@ async def test_br63_seed_endpoint_not_registered_when_env_prod(monkeypatch: Any)
 
     monkeypatch.setattr(settings, "env", "dev")
     assert "/api/v1/internal/seed" in _semua_path(create_app().routes)
+
+
+async def test_seed_fills_the_community_feature_instead_of_leaving_it_empty(client, db):
+    """Vote dan komentar ikut disemai, bukan dibiarkan kosong.
+
+    Sebelum ini seed tidak membuat satu pun akun komunitas, vote, maupun
+    komentar, sehingga juri yang membuka demo melihat SELURUH fitur komunitas
+    (05-feature-komunitas.md) dalam keadaan kosong: setiap proposal tertulis
+    "0 dukungan" dan "Belum ada yang berkomentar di proposal ini".
+    """
+    await client.post("/api/v1/internal/seed")
+    proposal_seed = await _proposal_seed(db)
+    id_seed = [p.id for p in proposal_seed]
+
+    votes = (await db.scalars(select(Vote).where(Vote.proposal_id.in_(id_seed)))).all()
+    comments = (
+        await db.scalars(select(Comment).where(Comment.proposal_id.in_(id_seed)))
+    ).all()
+    assert len(votes) >= 2
+    assert len(comments) >= 2
+
+
+async def test_seed_only_votes_and_comments_on_proposals_that_are_public(client, db):
+    """BR-30..BR-34: dukungan dan komentar hanya sah pada proposal yang sudah
+    terbuka untuk publik. Seed memakai toggle_vote/create_comment sungguhan,
+    bukan menulis langsung ke tabel, jadi aturan itu tidak bisa dilewati --
+    test ini yang membuktikan jalurnya memang begitu."""
+    await client.post("/api/v1/internal/seed")
+    per_id = {p.id: p for p in await _proposal_seed(db)}
+
+    votes = (
+        await db.scalars(select(Vote).where(Vote.proposal_id.in_(list(per_id))))
+    ).all()
+    comments = (
+        await db.scalars(select(Comment).where(Comment.proposal_id.in_(list(per_id))))
+    ).all()
+    for baris in [*votes, *comments]:
+        status = per_id[baris.proposal_id].status
+        assert status is not ProposalStatus.REJECTED, baris.proposal_id

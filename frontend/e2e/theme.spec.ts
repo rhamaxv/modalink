@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // dikembalikan getComputedStyle di browser.
 const EXPECTED_BODY_BACKGROUND: Record<string, string> = {
   light: "rgb(251, 249, 244)", // #FBF9F4
-  dark: "rgb(20, 19, 16)", // #141310
+  dark: "rgb(16, 15, 15)", // #100F0F
 };
 
 test("both themes have adequate contrast and an intact layout", async ({ page }) => {
@@ -12,7 +12,15 @@ test("both themes have adequate contrast and an intact layout", async ({ page })
   const backgrounds: Record<string, string> = {};
 
   for (const theme of ["light", "dark"] as const) {
-    await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, theme);
+    // Tema gelap adalah keadaan DEFAULT di :root, dan tidak punya blok
+    // [data-theme="dark"] sendiri (lihat app/globals.css). Jadi untuk gelap
+    // atributnya DIHAPUS, bukan disetel: menyetelnya ke "dark" kebetulan
+    // memberi hasil yang sama hari ini, tapi ia menguji ejaan atribut yang
+    // tidak pernah dipakai produk ini.
+    await page.evaluate((t) => {
+      if (t === "light") document.documentElement.dataset.theme = "light";
+      else delete document.documentElement.dataset.theme;
+    }, theme);
 
     // Tidak ada scroll horizontal di 320, 375, dan 768 (R-03).
     for (const width of [320, 375, 768]) {

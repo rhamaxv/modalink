@@ -78,8 +78,15 @@ export function PledgeForm({ proposalId = "", sisa, onSukses }: PledgeFormProps)
       <Field label="Nominal pledge (Rp)" value={nominal} onChange={setNominal} required />
 
       {melebihiSisa && (
+        // Menyebut ANGKA sisanya, bukan hanya menyatakan nominalnya terlalu
+        // besar. Tombolnya dinonaktifkan di bawah, jadi tanpa angka ini
+        // investor menghadapi tombol mati dan harus menebak berapa yang
+        // sebenarnya boleh dimasukkan. Kontrak backend sendiri mengirim
+        // remaining_amount di detail 409 justru untuk tujuan ini
+        // (10-api-contract.md baris POST pledges), dan nilai itulah yang
+        // dipegang sisaSekarang setelah balapan antar investor.
         <p role="status" className="text-label font-medium text-warn">
-          Nominal melebihi sisa dana yang dibutuhkan.
+          Sisa dana yang dibutuhkan tinggal {formatRupiah(sisaSekarang)}.
         </p>
       )}
 

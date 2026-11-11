@@ -18,6 +18,15 @@ async function mockProposalLengkap(page: Page, status: "listed" | "funded" = "li
     fund_usage_plan: "60% mesin roasting, 40% kemasan dan distribusi ke tiga kota baru.",
     business_projection: "Omzet diproyeksikan naik dua kali lipat dalam satu tahun.",
     requested_amount: 10_000_000,
+    // Field ini SELALU dikirim backend sungguhan (ProposalOut di
+    // backend/app/schemas/proposal.py). Dulu tidak ada di stub ini, dan
+    // halaman tetap terlihat jalan karena nilainya hanya dipakai untuk
+    // dirender; sejak ProposalDetailView memagari bentuk responsnya,
+    // kekurangan itu ditolak terang-terangan alih-alih berubah jadi
+    // TypeError di tengah render.
+    collected_amount: 4_000_000,
+    cover_updated_at: null,
+    sector: "kuliner",
     status,
     scoring_status: "done",
     lead_investor_id: "u-investor-9",
@@ -89,7 +98,13 @@ async function mockProposalLengkap(page: Page, status: "listed" | "funded" = "li
       voteCount += voted ? 1 : -1;
       return json({ voted, vote_count: voteCount });
     }
-    if (url.endsWith("/comments") && method === "GET") return json({ items: comments });
+    // Amplop ini mengikuti CommentListOut sungguhan: jumlah dukungan ikut
+    // di sini, bukan hanya di respons POST /vote. Sebelumnya tidak, dan
+    // akibatnya setiap pengunjung yang belum pernah menekan tombolnya --
+    // termasuk yang memang tidak boleh menekannya -- membaca "Jumlah
+    // dukungan belum tersedia" selamanya.
+    if (url.endsWith("/comments") && method === "GET")
+      return json({ items: comments, vote_count: voteCount, voted_by_me: voted });
     if (url.endsWith("/comments") && method === "POST") {
       return json({ id: "c3", proposal_id: PROPOSAL_ID, user_id: "u-investor-1", body: "Komentar baru dari uji e2e.", created_at: "2026-11-09T00:00:00Z" }, 201);
     }
@@ -168,11 +183,14 @@ test("every interactive control on a fully-loaded proposal page works when click
   await expect(page.getByText("73")).toBeVisible();
   hasil.push("Panel skor -> total skor 73 tampil (bukan keadaan menunggu, bukan nol)");
 
-  const tombolVote = page.getByRole("button", { name: /dukung/i });
-  await expect(tombolVote).toHaveAttribute("aria-pressed", "false");
-  await tombolVote.click();
-  await expect(tombolVote).toHaveAttribute("aria-pressed", "true");
-  hasil.push("Tombol 'Dukung proposal ini' -> aria-pressed berubah false ke true setelah diklik");
+  // Akun di stub ini berperan investor, dan POST /vote hanya untuk peran
+  // community (10-api-contract.md:82). Tombolnya karena itu TIDAK ditawarkan:
+  // menawarkan aksi yang pasti ditolak lalu menjelaskan penolakannya dengan
+  // pesan mentah server ("Token tidak ada.") adalah bug yang dilaporkan
+  // pemilik project lewat tangkapan layar. Jumlah dukungannya tetap terbaca.
+  await expect(page.getByRole("button", { name: /dukung proposal/i })).toHaveCount(0);
+  await expect(page.getByText(/\d+ dukungan/)).toBeVisible();
+  hasil.push("Dukungan -> jumlahnya tampil, tombolnya tidak ditawarkan ke peran investor");
 
   await expect(page.getByText("Komentar milik saya sendiri.")).toBeVisible();
   const tombolHapus = page.getByRole("button", { name: /hapus komentar/i });
@@ -190,8 +208,12 @@ test("every interactive control on a fully-loaded proposal page works when click
   await nominal.fill("99999999");
   const tombolDanai = page.getByRole("button", { name: /danai/i });
   await expect(tombolDanai).toBeDisabled();
-  await expect(page.getByRole("status")).toContainText(/melebihi sisa/i);
-  hasil.push("Form pledge -> nominal melebihi sisa menonaktifkan tombol Danai dan menampilkan peringatan");
+  // Pesannya harus menyebut ANGKA sisanya, bukan hanya menyatakan nominalnya
+  // terlalu besar: tombolnya dinonaktifkan, jadi tanpa angka ini investor
+  // menghadapi tombol mati dan harus menebak berapa yang boleh dimasukkan.
+  await expect(page.getByRole("status")).toContainText(/sisa dana yang dibutuhkan tinggal/i);
+  await expect(page.getByRole("status")).toContainText("Rp6.000.000");
+  hasil.push("Form pledge -> nominal melebihi sisa menonaktifkan tombol Danai dan menyebut sisa yang benar");
 
   await nominal.fill("5000000");
   await expect(tombolDanai).toBeEnabled();

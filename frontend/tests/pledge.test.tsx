@@ -58,7 +58,14 @@ describe("pledge form", () => {
     render(<PledgeForm sisa={6_000_000} />);
     await userEvent.type(screen.getByLabelText(/nominal/i), "7000000");
     expect(screen.getByRole("button", { name: /danai/i })).toBeDisabled();
-    expect(screen.getByRole("status")).toHaveTextContent(/melebihi sisa/i);
+    // Pesannya harus menyebut ANGKA sisanya, bukan hanya menyatakan
+    // nominalnya terlalu besar: tombolnya dinonaktifkan di baris atas, jadi
+    // tanpa angka ini investor menghadapi tombol mati dan harus menebak
+    // berapa yang sebenarnya boleh dimasukkan.
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /sisa dana yang dibutuhkan tinggal/i,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Rp6.000.000");
   });
 
   it("shows the backend message as is when the server rejects a funding race", async () => {

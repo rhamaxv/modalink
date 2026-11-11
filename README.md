@@ -181,14 +181,11 @@ Yang benar-benar belum ada pada commit ini:
   Data demo disemai lewat `python -m app.seed` yang dijalankan sekali di server, karena
   seluruh router `/internal/` hanya aktif saat `ENV=dev` (BR-63). Lihat
   [Akun demonstrasi](#akun-demonstrasi).
-- **Pembatas laju permintaan.** Tidak ada rate limit pada pendaftaran, login, pengajuan
-  proposal, maupun pendanaan. Konsekuensinya nyata dan sudah diukur dalam review keamanan
-  internal: 60 pendaftaran paralel berhasil dalam 2,2 detik, dan jalur scoring AI bisa
-  dipanggil tanpa batas oleh akun yang gratis dibuat. Ini kelemahan yang diketahui, bukan
-  yang tidak disadari.
-- **Paginasi pada endpoint daftar.** `GET /proposals` dan `GET /campaigns` mengembalikan
-  seluruh baris, dan `GET /proposals` menyertakan teks proposal penuh, sehingga responsnya
-  tumbuh seiring data.
+- **Pembatas laju per akun.** Rate limit yang ada dihitung per alamat IP
+  (`backend/app/middleware.py`): pendaftaran 5 per menit, login 10 per menit. Itu menutup
+  percobaan paksa dari satu sumber, tapi tidak menutup penyerang yang tersebar di banyak
+  IP, dan tidak membatasi jalur scoring AI per akun. Batasnya nyata dan diuji
+  (`backend/tests/integration/test_rate_limit_wiring.py`), cakupannya yang belum penuh.
 - **Batas panjang pada sebagian field teks.** Beberapa field punya panjang minimum tapi
   tidak punya maksimum.
 
@@ -431,7 +428,15 @@ make test-regression  # hanya enam kelompok invarian; wajib hijau sebelum klaim 
 make test-live         # memanggil Gemini sungguhan, butuh GEMINI_API_KEY, di-skip CI
 make test-fe           # test frontend (vitest), butuh frontend/node_modules
 make check             # ruff + mypy + eslint + tsc + seluruh test di atas
+make test-e2e          # Playwright lewat browser sungguhan, butuh backend hidup
+make check-all         # check + test-e2e; jalankan sebelum menyatakan selesai
 ```
+
+`make check` sengaja tidak memanggil e2e, karena Playwright butuh backend dan database
+yang benar-benar hidup sementara `check` harus tetap bisa dijalankan tanpa keduanya.
+Harganya pernah terbukti: suite e2e sempat merah berminggu-minggu tanpa ada yang
+menyadarinya, karena satu-satunya perintah yang rutin dijalankan tidak pernah
+menyentuhnya. Karena itu ada `make check-all`.
 
 ## Variabel lingkungan
 
@@ -458,9 +463,10 @@ pada server deploy.
 
 ## Akun demonstrasi
 
-Tujuh akun dibuat oleh perintah seed, semuanya dengan password yang sama. Domain
-`.test` dipakai dengan sengaja: ia dicadangkan oleh RFC 2606 dan tidak pernah resolve ke
-mana pun, jadi tidak ada alamat email sungguhan milik siapa pun yang terpakai di sini.
+Sembilan akun dibuat oleh perintah seed, semuanya dengan password yang sama. Domain
+`example.com` dipakai dengan sengaja: ia dicadangkan oleh RFC 2606 dan tidak pernah
+dipakai siapa pun, jadi tidak ada alamat email sungguhan milik orang lain yang terpakai
+di sini.
 
 | Peran | Email | Password |
 | --- | --- | --- |
@@ -471,13 +477,17 @@ mana pun, jadi tidak ada alamat email sungguhan milik siapa pun yang terpakai di
 | UMKM | `umkm2@demo.example.com` | `Demo#Modalink2026` |
 | UMKM | `umkm3@demo.example.com` | `Demo#Modalink2026` |
 | UMKM | `umkm4@demo.example.com` | `Demo#Modalink2026` |
+| Komunitas | `warga1@demo.example.com` | `Demo#Modalink2026` |
+| Komunitas | `warga2@demo.example.com` | `Demo#Modalink2026` |
 
-Password ini memang publik, dan itu disengaja: ketujuh akun hanya ada di deployment
+Password ini memang publik, dan itu disengaja: kesembilan akun hanya ada di deployment
 demonstrasi, tidak memegang data siapa pun, dan dibuat ulang kapan saja oleh perintah di
 bawah. Tidak ada kredensial lain di repositori ini yang bisa dipakai di mana pun.
 
-Akun komunitas tidak ikut disemai. Peran itu bisa dicoba dengan mendaftar sendiri lewat
-`/daftar`, yang justru memperlihatkan alur pendaftarannya.
+Kedua akun komunitas sudah meninggalkan dukungan dan komentar pada proposal demo, jadi
+fitur komunitas (`05-feature-komunitas.md`) terlihat terisi begitu halaman dibuka, bukan
+kosong dengan tulisan "0 dukungan" di mana-mana. Alur pendaftaran tetap bisa dicoba lewat
+`/daftar` seperti biasa.
 
 **Menjalankan seed di server, sekali saja:**
 

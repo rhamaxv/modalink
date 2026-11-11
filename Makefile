@@ -1,4 +1,4 @@
-.PHONY: up down migrate test test-unit test-regression test-live test-fe test-e2e check demo
+.PHONY: up down migrate test test-unit test-regression test-live test-fe test-e2e check check-all demo
 
 # Local dev runs these targets without an activated venv, so tool names alone
 # are not on PATH. Relative to backend/, since every use below follows a
@@ -47,6 +47,16 @@ check:
 	@if [ -d frontend/node_modules ]; then cd frontend && npx tsc --noEmit && npm run lint; else $(SKIP_FE); fi
 	$(MAKE) test
 	$(MAKE) test-fe
+
+# `check` SENGAJA tidak memanggil e2e: Playwright butuh backend dan database
+# yang benar-benar hidup, dan `check` harus tetap bisa dijalankan tanpa
+# keduanya. Harganya sudah terbukti: suite e2e sempat merah berminggu-minggu
+# tanpa ada yang menyadarinya, karena satu-satunya perintah yang rutin
+# dijalankan tidak pernah menyentuhnya. Jalankan ini sebelum menyatakan
+# sebuah pekerjaan selesai, dengan `make up` berjalan di terminal lain.
+check-all:
+	$(MAKE) check
+	$(MAKE) test-e2e
 
 demo:
 	SCORING_ENGINE=mock $(MAKE) up

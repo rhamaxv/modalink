@@ -148,11 +148,42 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
     setProposal({ status: "loading" });
     try {
       const data = await api.get<ProposalOut>(`/proposals/${proposalId}`);
+      // Pagar bentuk respons, bukan sekadar pemanis tipe.
+      //
+      // `api.get<ProposalOut>` hanya MEMAKSA tipe; ia tidak memeriksa apa pun
+      // saat berjalan. Begitu satu nominal datang bukan sebagai angka,
+      // formatRupiah melempar TypeError di tengah render, React membuang
+      // seluruh pohon, dan pengunjung melihat layar kosong bertuliskan
+      // "Application error" -- bukan pesan galat halaman ini yang sudah ada
+      // tepat di bawah. Ditemukan lewat e2e: satu field yang hilang dari
+      // respons mengosongkan seluruh halaman proposal.
+      //
+      // Dilempar sebagai ApiError, bukan diperbaiki diam-diam dengan 0:
+      // nol adalah nominal yang sah, dan menampilkannya untuk data yang
+      // sebenarnya tidak diketahui adalah berbohong tentang uang.
+      if (
+        !Number.isInteger(data?.requested_amount) ||
+        !Number.isInteger(data?.collected_amount)
+      ) {
+        throw new ApiError(
+          "bentuk_respons_tidak_terduga",
+          "Data pendanaan proposal ini tidak lengkap. Coba muat ulang halaman.",
+          0,
+        );
+      }
       setProposal({ status: "done", data });
     } catch (error) {
       setProposal({ status: "error", message: pesanGalat(error) });
     }
   }, [proposalId]);
+
+  // Pembatalan pledge: endpoint DELETE /pledges/{id} sudah ada di kontrak
+  // (10-api-contract.md:72) dan sudah diimplementasikan backend, tapi sampai
+  // sekarang tidak ada SATU PUN jalan ke sana dari antarmuka. Investor yang
+  // salah memasukkan nominal tidak punya cara membatalkannya sendiri.
+  // Ditemukan lewat e2e alur pasar, bukan lewat pembacaan kontrak.
+  const [membatalkan, setMembatalkan] = useState<string | null>(null);
+  const [galatBatal, setGalatBatal] = useState<string | null>(null);
 
   const muatPledges = useCallback(async () => {
     setPledges({ status: "loading" });
@@ -176,6 +207,25 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
       }
     }
   }, [proposalId]);
+
+  async function batalkanPledge(pledgeId: string) {
+    setGalatBatal(null);
+    setMembatalkan(pledgeId);
+    try {
+      await api.del(`/pledges/${pledgeId}`);
+      // Keduanya dimuat ulang, bukan hanya daftar pledge: membatalkan
+      // mencatat refund_out dan MENGHITUNG ULANG status funding (BR-51),
+      // jadi nominal terkumpul dan status proposal ikut berubah.
+      await Promise.all([muatProposal(), muatPledges()]);
+    } catch (error) {
+      // 409 ketika proposal sudah funded adalah penolakan yang SAH dan
+      // dijelaskan kontrak, bukan kegagalan teknis: pesannya diteruskan apa
+      // adanya karena ia memang menjelaskan sesuatu kepada investor.
+      setGalatBatal(pesanGalat(error));
+    } finally {
+      setMembatalkan(null);
+    }
+  }
 
   const muatMilestones = useCallback(async () => {
     setMilestones({ status: "loading" });
@@ -417,10 +467,37 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
                       </span>
                     )}
                   </span>
-                  <Amount label="" amount={pledge.amount} size="medium" />
+                  <span className="flex items-center gap-space-3">
+                    <Amount label="" amount={pledge.amount} size="medium" />
+                    {/* Hanya untuk pledge MILIK SENDIRI, dan hanya selama
+                        proposalnya belum penuh. Keduanya syarat nyata, bukan
+                        kehati-hatian: backend mengirim investor_id = null
+                        untuk pledge investor lain (jadi yang punya id adalah
+                        milik kita), dan ia membalas 409 begitu proposal
+                        sudah funded. Menawarkan tombol yang pasti ditolak
+                        adalah kesalahan yang sama dengan tombol dukungan
+                        untuk pengunjung anonim. */}
+                    {pledge.investor_id !== null &&
+                      currentUser?.id === pledge.investor_id &&
+                      STATUS_BISA_DIDANAI.includes(data.status) && (
+                        <button
+                          type="button"
+                          onClick={() => batalkanPledge(pledge.id)}
+                          disabled={membatalkan === pledge.id}
+                          className="inline-flex min-h-[44px] items-center rounded-pill border border-line-strong px-space-3 text-label font-medium text-muted transition-colors hover:bg-panel-raised hover:text-ink disabled:cursor-not-allowed"
+                        >
+                          {membatalkan === pledge.id ? "Membatalkan..." : "Batalkan"}
+                        </button>
+                      )}
+                  </span>
                 </li>
               ))}
           </ul>
+        )}
+        {galatBatal && (
+          <p role="alert" className="text-label text-danger">
+            {galatBatal}
+          </p>
         )}
       </section>
 
