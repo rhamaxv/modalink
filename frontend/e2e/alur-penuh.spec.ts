@@ -363,7 +363,18 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
     await masukSebagai(page, investorA);
     await page.goto("/investor/milestone");
     await page.getByRole("button", { name: /setujui pencairan/i }).click();
+    // Ditunggu sampai feed persetujuan benar-benar kosong sebelum berpindah
+    // halaman. Versi sebelumnya langsung memanggil goto setelah klik, dan di
+    // bawah beban navigasi itu mendahului POST-nya sendiri: approve-nya tidak
+    // pernah mendarat, proposal berhenti di "funded", dan kegagalannya
+    // muncul sebagai status terakhir yang tidak ditemukan -- jauh dari
+    // sebabnya.
+    await expect(page.getByRole("button", { name: /setujui pencairan/i })).toHaveCount(
+      0,
+      { timeout: 30_000 },
+    );
     await page.goto(`/proposal/${proposalId}`);
+    await tungguTeksMuncul(page, /selesai/i);
     await expect(page.locator('[data-status="completed"]').first()).toBeVisible();
     await expect(page.getByText(/selesai/i)).toBeVisible();
   });
