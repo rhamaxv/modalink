@@ -14,6 +14,7 @@ type LedgerEntry = {
   amount: number;
   ref_type: string;
   created_at: string;
+  destination_label: string | null;
   milik_saya: boolean;
 };
 
@@ -177,6 +178,13 @@ export function LedgerTrail({ proposalId }: { proposalId: string }) {
                       </span>
                       <span className="tabular text-label text-muted">
                         {formatWaktu(entri.created_at)}
+                        {/* Rekening tujuan hanya ada pada baris pencairan,
+                            dan ia dicatat SAAT pencairan itu terjadi: UMKM
+                            boleh mengganti rekeningnya nanti tanpa mengubah
+                            riwayat yang sudah lewat. */}
+                        {entri.destination_label && (
+                          <> · ke {entri.destination_label}</>
+                        )}
                       </span>
                     </span>
                   </span>

@@ -204,3 +204,46 @@ async def test_an_anonymous_visitor_cannot_read_the_money_trail(
     assert (
         await client.get(f"/api/v1/proposals/{listed_proposal.id}/ledger")
     ).status_code == 401
+
+
+async def test_a_disbursement_records_where_the_money_went(
+    client, db, funded_proposal, investor
+):
+    """Rekening tujuan dicatat pada baris pencairannya sendiri.
+
+    Tanpa ini, riwayat dana menjawab "berapa" dan "kapan" tapi tidak pernah
+    "ke mana", padahal itu pertanyaan pertama siapa pun yang mengecek apakah
+    dananya sungguh sampai.
+    """
+    from sqlmodel import select
+
+    from app.models.proposal import ProposalMilestone
+
+    milestone = await db.scalar(
+        select(ProposalMilestone)
+        .where(ProposalMilestone.proposal_id == funded_proposal.id)
+        .order_by(ProposalMilestone.seq)
+    )
+    assert milestone is not None
+    r = await client.post(
+        f"/api/v1/milestones/{milestone.id}/approve", headers=investor.headers
+    )
+    assert r.status_code == 200, r.text
+
+    body = (
+        await client.get(
+            f"/api/v1/proposals/{funded_proposal.id}/ledger", headers=investor.headers
+        )
+    ).json()
+    cair = [e for e in body["entries"] if e["entry_type"] == "disbursement_out"]
+    assert len(cair) == 1
+    # Bank dan empat digit terakhir, tidak pernah nomor penuh: yang tersimpan
+    # di database sejak awal memang hanya empat digit itu.
+    assert cair[0]["destination_label"] is not None
+    assert "••••" in cair[0]["destination_label"]
+    assert "4321" in cair[0]["destination_label"]
+
+    # Baris pledge tidak punya rekening tujuan: uang masuk tidak dikirim ke
+    # mana pun.
+    masuk = [e for e in body["entries"] if e["entry_type"] == "pledge_in"]
+    assert masuk and all(e["destination_label"] is None for e in masuk)

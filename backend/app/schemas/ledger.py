@@ -58,6 +58,11 @@ class LedgerEntryPublicOut(BaseModel):
     # menyebut siapa pelakunya.
     ref_type: str
     created_at: datetime
+    # "BCA ••••7890" untuk baris pencairan, None untuk yang lain. Sudah
+    # tersamar di database (hanya empat digit terakhir yang pernah disimpan),
+    # jadi bentuk ini bukan penyamaran di lapisan tampilan yang bisa
+    # dilangkahi.
+    destination_label: str | None = None
     # True hanya untuk baris yang dicatat oleh pemanggil sendiri. Investor
     # butuh bisa menemukan pledge-nya sendiri di antara pledge orang lain,
     # dan itu tidak membocorkan apa pun: ia memang sudah tahu siapa dirinya.

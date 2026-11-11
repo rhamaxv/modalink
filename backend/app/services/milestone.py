@@ -35,6 +35,7 @@ from app.models.milestone_report import MilestoneReport, ReportStatus
 from app.models.proposal import MilestoneStatus, ProposalMilestone, ProposalStatus
 from app.models.user import User
 from app.schemas.milestone import MilestoneReportIn
+from app.services.kyc import get_kyc
 from app.services.ledger import record_entry
 from app.services.pledge import get_locked_proposal
 from app.services.status import advance_milestone, advance_proposal, advance_report
@@ -205,6 +206,20 @@ async def approve_milestone(
     # approve ganda (sekuensial lewat BR-48, atau konkuren lewat RF-5) hanya
     # menghasilkan satu entri: record_entry mengembalikan None secara diam-diam
     # untuk kunci yang sudah pernah dipakai, bukan melempar error.
+    # Rekening tujuan dicatat DI SINI, pada saat pencairan, bukan dibaca ulang
+    # saat riwayat ditampilkan: UMKM boleh mengganti rekeningnya kapan saja,
+    # dan riwayat yang membaca nilai terkini akan memperlihatkan seluruh
+    # pencairan masa lalu seolah dikirim ke rekening yang baru.
+    #
+    # None kalau KYC-nya entah bagaimana tidak ada: pencairan tidak dibatalkan
+    # karenanya (dananya memang milik UMKM itu), tapi riwayatnya jujur bahwa
+    # tujuannya tidak tercatat, bukan mengarang nomor.
+    kyc_umkm = await get_kyc(session, proposal.umkm_id)
+    tujuan = (
+        f"{kyc_umkm.bank_code.value.upper()} ••••{kyc_umkm.account_last4}"
+        if kyc_umkm is not None
+        else None
+    )
     await record_entry(
         session,
         proposal.id,
@@ -212,6 +227,7 @@ async def approve_milestone(
         milestone.amount,
         idempotency_key=f"disburse:{milestone.id}",
         clock=clock,
+        destination_label=tujuan,
         ref_type="milestone",
         ref_id=milestone.id,
         actor_id=aktor.id,

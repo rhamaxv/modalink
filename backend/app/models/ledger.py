@@ -59,5 +59,14 @@ class LedgerEntry(SQLModel, table=True):
     actor_id: UUID | None = Field(default=None, foreign_key="users.id", nullable=True)
     # Unique: inilah yang membuat approve atau klik ganda menghasilkan satu
     # entri, bukan harapan bahwa tidak ada yang mengklik dua kali (BR-55).
+    # Rekening tujuan, DICATAT SAAT PENCAIRAN, bukan dibaca ulang dari KYC
+    # pemiliknya saat riwayat ditampilkan. Bedanya menentukan: UMKM boleh
+    # mengganti rekeningnya kapan saja, dan kalau tampilan membaca nilai
+    # terkini, seluruh pencairan masa lalu akan terlihat seolah dikirim ke
+    # rekening yang baru. Riwayat yang berubah sendiri bukan riwayat.
+    #
+    # Hanya terisi untuk disbursement_out; pledge_in dan refund_out tidak
+    # punya rekening tujuan di produk ini.
+    destination_label: str | None = Field(default=None, nullable=True)
     idempotency_key: str = Field(unique=True, index=True)
     created_at: datetime

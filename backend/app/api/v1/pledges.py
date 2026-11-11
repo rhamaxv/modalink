@@ -118,6 +118,7 @@ async def get_proposal_ledger_endpoint(
                 amount=e.amount,
                 ref_type=e.ref_type,
                 created_at=e.created_at,
+                destination_label=e.destination_label,
                 milik_saya=e.actor_id == user.id,
             )
             for e in entri

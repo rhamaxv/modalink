@@ -65,6 +65,7 @@ async def record_entry(
     ref_type: str = "",
     ref_id: UUID | None = None,
     actor_id: UUID | None = None,
+    destination_label: str | None = None,
 ) -> LedgerEntry | None:
     """Mengembalikan None bila kunci idempotensi sudah pernah dipakai (BR-55).
 
@@ -90,6 +91,7 @@ async def record_entry(
         ref_type=ref_type,
         ref_id=ref_id,
         actor_id=actor_id,
+        destination_label=destination_label,
         idempotency_key=idempotency_key,
         created_at=clock.now(),
     )
