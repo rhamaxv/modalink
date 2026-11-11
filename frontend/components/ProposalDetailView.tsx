@@ -10,6 +10,7 @@ import { ScorePanel, type ProposalScore, type ScoringStatus } from "@/components
 import type { CurrentUser } from "@/lib/auth";
 import { CoverImage } from "@/components/ui/CoverImage";
 import { LedgerTrail } from "@/components/LedgerTrail";
+import { TerminationPanel } from "@/components/TerminationPanel";
 import { CoverUpload } from "@/components/CoverUpload";
 import { SECTOR_ICON } from "@/components/CampaignBrowseCard";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -48,6 +49,9 @@ type ProposalOut = {
   collected_amount: number;
   // null berarti belum ada foto sampul; nilainya sekaligus kunci cache URL
   // gambarnya (lihat lib/cover.ts).
+  // Kapan lead investor mengajukan penghentian; null berarti tidak ada
+  // pengajuan berjalan.
+  termination_requested_at: string | null;
   cover_updated_at: string | null;
   // Sektor campaign yang menaungi proposal ini, dipakai sebagai lambang
   // sampul cadangan saat fotonya belum ada.
@@ -660,6 +664,25 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
           sudah membawa jarak internalnya sendiri, dan class wrapper yang
           identik dengan section 3 ("naratif-kiri") persis pola yang
           ditemukan audit browser minggu ini di dua label berbeda. */}
+      {/* Penghentian proposal yang tahapnya macet. Dirender untuk kedua
+          pihak: lead investor melihat tombolnya, UMKM melihat peringatan
+          beserta batas waktunya. Panel ini sendiri yang memutuskan kapan
+          menampilkan apa, dan mengembalikan null kalau tidak ada yang perlu
+          ditampilkan. */}
+      {data.status === "funded" &&
+        (currentUser?.id === data.lead_investor_id ||
+          currentUser?.id === data.umkm_id) && (
+          <section data-pola="penghentian" className="flex w-full flex-col">
+            <TerminationPanel
+              proposalId={proposalId}
+              terminationRequestedAt={data.termination_requested_at}
+              bolehMengajukan={currentUser?.id === data.lead_investor_id}
+              akuUmkm={currentUser?.id === data.umkm_id}
+              onBerubah={muatProposal}
+            />
+          </section>
+        )}
+
       {/* Riwayat dana. Hanya dirender untuk akun yang sudah masuk: endpoint
           di baliknya menolak pengunjung anonim, dan menampilkan judul yang
           isinya selalu "hanya bisa dilihat investor dan pemilik" kepada

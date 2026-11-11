@@ -136,6 +136,15 @@ async def submit_report(
         submitted_at=clock.now(),
     )
     session.add(report)
+
+    # Laporan yang masuk MEMBATALKAN pengajuan penghentian yang sedang
+    # berjalan: itulah gunanya jendela jawaban. UMKM yang akhirnya melapor
+    # tidak boleh kehilangan sisa dananya hanya karena sempat terlambat.
+    from app.services.termination import cancel_termination
+
+    proposal_terkait = await get_locked_proposal(session, milestone.proposal_id)
+    await cancel_termination(session, proposal_terkait)
+
     await session.flush()
     return report
 

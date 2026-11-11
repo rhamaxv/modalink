@@ -107,6 +107,11 @@ class ProposalOut(BaseModel):
     # None berarti proposal ini belum punya foto sampul. Bukan boolean
     # "punya sampul": waktunya sekaligus menjadi kunci cache pada URL gambar,
     # sehingga sampul yang diganti tidak tertutup versi lama di browser.
+    # Kapan lead investor mengajukan penghentian; None berarti tidak ada
+    # pengajuan berjalan. Dikirim supaya kedua pihak melihat jam yang sama:
+    # UMKM tahu sampai kapan ia masih bisa melapor, investor tahu kapan
+    # dananya kembali.
+    termination_requested_at: datetime | None = None
     cover_updated_at: datetime | None = None
     # Sektor campaign yang menaungi proposal ini. None hanya pada bentuk
     # keluaran yang belum mengambilnya (lihat services/proposal.py).
@@ -148,6 +153,11 @@ class ProposalListItemOut(BaseModel):
     # None berarti proposal ini belum punya foto sampul. Bukan boolean
     # "punya sampul": waktunya sekaligus menjadi kunci cache pada URL gambar,
     # sehingga sampul yang diganti tidak tertutup versi lama di browser.
+    # Kapan lead investor mengajukan penghentian; None berarti tidak ada
+    # pengajuan berjalan. Dikirim supaya kedua pihak melihat jam yang sama:
+    # UMKM tahu sampai kapan ia masih bisa melapor, investor tahu kapan
+    # dananya kembali.
+    termination_requested_at: datetime | None = None
     cover_updated_at: datetime | None = None
     # Sektor campaign yang menaungi proposal ini. None hanya pada bentuk
     # keluaran yang belum mengambilnya (lihat services/proposal.py).

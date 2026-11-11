@@ -254,6 +254,14 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # harness ini belum pernah mengajukan, jadi 404.
     ("GET", "/api/v1/kyc/me", None, 401),
     ("GET", "/api/v1/kyc/me", "community", 404),
+    # Penghentian proposal yang tahapnya macet. Hanya lead investor yang
+    # berwenang, dan itu diperiksa di service (404 untuk investor lain),
+    # bukan di pagar peran. 422 di sini karena {proposal_id} tidak
+    # disubstitusi harness ini; angka itu membuktikan pagar perannya lolos.
+    ("POST", "/api/v1/proposals/{proposal_id}/terminate", None, 401),
+    ("POST", "/api/v1/proposals/{proposal_id}/terminate", "umkm", 403),
+    ("POST", "/api/v1/proposals/{proposal_id}/terminate", "community", 403),
+    ("POST", "/api/v1/proposals/{proposal_id}/terminate", "investor", 422),
     # Baris ditambahkan oleh setiap fase yang menambah endpoint.
 ]
 

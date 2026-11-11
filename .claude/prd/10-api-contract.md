@@ -89,6 +89,7 @@ berarti mengumpulkan data pribadi tanpa alasan.
 | `GET /proposals` | publik | Hanya `listed` ke atas. Query: `sector`, `campaign_id`, `sort`. |
 | `GET /proposals/{id}` | kondisional | Publik bila `listed` ke atas. Bila `submitted` atau `rejected`, hanya pemilik proposal dan pemilik campaign. |
 | `GET /proposals/mine` | umkm | Proposal milik pengguna saat ini beserta statusnya. |
+| `POST /proposals/{id}/terminate` | lead investor | Mengajukan penghentian proposal `funded` yang tahap berikutnya lewat tenggat laporan. Belum mengembalikan dana: UMKM punya 7 hari untuk tetap melapor, dan laporan yang masuk membatalkan pengajuan. `409` bila proposal belum `funded`, tahapnya belum macet, atau pengajuan sudah berjalan. `404` untuk investor yang bukan lead. |
 | `POST /proposals/{id}/rescore` | pemilik proposal, pemilik campaign | Hanya bila `scoring_status = failed`, selain itu `409`. |
 | `GET /proposals/{id}/scoring` | pemilik proposal, investor | Hasil scoring terbaru lengkap dengan komponen, red flag, dan brief. `403` untuk peran komunitas ([BR-35](07-business-rules.md)). |
 | `PUT /proposals/{id}/cover` | pemilik proposal | Foto sampul, multipart field `file`. Menimpa sampul lama. `422` bila byte-nya bukan JPG/PNG/WebP atau melebihi 1,5 MB. |

@@ -48,6 +48,16 @@ async def evaluate_expiry(
     seluruh pledge aktifnya sudah `cancelled`, baris `aktif` di bawah kosong
     dan badan loop tidak pernah berjalan lagi.
     """
+    # Penghentian dituntaskan lebih dulu dan terpisah dari jalur deadline
+    # pendanaan di bawah: ia berlaku pada proposal FUNDED, yang justru TIDAK
+    # termasuk NEEDS_RECONCILIATION. Dua aturan waktu yang berbeda pada
+    # status yang berbeda, bukan satu aturan yang dipaksa menampung keduanya.
+    if proposal.termination_requested_at is not None:
+        from app.services.termination import finalize_termination
+
+        if await finalize_termination(session, proposal, clock):
+            return
+
     if proposal.status not in NEEDS_RECONCILIATION:
         return
 

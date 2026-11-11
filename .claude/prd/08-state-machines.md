@@ -24,6 +24,7 @@ Tujuh status. "Didanai sebagian" adalah status sungguhan di database, bukan hasi
 | T-07 | `partially_funded` | Seluruh pledge dibatalkan, total kembali nol | `listed` |
 | T-08 | `partially_funded` | `funding_deadline` campaign lewat, total masih kurang | `failed` |
 | T-09 | `funded` | Seluruh milestone berstatus `disbursed` | `completed` |
+| T-10 | `funded` | Penghentian yang diajukan lead investor lewat jendela jawaban UMKM | `failed` |
 
 Status terminal: `rejected`, `failed`, `completed`. Tidak ada jalan keluar dari ketiganya.
 

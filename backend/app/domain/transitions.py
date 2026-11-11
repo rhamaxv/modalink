@@ -25,6 +25,11 @@ class ProposalEvent(StrEnum):
     PLEDGE_KOSONG = "pledge_kosong"
     DEADLINE_LEWAT = "deadline_lewat"
     SEMUA_MILESTONE_CAIR = "semua_milestone_cair"
+    # Penghentian oleh lead investor pada proposal yang sudah penuh tapi
+    # tahapnya macet. Sebelum ini, satu-satunya jalan keluar dari FUNDED
+    # adalah COMPLETED, sehingga UMKM yang berhenti melapor membuat sisa dana
+    # tertahan selamanya tanpa satu pun pihak yang bisa mengeluarkannya.
+    PENGHENTIAN_TUNTAS = "penghentian_tuntas"
 
 
 class MilestoneStatus(StrEnum):
@@ -54,6 +59,7 @@ PROPOSAL_MAP: dict[tuple[ProposalStatus, ProposalEvent], ProposalStatus] = {
     (S.PARTIALLY_FUNDED, E.PLEDGE_KOSONG): S.LISTED,  # T-07
     (S.PARTIALLY_FUNDED, E.DEADLINE_LEWAT): S.FAILED,  # T-08
     (S.FUNDED, E.SEMUA_MILESTONE_CAIR): S.COMPLETED,  # T-09
+    (S.FUNDED, E.PENGHENTIAN_TUNTAS): S.FAILED,  # T-10
 }
 
 

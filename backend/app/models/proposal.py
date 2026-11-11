@@ -128,6 +128,15 @@ class Proposal(SQLModel, table=True):
         default=None, foreign_key="users.id", nullable=True
     )
     funded_at: datetime | None = Field(default=None, nullable=True)
+    # Kapan lead investor mengajukan penghentian karena tahap berikutnya
+    # macet. Null berarti tidak ada pengajuan yang sedang berjalan.
+    #
+    # Satu kolom waktu, bukan status baru: UMKM punya jendela untuk tetap
+    # melapor dan membatalkan pengajuan ini (lihat services/termination.py),
+    # jadi yang dibutuhkan hanya "sejak kapan jamnya berjalan". Menambah
+    # status proposal justru akan menggandakan seluruh matriks transisi untuk
+    # keadaan yang umurnya paling lama tujuh hari.
+    termination_requested_at: datetime | None = Field(default=None, nullable=True)
     created_at: datetime = Field(default_factory=lambda: SystemClock().now())
 
 

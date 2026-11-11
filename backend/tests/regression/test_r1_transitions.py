@@ -83,7 +83,7 @@ def test_r1_scoring_every_combination_matches_map(status, event):
 def test_r1_proposal_transition_count_matches_spec():
     """Mengunci jumlahnya ke spec. Menambah transisi tanpa memperbarui
     08-state-machines.md akan membuat test ini merah."""
-    assert len(PROPOSAL_MAP) == 9  # T-01 sampai T-09
+    assert len(PROPOSAL_MAP) == 10  # T-01 sampai T-10
 
 
 def test_r1_milestone_transition_count_matches_spec():

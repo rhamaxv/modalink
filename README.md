@@ -95,6 +95,22 @@ disebut apa adanya.
   tetap menghasilkan satu pencairan.
 - **Riwayatnya bisa dilihat pihak yang uangnya ada di dalamnya** lewat
   `GET /proposals/{id}/ledger` dan bagian "Riwayat dana" di halaman proposal.
+- **Dana tidak bisa tertahan selamanya kalau UMKM berhenti di tengah jalan.**
+  Ini lubang yang paling mudah terlewat, dan sempat ada di produk ini: proposal
+  yang dananya sudah penuh hanya punya satu jalan keluar, yaitu seluruh tahap
+  cair. UMKM yang berhenti melapor setelah tahap pertama karena itu menahan
+  sisa dana tanpa batas waktu, dan lead investor tidak bisa berbuat apa-apa
+  (menyetujui butuh laporan, menolak hanya sah untuk laporan yang masuk).
+
+  Sekarang: tahap yang lewat 30 hari tanpa laporan dianggap macet, lead
+  investor boleh mengajukan penghentian, UMKM punya 7 hari untuk tetap
+  melapor, dan kalau ia diam, sisa dana yang belum cair kembali ke para
+  pendana sesuai porsi masing-masing (BR-79 sampai BR-83). Dana yang sudah
+  cair tidak ditarik kembali, karena ia memang sudah keluar dari escrow.
+
+  Bentuknya meniru yang dipakai platform escrow bermilestone seperti Upwork
+  dan Cad Crowd: dana di escrow tidak boleh tertahan tanpa batas waktu, dan
+  **kedua pihak** punya jam, bukan hanya yang memegang uang.
 - **Tindakan yang menyentuh uang dipagari verifikasi identitas.** UMKM tidak bisa mengajukan
   proposal dan investor tidak bisa memberi pledge sebelum akunnya melewati `POST /kyc`: nama
   sesuai identitas, NIK, dan rekening tujuan pencairan. Satu NIK hanya bisa dipakai satu akun,

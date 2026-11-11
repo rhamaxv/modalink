@@ -107,3 +107,8 @@ Pengelompokan nomor: 01-09 auth, 10-19 proposal, 20-29 pledge, 30-39 komunitas, 
 | BR-76 | Setiap percobaan scoring membuat baris baru di `scoring_results`. Baris lama tidak pernah ditimpa. |
 | BR-77 | `score_threshold` campaign dikunci setelah proposal pertama masuk, supaya penilaian antar proposal tetap sebanding. |
 | BR-78 | Setiap komponen skor dibatasi rentangnya oleh validator Pydantic. Nilai di luar rentang memicu retry Instructor, dan kalau tetap gagal, BR-74 berlaku. |
+| BR-79 | Tahap yang belum cair dianggap **macet** bila 30 hari lewat sejak tahap sebelumnya cair tanpa laporan masuk. Tahap yang sudah dilaporkan tidak pernah macet: bolanya ada di lead investor. |
+| BR-80 | Lead investor boleh **mengajukan penghentian** proposal `funded` yang tahapnya macet. Pengajuan tidak mengembalikan dana apa pun. |
+| BR-81 | UMKM punya **7 hari** menjawab pengajuan itu. Laporan yang masuk dalam jendela tersebut membatalkan pengajuan dan pendanaan berlanjut normal. |
+| BR-82 | Lewat jendela tanpa laporan, **sisa dana yang belum cair** dikembalikan ke para pendana secara proporsional terhadap kontribusi masing-masing, dan proposal menjadi `failed` (T-10). Dana yang sudah cair tidak pernah ditarik kembali. |
+| BR-83 | Pembagian pro-rata wajib berjumlah **sama persis** dengan sisa dana: tidak boleh menghilangkan maupun menciptakan satu rupiah pun. Sisa pembagian dialokasikan dengan metode largest remainder yang deterministik, bukan pembulatan float. |

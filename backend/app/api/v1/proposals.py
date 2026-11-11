@@ -40,6 +40,7 @@ from app.services.cover import ambil_cover, cover_versions
 from app.services.expiry import evaluate_expiry
 from app.services.kyc import require_verified
 from app.services.ledger import collected_amount_for_proposal
+from app.services.pledge import get_locked_proposal
 from app.services.proposal import (
     PROPOSAL_PAGE_SIZE_DEFAULT,
     PROPOSAL_PAGE_SIZE_MAX,
@@ -57,6 +58,7 @@ from app.services.scoring import (
     request_rescore,
     run_scoring_job,
 )
+from app.services.termination import request_termination
 
 router = APIRouter(tags=["proposals"])
 
@@ -226,3 +228,35 @@ async def list_milestones_endpoint(
     if campaign is None or not can_view(proposal, campaign, user):
         raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
     return MilestoneListOut(items=await list_proposal_milestones(session, proposal_id))
+
+
+@router.post(
+    "/api/v1/proposals/{proposal_id}/terminate",
+    response_model=ProposalOut,
+)
+async def request_termination_endpoint(
+    proposal_id: UUID,
+    investor: User = Depends(require_role(Role.INVESTOR)),
+    session: AsyncSession = Depends(get_session),
+    clock: Clock = Depends(get_clock),
+) -> ProposalWithCollectedAmount:
+    """Lead investor mengajukan penghentian proposal yang tahapnya macet.
+
+    Tidak langsung mengembalikan dana: UMKM diberi tujuh hari untuk tetap
+    mengirim laporan, dan laporan yang masuk membatalkan pengajuan ini.
+    Dananya baru kembali kalau jendela itu lewat tanpa jawaban (lihat
+    app/services/termination.py).
+
+    Baris proposal dikunci lebih dulu, seperti approve_milestone: keputusan
+    ini membaca identitas lead investor dan status funding, dan keduanya bisa
+    berubah oleh pledge yang masuk hampir bersamaan.
+    """
+    proposal = await get_locked_proposal(session, proposal_id)
+    await request_termination(session, proposal, investor, clock)
+    collected_amount = await collected_amount_for_proposal(session, proposal.id)
+    campaign = await get_campaign(session, proposal.campaign_id)
+    return ProposalWithCollectedAmount(
+        proposal=proposal,
+        collected_amount=collected_amount,
+        sector=campaign.sector if campaign is not None else None,
+    )
