@@ -143,7 +143,7 @@ test("a failed proposal fetch shows a real, keyboard-operable error state instea
 
   await page.goto("/proposal/proposal-uji-coba");
 
-  const galat = page.getByRole("alert");
+  const galat = page.getByRole("alert").filter({ hasText: /\S/ }).first();
   await expect(galat).toBeVisible();
 
   const cobaLagi = page.getByRole("button", { name: /coba lagi/i });
@@ -155,7 +155,7 @@ test("a failed proposal fetch shows a real, keyboard-operable error state instea
   await cobaLagi.focus();
   await expect(cobaLagi).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: /\S/ }).first()).toBeVisible();
 
   expect(consoleErrors.join("\n")).not.toMatch(/Hydration|error #418|did not match|Uncaught/i);
 });
@@ -163,7 +163,7 @@ test("a failed proposal fetch shows a real, keyboard-operable error state instea
 test("has no horizontal scroll at 320px even while showing the error state", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto("/proposal/proposal-uji-coba");
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: /\S/ }).first()).toBeVisible();
 
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollWidth).toBeLessThanOrEqual(320);

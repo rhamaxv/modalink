@@ -1,12 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Rute terlindungi sungguhan yang sudah ada di worktree ini. app/umkm/* ada
-// di brief yang sama tapi dibangun stream lain di worktree lain (f11-c), dan
-// berkas-berkasnya belum ada di sini, jadi guard RequireRole untuk peran
-// "umkm" dibuktikan lewat endpoint yang sama (RequireRole, lib/auth.ts)
-// dipakai pada rute yang benar-benar ada: /investor/campaign dengan peran
-// akun yang BUKAN investor. Mekanismenya identik; hanya rute contohnya beda.
+// Dua segmen terlindungi, dan KEDUANYA diuji di sini.
+//
+// Komentar lama di tempat ini menulis bahwa app/umkm/* dibangun stream lain
+// di worktree lain, jadi guard untuk peran "umkm" cukup "dibuktikan lewat
+// mekanisme yang identik" pada /investor/campaign. Asumsi itu ternyata
+// salah: setelah worktree digabung, app/umkm/layout.tsx tidak pernah ada,
+// sehingga SELURUH segmen /umkm/* berjalan tanpa pagar peran sama sekali dan
+// akun investor bisa membuka form pengajuan proposal UMKM. Tidak ada yang
+// menyadarinya karena tidak ada satu pun test yang benar-benar membuka rute
+// itu sebagai peran yang salah.
 const PROTECTED_INVESTOR_ROUTE = "/investor/campaign";
+const PROTECTED_UMKM_ROUTE = "/umkm/proposal/baru";
 
 function routeAuth(page: Page, role: "investor" | "umkm" | "community" | null) {
   return page.route("**/api/v1/**", async (route) => {
@@ -107,4 +112,32 @@ test("the shared header and its theme toggle appear on every route checked", asy
     await expect(page.getByRole("link", { name: "Modalink" })).toBeVisible();
     await expect(page.getByRole("button", { name: /tema/i })).toBeVisible();
   }
+});
+
+
+test("the umkm segment refuses an investor, the same way the investor segment refuses a umkm", async ({
+  page,
+}) => {
+  // Pasangan terbalik dari test di atas, dan ia yang hilang selama ini.
+  // Token wajib disetel lebih dulu: fetchCurrentUser() di lib/auth.ts tidak
+  // pernah memanggil /auth/me kalau localStorage kosong, jadi tanpa baris ini
+  // RequireRole melihat "belum masuk" dan mengarahkan ke /masuk, bukan 404.
+  await page.addInitScript(() => localStorage.setItem("modalink_token", "token-e2e"));
+  await routeAuth(page, "investor");
+  await page.goto(PROTECTED_UMKM_ROUTE);
+
+  // 404, bukan 403, dan bukan pula formulirnya sendiri: investor tidak perlu
+  // tahu bahwa halaman ini ada.
+  await expect(page.getByRole("button", { name: "Kirim proposal" })).toHaveCount(0);
+  await expect(page.getByText(/404|tidak ditemukan/i)).toBeVisible();
+});
+
+test("the umkm segment sends a signed-out visitor to sign in, carrying the destination", async ({
+  page,
+}) => {
+  await routeAuth(page, null);
+  await page.goto(PROTECTED_UMKM_ROUTE);
+  await expect(page).toHaveURL(
+    `/masuk?next=${encodeURIComponent(PROTECTED_UMKM_ROUTE)}`,
+  );
 });

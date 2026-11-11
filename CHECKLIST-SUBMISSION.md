@@ -64,31 +64,25 @@ juri tidak bisa melihat apa pun selain halaman publik.
 
 **Pelaku:** Pemilik. Harus dijalankan terhadap database produksi.
 
-Tidak ada modul seed di repo ini. `backend/app/seed.py` tidak ada, dan
-`POST /api/v1/internal/seed` juga tidak ada di `backend/app/api/v1/internal.py`; router itu
-hanya punya `clock/tick` dan `ledger/{proposal_id}`. Commit `085a9e8` berjudul
-`fix: seed demo data with a command that works in production` hanya menambah peringatan di
-`.claude/plan/phase-13-submission.md`, tidak menambah perintahnya. Jadi saat ini ada dua
-jalan:
+Modul seed **sudah ada** dan tidak perlu dikerjakan lagi: `backend/app/seed/demo.py`
+beserta `backend/app/seed/__main__.py`, dijalankan lewat satu perintah, idempoten, dan
+memakai jalur service produksi yang sama dengan aplikasi (bukan INSERT mentah), sehingga
+seluruh aturan bisnis tetap berlaku pada data demo.
 
-**Jalan A, manual lewat API.** Tidak butuh kode baru. Registrasi dua akun lewat endpoint
-yang sudah berjalan, lalu isi data demo dari UI seperti pengguna biasa: login sebagai
-investor, buat campaign, login sebagai UMKM, ajukan proposal, lalu pledge.
+Bagian ini sebelumnya menulis bahwa modul itu tidak ada dan menawarkan "Jalan A, manual
+lewat API" sebagai alternatif. Keterangan itu sudah usang sejak modulnya dibangun;
+dibiarkan apa adanya, ia menyuruh pemilik mengerjakan ulang sesuatu yang sudah selesai.
+
+Sembilan akun dibuat: tiga investor, empat UMKM, dan dua komunitas, beserta dua campaign,
+enam proposal dengan status yang berbeda-beda, pledge, dukungan, dan komentar. Daftar
+lengkapnya ada di [Akun demonstrasi](README.md#akun-demonstrasi).
 
 ```bash
-curl -X POST https://<domain>/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"<email>","password":"<password>","name":"<nama>","role":"investor"}'
+docker compose -f docker-compose.prod.yml exec backend python -m app.seed
 ```
 
-**Jalan B, modul seed.** Butuh kode baru: satu modul yang bisa dijalankan lewat
-`docker compose exec backend python -m app.seed`, idempoten, dan memakai logika yang sama
-dengan endpoint seed untuk test lokal. Rancangannya sudah ditulis di
-`.claude/plan/phase-13-submission.md` lengkap dengan enam proposal contoh dan status yang
-diharapkan. Lebih bagus untuk demo karena datanya bercerita, tapi ini pekerjaan **Kode**,
-bukan Pemilik, dan harus selesai sebelum 1.1 dijalankan ulang.
-
-Pilih satu. Jalan A cukup untuk memenuhi syarat kelayakan.
+Aman dijalankan lebih dari sekali: perintah ini mengenali database yang sudah pernah
+disemai dan berhenti tanpa menulis apa pun.
 
 **Verifikasi:** dari browser yang belum pernah login (mode incognito), buka
 `https://<domain>/masuk`, login dengan kredensial yang akan ditulis di README, dan pastikan
@@ -257,7 +251,7 @@ Yang sudah usang, diverifikasi terhadap isi repo hari ini:
 | Yang belum dibangun, butir 3 | Transisi otomatis ke `failed` belum ada | `backend/app/services/expiry.py` ada, evaluasi deadline dan refund simulasi |
 | Yang belum dibangun, butir 4 | Keempat endpoint internal belum ada | `clock/tick` dan `ledger/{id}` sudah ada. `clock/reset` dan `seed` memang belum |
 | Variabel lingkungan, baris terakhir | `.env.example` mendaftarkan `NEXT_PUBLIC_API_BASE` | `.env.example` mendaftarkan `NEXT_PUBLIC_API_URL`. Nama lama sudah tidak ada |
-| Pengujian | `434 passed`, frontend `18 files, 103 tests` | Angka dari sebelum 20 commit terakhir. Frontend kini punya 21 berkas test |
+| Pengujian | ~~`434 passed`, frontend `18 files, 103 tests`~~ | **Sudah diperbarui** 11 November 2026: 681 backend, 285 frontend di 28 berkas, plus 29 skenario Playwright |
 | Struktur repositori | Akar diagram bernama `logicodix/` | Nama repositori `modalink` |
 
 Daftar fitur utama juga perlu dibaca ulang: beberapa yang kini berjalan ujung ke ujung belum

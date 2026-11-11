@@ -587,21 +587,27 @@ menyesuaikan diri ke ambang itu.
 
 ## Pengujian
 
-Dijalankan ulang saat menulis dokumen ini (9 November 2026), bukan diambil dari dokumen
+Dijalankan ulang saat menulis dokumen ini (11 November 2026), bukan diambil dari dokumen
 rencana:
 
 ```bash
 $ cd backend && PYTHONPATH=. pytest tests/unit tests/integration tests/regression -q
-434 passed, 1 skipped in 17.29s
+681 passed, 1 skipped in 33.36s
 ```
 
 Rincian per kelompok:
 
 | Kelompok | Jumlah test | Isi |
 | --- | --- | --- |
-| `tests/unit` | 173 passed, 1 skipped | Lapisan domain murni dan unit lain tanpa database |
-| `tests/integration` | 108 passed | Jalur endpoint utama, lewat Postgres sungguhan |
-| `tests/regression` | 153 passed | Enam kelompok invarian (R1 transisi status, R2 dan R2b ledger/funding, R5 RBAC, R6 kegagalan AI) |
+| `tests/unit` | 211 passed, 1 skipped | Lapisan domain murni dan unit lain tanpa database |
+| `tests/integration` | 251 passed | Jalur endpoint utama, lewat Postgres sungguhan |
+| `tests/regression` | 219 passed | Enam kelompok invarian (R1 transisi status, R2 dan R2b ledger/funding, R5 RBAC, R6 kegagalan AI) |
+
+Frontend: 285 test di 28 berkas (`npm run test`). Di luar itu ada 29 skenario Playwright
+(`make test-e2e`) yang menjalankan produk lewat browser sungguhan terhadap backend asli,
+termasuk dua alur panjang: satu jalur bahagia dari campaign dibuat sampai milestone
+terakhir cair, dan satu alur pasar yang menjalankan yang berantakan (dua UMKM bersaing,
+proposal ditolak AI, pledge melebihi sisa, pembatalan, lalu pencairan bertahap).
 
 Satu test yang di-skip bukan terkait Gemini; test itu memeriksa bahwa `clock.py` adalah
 satu-satunya pemanggil jam sistem (`tests/unit/test_domain_murni.py`). `R3` dan `R4` yang

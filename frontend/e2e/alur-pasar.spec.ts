@@ -218,7 +218,10 @@ test.describe("alur pasar: dua UMKM bersaing, satu dibatalkan, dua tahap cair", 
     await isiProposal(ditolak, usahaDitolak, "8000000", 40, ["4000000", "4000000"]);
     await tungguTeks(ditolak, /tidak lolos penilaian/i);
     // Pemiliknya sendiri tetap melihat proposalnya yang ditolak.
-    await expect(ditolak.getByText(usahaDitolak)).toBeVisible();
+    // Dipersempit ke sel tabelnya: nama usaha yang sama juga muncul di
+    // dalam kalimat daftar periksa ("Profil usaha X terisi."), jadi
+    // pencocokan teks polos menemukan dua elemen.
+    await expect(ditolak.getByRole("cell", { name: usahaDitolak })).toBeVisible();
 
     // Publik tidak: GET /proposals hanya mengirim listed ke atas.
     const w = halaman.warga!;
