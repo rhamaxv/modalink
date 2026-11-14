@@ -98,3 +98,18 @@ describe("milestone plan", () => {
     expect(document.activeElement).toBe(kolom);
   });
 });
+
+describe("kolom nominal tidak pernah mati", () => {
+  it("still accepts digits after a non-digit was the very first character typed", async () => {
+    // Ditemukan saat perekaman video demo: "nominal tahap 1 gaiso diisi".
+    // Karakter non-digit pertama mengunci kolom pada nilai kosong, dan
+    // backspace tidak bisa membuka kuncinya karena tidak ada yang bisa
+    // mengecil dari string kosong.
+    render(<ProposalForm requestedAmount={10_000_000} />);
+    const kolom = nominalField(0);
+    await userEvent.type(kolom, "Rp");
+    expect(nominalField(0)).toHaveValue("");
+    await userEvent.type(nominalField(0), "5000000");
+    expect(nominalField(0)).toHaveValue("5000000");
+  });
+});

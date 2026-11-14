@@ -145,7 +145,21 @@ function MilestoneRow({ index, milestone, onChange, onRemove }: MilestoneRowProp
       onChange({ amount: raw.replace(/[^0-9]/g, "") });
       return;
     }
-    if (lockedRef.current) return;
+    if (lockedRef.current) {
+      // Kunci juga lepas saat kolomnya memang SUDAH kosong dan yang masuk
+      // seluruhnya digit. Tanpa cabang ini kolomnya punya keadaan mati:
+      // karakter non-digit yang diketik paling pertama mengunci kolom pada
+      // nilai kosong, lalu `isShrinking` di atas tidak pernah bisa benar
+      // karena tidak ada apa pun yang bisa mengecil dari string kosong --
+      // backspace tidak menolong, dan kolom itu tidak bisa diisi lagi
+      // sampai halaman dimuat ulang. Ditemukan saat perekaman demo, bukan
+      // oleh test: seluruh test mengetik digit lebih dulu.
+      if (milestone.amount === "" && !/[^0-9]/.test(raw)) {
+        lockedRef.current = false;
+      } else {
+        return;
+      }
+    }
     if (/[^0-9]/.test(raw)) {
       lockedRef.current = true;
       return;
