@@ -188,9 +188,12 @@ teruji, dan dipakai oleh halaman frontend), diverifikasi langsung dari
 
 **UMKM**
 
-- Mengajukan proposal ke sebuah campaign, lengkap dengan rencana milestone pencairan dana
-  (`POST /api/v1/campaigns/{id}/proposals`). Proposal langsung tersimpan dengan status
-  `submitted` dan direspons `201` tanpa menunggu AI; penilaian berjalan di latar belakang.
+- Mengajukan proposal ke sebuah campaign dengan **mengunggah dokumen proposalnya sebagai
+  PDF**, ditambah nama usaha, ringkasan satu-dua kalimat, dana yang diminta, dan rencana
+  milestone pencairan (`POST /api/v1/campaigns/{id}/proposals`, multipart). Dokumen itulah
+  isi proposalnya: AI membacanya untuk menilai, dan investor membacanya sebelum mendanai.
+  Proposal langsung tersimpan dengan status `submitted` dan direspons `201` tanpa menunggu
+  AI; penilaian berjalan di latar belakang.
 - Meminta penilaian ulang bila penilaian sebelumnya gagal secara teknis
   (`POST /api/v1/proposals/{id}/rescore`).
 - Melihat status dan hasil skor proposalnya sendiri.
@@ -202,6 +205,9 @@ teruji, dan dipakai oleh halaman frontend), diverifikasi langsung dari
   bisa dilihat oleh pemilik proposal dan pemilik campaign (`GET /api/v1/proposals/{id}`).
 - Melihat hasil penilaian AI milik satu proposal: tiga komponen skor, daftar red flag
   dengan kutipan bukti, dan ringkasan brief (`GET /api/v1/proposals/{id}/scoring`).
+- Membuka dokumen PDF proposalnya (`GET /api/v1/proposals/{id}/document`). Aturan aksesnya
+  mewarisi proposalnya persis: dokumen bukan sumber daya dengan visibilitas sendiri, ia isi
+  proposal itu.
 
 **Penilaian AI**
 
@@ -353,7 +359,7 @@ flowchart TB
     subgraph DB["PostgreSQL"]
         T_USER[("users")]
         T_CAMP[("campaigns")]
-        T_PROP[("proposals +<br/>proposal_milestones")]
+        T_PROP[("proposals +<br/>proposal_milestones +<br/>proposal_documents (PDF)")]
         T_PLEDGE[("pledges")]
         T_SCORE[("scoring_results<br/>append-only")]
         T_LEDGER[("ledger_entries<br/>append-only, INSERT saja")]
@@ -397,12 +403,16 @@ flowchart TB
 1. Investor membuat campaign (sektor, dana target, dua deadline, ambang skor) lewat
    `POST /campaigns`. Tersimpan sebagai baris `campaigns` dengan status `open`.
 2. UMKM mengajukan proposal ke campaign itu lewat `POST
-   /campaigns/{id}/proposals`, lengkap dengan rencana milestone. Baris `proposals` dan
-   `proposal_milestones` tersimpan dengan status `submitted`, dan `201` langsung
-   dikembalikan ke klien.
+   /campaigns/{id}/proposals` (multipart: satu bagian JSON, satu bagian berkas PDF).
+   PDF-nya diperiksa lebih dulu -- sidik byte, ukuran, jumlah halaman, dan apakah ia
+   sungguh bisa diurai -- sebelum satu baris pun ditulis. Baris `proposals`,
+   `proposal_milestones`, dan `proposal_documents` tersimpan dalam satu transaksi dengan
+   status `submitted`, dan `201` langsung dikembalikan ke klien.
 3. Tanpa membuat klien menunggu, job penilaian berjalan di latar belakang
    (`BackgroundTasks`, di balik interface `JobRunner`): memanggil `ScoringEngine`
-   (`MockScoringEngine` di test/demo, `GeminiEngine` di produksi), menyimpan hasilnya
+   (`MockScoringEngine` di test/demo, `GeminiEngine` di produksi) dengan **byte PDF-nya
+   dikirim apa adanya ke model**, yang membacanya secara native tanpa langkah OCR
+   terpisah; lalu menyimpan hasilnya
    sebagai baris baru di `scoring_results`, dan mengubah status proposal menjadi
    `listed` atau `rejected` lewat peta transisi di `transitions.py`.
 4. Investor mana pun boleh menaruh pledge pada proposal yang `listed` lewat `POST
@@ -432,6 +442,7 @@ logicodix/
 ├── .claude/    # dokumen sumber kebenaran proyek: PRD, plan, keputusan arsitektur, skill
 ├── docker-compose.yml       # Postgres untuk dev dan test lokal
 ├── docker-compose.prod.yml  # backend + frontend + Postgres + Caddy untuk deploy
+├── docker-compose.nginx.yml # override untuk server yang port 80/443-nya dipegang nginx
 ├── Caddyfile
 └── Makefile    # seluruh perintah yang didokumentasikan di bawah
 ```
@@ -605,7 +616,7 @@ class ProposalScore(BaseModel):
 ```
 
 Tiap `RedFlag` punya `code`, `severity` (`info` / `warning` / `critical`), `message`, dan
-`evidence` yaitu kutipan yang wajib berupa teks persis dari isi proposal.
+`evidence` yaitu kutipan yang wajib berupa teks persis dari dokumen proposal.
 
 **Keputusan dihitung oleh kode, bukan oleh model.** Model sama sekali tidak diminta
 mengembalikan total skor atau verdict. Keduanya dihitung di `backend/app/domain/verdict.py`:
@@ -627,11 +638,16 @@ memutuskan.
 
 **Penjagaan terhadap kutipan karangan.** Sebelum hasil penilaian dipakai, setiap
 `evidence` pada red flag diperiksa ulang: bila kutipannya tidak benar-benar muncul sebagai
-substring di isi proposal, red flag itu dibuang (`buang_evidence_halusinasi` di
-`backend/app/ai/gemini_engine.py`). Ini bisa membuat red flag kritis ikut terbuang dan
-verdict berubah dari `rejected` menjadi `listed`; itu konsekuensi yang disengaja, karena
-menampilkan kutipan karangan ke UMKM sebagai alasan penolakan dianggap lebih merusak
-daripada melewatkan satu red flag.
+substring di teks dokumen, red flag itu dibuang (`drop_hallucinated_evidence` di
+`backend/app/ai/gemini_engine.py`). Teks pembandingnya diambil dari lapisan teks PDF lewat
+pypdf saat unggahan diterima, bukan diminta ulang ke model.
+
+Konsekuensinya ada dua, dan keduanya disengaja. Pertama, red flag kritis bisa ikut terbuang
+dan verdict berubah dari `rejected` menjadi `listed`. Kedua, **dokumen hasil pindai tidak
+punya lapisan teks sama sekali**, jadi untuk dokumen semacam itu tidak ada kutipan yang
+bisa diverifikasi dan seluruh red flag-nya dibuang; skornya tetap jalan, yang hilang hanya
+alasan bernada tuduhan yang tidak bisa dibuktikan. Menampilkan kutipan karangan ke UMKM
+sebagai alasan penolakan dianggap lebih merusak daripada melewatkan satu red flag.
 
 **Mode kegagalan.** Error jaringan, timeout, output yang gagal lolos validasi setelah
 percobaan ulang oleh Instructor, atau `GEMINI_API_KEY` yang tidak diset, semuanya
@@ -641,8 +657,8 @@ infrastruktur dianggap kerusakan produk, bukan keputusan bisnis atas usaha seseo
 UMKM atau pemilik campaign kemudian bisa memicu `POST /proposals/{id}/rescore`.
 
 **Default tanpa jaringan.** `SCORING_ENGINE=mock` (default) memakai
-`MockScoringEngine`: deterministik, dihitung dari panjang dan kelengkapan isian proposal
-dibanding dana target campaign, tanpa memanggil Gemini sama sekali. Ini dipakai oleh
+`MockScoringEngine`: deterministik, dihitung dari panjang teks dokumen, jumlah tahap, dan
+porsi dana yang diminta terhadap dana target campaign, tanpa memanggil Gemini sama sekali. Ini dipakai oleh
 seluruh unit test dan integration test di repositori ini; tidak ada test yang memanggil
 Gemini sungguhan kecuali satu berkas yang ditandai `@pytest.mark.live`
 (`backend/tests/contract/test_gemini_scoring.py`), yang di-skip secara default dan hanya
