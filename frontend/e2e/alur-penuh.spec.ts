@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import path from "node:path";
 
 // Satu skenario, bukan dua puluh (brief Fase 11 Task 12): test ini
 // menjalankan seluruh rantai Modalink lewat klik dan ketikan sungguhan,
@@ -249,26 +250,27 @@ test.describe("alur penuh: dari campaign dibuat sampai milestone terakhir cair",
     campaignId = page.url().match(polaIdCampaign)![1]!;
 
     // 2. UMKM mengajukan proposal ke campaign itu, dengan milestone yang
-    // jumlahnya pas dengan dana yang diminta (BR-14). fund_usage_plan
-    // menyisipkan penanda [[SCORE:90]] yang hanya dikenali MockScoringEngine
-    // (backend/app/ai/mock_engine.py): ini membuat skor AI deterministik di
-    // atas ambang 60 campaign, bukan bergantung pada heuristik panjang teks
-    // yang bisa berubah kalau teksnya diedit nanti.
+    // jumlahnya pas dengan dana yang diminta (BR-14). Berkas PDF di
+    // e2e/fixtures menyisipkan penanda [[SCORE:90]] yang hanya dikenali
+    // MockScoringEngine (backend/app/ai/mock_engine.py): ini membuat skor AI
+    // deterministik di atas ambang 60 campaign, bukan bergantung pada
+    // heuristik panjang teks yang bisa berubah kalau isinya diedit nanti.
+    //
+    // Penandanya ada DI DALAM PDF, bukan di field formulir, dan itu memang
+    // jalur yang harus diuji: dokumennya diurai pypdf di server, dan penanda
+    // yang tidak selamat melewati perjalanan tulis-lalu-baca akan ketahuan
+    // di sini sebagai proposal yang tidak pernah jadi `listed`.
     await masukSebagai(page, umkm);
     await page.goto("/umkm/proposal/baru");
     await page.getByLabel("Nama usaha").fill(businessName);
-    await page.getByLabel("Profil usaha").fill(
+    await page.getByLabel("Ringkasan usaha").fill(
       "Usaha kopi rakyat yang sudah berjalan tiga tahun di Yogyakarta, melayani pelanggan tetap " +
-        "setiap minggu dengan kualitas biji kopi yang konsisten dan harga yang bersahabat untuk warga sekitar.",
+        "setiap minggu dengan kualitas biji kopi yang konsisten.",
     );
     await page.getByLabel("Jumlah dana yang diminta").fill("10000000");
-    await page.getByLabel("Rencana penggunaan dana").fill(
-      "60 persen dana untuk membeli mesin roasting baru, 40 persen untuk kemasan dan distribusi " +
-        "ke tiga kota terdekat dalam enam bulan ke depan. [[SCORE:90]]",
-    );
-    await page.getByLabel("Proyeksi usaha").fill(
-      "Omzet diproyeksikan naik dua kali lipat dalam satu tahun ke depan seiring ekspansi distribusi.",
-    );
+    await page
+      .getByLabel("Dokumen proposal (PDF)")
+      .setInputFiles(path.join(__dirname, "fixtures", "proposal-e2e.pdf"));
     await page.getByLabel("Judul tahap 1").fill("Pembelian mesin roasting");
     await page.getByLabel("Rincian tahap 1").fill("Membeli dan memasang mesin roasting baru di lokasi produksi.");
     await page.getByLabel("Nominal tahap 1").fill("5000000");

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { buatPdf } from "./pdf";
 
 // Pelengkap e2e/alur-penuh.spec.ts, bukan pengulangannya.
 //
@@ -134,20 +135,28 @@ test.describe("alur pasar: dua UMKM bersaing, satu dibatalkan, dua tahap cair", 
   ) {
     await page.goto("/umkm/proposal/baru");
     await page.getByLabel("Nama usaha").fill(nama);
-    await page.getByLabel("Profil usaha").fill(
-      `${nama} adalah usaha rumahan yang sudah berjalan beberapa tahun dan melayani pelanggan ` +
-        "tetap setiap minggu dengan kualitas yang konsisten dan harga yang terjangkau warga sekitar.",
+    await page.getByLabel("Ringkasan usaha").fill(
+      `${nama} adalah usaha rumahan yang sudah berjalan beberapa tahun dan melayani ` +
+        "pelanggan tetap setiap minggu.",
     );
     await page.getByLabel("Jumlah dana yang diminta").fill(nominal);
     // [[SCORE:n]] hanya dikenali MockScoringEngine, jadi skornya deterministik
-    // dan test ini tidak bergantung pada heuristik panjang teks.
-    await page.getByLabel("Rencana penggunaan dana").fill(
-      `Dana dipakai untuk menambah peralatan produksi dan memperluas distribusi ke kota ` +
-        `terdekat dalam enam bulan ke depan. [[SCORE:${skor}]]`,
-    );
-    await page.getByLabel("Proyeksi usaha").fill(
-      "Omzet diproyeksikan naik bertahap setiap kuartal seiring bertambahnya kapasitas produksi.",
-    );
+    // dan test ini tidak bergantung pada heuristik panjang teks. Penandanya
+    // ada di dalam PDF karena di situlah mesin skoring membacanya sekarang:
+    // teks dokumen diurai pypdf di server, bukan diambil dari formulir.
+    await page.getByLabel("Dokumen proposal (PDF)").setInputFiles({
+      name: `proposal-${skor}.pdf`,
+      mimeType: "application/pdf",
+      buffer: buatPdf(
+        `Proposal Usaha ${nama}`,
+        `${nama} adalah usaha rumahan yang sudah berjalan beberapa tahun dan melayani ` +
+          "pelanggan tetap setiap minggu dengan kualitas yang konsisten dan harga yang " +
+          "terjangkau warga sekitar. Dana dipakai untuk menambah peralatan produksi dan " +
+          "memperluas distribusi ke kota terdekat dalam enam bulan ke depan. Omzet " +
+          "diproyeksikan naik bertahap setiap kuartal seiring bertambahnya kapasitas " +
+          `produksi. [[SCORE:${skor}]]`,
+      ),
+    });
     await page.getByLabel("Judul tahap 1").fill("Peralatan produksi");
     await page.getByLabel("Rincian tahap 1").fill("Membeli peralatan produksi dan memasangnya di lokasi usaha.");
     await page.getByLabel("Nominal tahap 1").fill(tahap[0]);

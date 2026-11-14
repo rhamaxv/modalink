@@ -31,9 +31,7 @@ function baseProposal(overrides: Partial<Record<string, unknown>> = {}) {
     campaign_id: "c1",
     umkm_id: "u-umkm-1",
     business_name: "Kopi Rakyat Nusantara",
-    business_profile: "Usaha kopi rakyat yang sudah berjalan tiga tahun di Yogyakarta.",
-    fund_usage_plan: "60% mesin roasting, 40% kemasan dan distribusi ke tiga kota baru.",
-    business_projection: "Omzet diproyeksikan naik dua kali lipat dalam satu tahun.",
+    business_summary: "Usaha kopi rakyat yang sudah berjalan tiga tahun di Yogyakarta.",
     requested_amount: 10_000_000,
     // GET /proposals/{id} sungguhan mengirim ini publik dan sudah terhitung
     // di server (dikonfirmasi lewat verifikasi browser terhadap backend
@@ -128,6 +126,22 @@ afterEach(() => {
 });
 
 describe("proposal detail page", () => {
+  it("links to the proposal document, because that is where the actual proposal lives", async () => {
+    // Satu-satunya jalan investor membaca isi proposal sejak uraiannya
+    // pindah ke PDF. Tanpa tautan ini, yang tersisa di halaman hanyalah
+    // ringkasan satu kalimat dan skor AI -- meminta orang mendanai
+    // berdasarkan angka tanpa pernah bisa memeriksa dasarnya.
+    stubEndpoints({ proposal: baseProposal({ status: "listed" }) });
+    render(<ProposalDetailView proposalId={PROPOSAL_ID} />);
+    const tautan = await screen.findByRole("link", { name: /buka dokumen proposal/i });
+    expect(tautan).toHaveAttribute("href", expect.stringContaining(`/proposals/${PROPOSAL_ID}/document`));
+    // Tab baru: halaman proposal punya formulir pendanaan yang mungkin
+    // sudah separuh diisi, dan menimpanya dengan pembaca PDF berarti
+    // kehilangan isian itu tanpa peringatan.
+    expect(tautan).toHaveAttribute("target", "_blank");
+    expect(tautan.getAttribute("rel")).toContain("noopener");
+  });
+
   it("shows the score panel waiting, not an empty panel and not a zero, while scoring is unfinished", async () => {
     stubEndpoints({
       proposal: baseProposal({ status: "submitted", scoring_status: "processing" }),

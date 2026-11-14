@@ -13,11 +13,12 @@ import { LedgerTrail } from "@/components/LedgerTrail";
 import { TerminationPanel } from "@/components/TerminationPanel";
 import { CoverUpload } from "@/components/CoverUpload";
 import { SECTOR_ICON } from "@/components/CampaignBrowseCard";
+import { Icon } from "@/components/icons/Icon";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Amount } from "@/components/ui/Amount";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { ApiError, api, daftarDariRespons } from "@/lib/api";
+import { API_BASE, ApiError, api, daftarDariRespons } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
 type ProposalStatus =
@@ -34,9 +35,7 @@ type ProposalOut = {
   campaign_id: string;
   umkm_id: string;
   business_name: string;
-  business_profile: string;
-  fund_usage_plan: string;
-  business_projection: string;
+  business_summary: string;
   requested_amount: number;
   // GET /proposals/{id} (10-api-contract.md) sudah menghitung ini di server
   // dan mengirimkannya publik, untuk proposal listed ke atas, tanpa token.
@@ -506,26 +505,28 @@ export function ProposalDetailView({ proposalId }: ProposalDetailViewProps) {
         )}
       </section>
 
-      {/* 3. Cerita usaha dan rencana dana: teks naratif, lebar dibatasi
-          max-w-measure, rata kiri, satu kolom, tanpa rule. Beda dari
-          section 2 lewat lebar (terbatas, bukan penuh). Satu judul section
-          (text-section) membuka bagian ini; ketiga sub-bagian di dalamnya
-          memakai ukuran judul kartu (text-card-title), bukan judul section
-          lagi, supaya tiga judul raksasa tidak berbaris tanpa jeda. */}
+      {/* 3. Cerita usaha: ringkasan singkat lalu tautan ke dokumennya.
+          Lebar dibatasi max-w-measure, rata kiri, satu kolom, tanpa rule.
+          Beda dari section 2 lewat lebar (terbatas, bukan penuh).
+
+          Dokumennya tidak disematkan sebagai <iframe>: pembaca PDF dalam
+          bingkai memaksa tinggi tetap yang salah di hampir setiap layar,
+          dan di ponsel ia menghasilkan dua area yang bisa di-scroll saling
+          bersarang. Tautan membuka pembaca PDF bawaan perangkat, yang sudah
+          tahu cara memperbesar, mencari teks, dan menyimpan. */}
       <section data-pola="naratif-kiri" className="flex max-w-measure flex-col gap-space-4">
         <h2 className="text-section font-display text-ink">Cerita usaha</h2>
-        <div className="flex flex-col gap-space-1">
-          <h3 className="text-card-title font-semibold text-ink">Profil usaha</h3>
-          <p className="text-body text-ink">{data.business_profile}</p>
-        </div>
-        <div className="flex flex-col gap-space-1">
-          <h3 className="text-card-title font-semibold text-ink">Rencana pemakaian dana</h3>
-          <p className="text-body text-ink">{data.fund_usage_plan}</p>
-        </div>
-        <div className="flex flex-col gap-space-1">
-          <h3 className="text-card-title font-semibold text-ink">Proyeksi usaha</h3>
-          <p className="text-body text-ink">{data.business_projection}</p>
-        </div>
+        <p className="text-body text-ink">{data.business_summary}</p>
+        <a
+          href={`${API_BASE}/proposals/${data.id}/document`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-[44px] items-center gap-space-2 self-start rounded-sm border border-line-strong px-space-3 py-space-2 text-body font-semibold text-ink"
+        >
+          <Icon name="dokumen" />
+          Buka dokumen proposal
+          <span className="text-label font-normal text-muted">(PDF, tab baru)</span>
+        </a>
       </section>
 
       {/* 4. Panel skor AI: lebar penuh, dua kolom asimetris SUNGGUHAN lewat

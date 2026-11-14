@@ -389,15 +389,22 @@ describe("CampaignDetailPanel: the public screen a UMKM decides from", () => {
     expect(await screen.findByText("Belum ada proposal yang diajukan ke campaign ini.")).toBeInTheDocument();
   });
 
-  it("maps the full business_profile from GET /campaigns/{id}/proposals into a real excerpt, truncated not fabricated", async () => {
-    const profilPanjang = "Usaha kopi rumahan ".repeat(20).trim();
+  it("shows the business_summary from GET /campaigns/{id}/proposals verbatim, without truncating it", async () => {
+    // Dulu di sini ada pemotongan di klien, karena endpoint ini mengirim
+    // business_profile penuh sementara kartunya mengharapkan cuplikan.
+    // Keduanya sekarang mengirim business_summary, yang sudah dibatasi 500
+    // karakter di tepi, jadi memotongnya lagi hanya akan menghilangkan
+    // kalimat yang memang ditulis pengaju untuk dibaca utuh.
+    const ringkasan =
+      "Kedai kopi rumahan di Condongcatur, Sleman, tiga tahun berjalan, " +
+      "mencari modal untuk renovasi gerobak dan mesin seduh.";
     stubEndpoints({
       campaigns: [OPEN_CAMPAIGN],
       proposals: [
         {
           id: "p1",
           business_name: "Kopi Senja",
-          business_profile: profilPanjang,
+          business_summary: ringkasan,
           requested_amount: 25_000_000,
           status: "listed",
           scoring_status: "done",
@@ -409,9 +416,8 @@ describe("CampaignDetailPanel: the public screen a UMKM decides from", () => {
     });
     render(<CampaignDetailPanel campaignId="c-open-1" />);
     expect(await screen.findByText("Kopi Senja")).toBeInTheDocument();
-    const cuplikan = `${profilPanjang.slice(0, 160)}...`;
-    expect(screen.getByText(cuplikan)).toBeInTheDocument();
-    expect(screen.queryByText(profilPanjang)).not.toBeInTheDocument();
+    expect(screen.getByText(ringkasan)).toBeInTheDocument();
+    expect(screen.queryByText(/\.\.\.$/)).not.toBeInTheDocument();
   });
 
   it("renders every submitted proposal as a real link to its own detail page", async () => {
@@ -421,7 +427,7 @@ describe("CampaignDetailPanel: the public screen a UMKM decides from", () => {
         {
           id: "p1",
           business_name: "Kopi Senja",
-          business_profile: "Usaha kopi rumahan yang sudah berjalan tiga tahun.",
+          business_summary: "Usaha kopi rumahan yang sudah berjalan tiga tahun.",
           requested_amount: 25_000_000,
           status: "listed",
           scoring_status: "done",

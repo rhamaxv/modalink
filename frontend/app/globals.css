@@ -173,6 +173,37 @@ textarea.control {
    supaya tidak menempel ke tepi kanan kontrol. */
 .control[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 
+/* Input berkas. Tombol "Choose file" di dalamnya dirender browser dan tidak
+   bisa ditata lewat kelas utilitas biasa; ::file-selector-button adalah
+   satu-satunya pintu masuknya. Dibiarkan apa adanya, tombol itu tampil
+   dengan abu-abu bawaan sistem yang menolak tema gelap maupun terang.
+
+   Inputnya sendiri TIDAK disembunyikan di balik label bergaya tombol.
+   Pola itu dipakai di tempat lain (CoverUpload), dan ia benar di sana karena
+   pemicunya memang bukan input; di sini input aslinya yang terlihat, supaya
+   nama berkas yang sudah dipilih tetap diumumkan pembaca layar tanpa kita
+   menulis ulang pengumumannya sendiri. */
+.control[type="file"] {
+  /* padding vertikal lebih kecil dari .control: tombol di dalamnya punya
+     tinggi sendiri, dan padding penuh membuat kotaknya jauh melewati 44px. */
+  padding: var(--space-1) var(--space-2);
+  line-height: 2;
+  cursor: pointer;
+}
+
+.control[type="file"]::file-selector-button {
+  margin-right: var(--space-3);
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background-color: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* Kontrol yang hidup di satu baris bersama kontrol lain (bilah penyaring
    halaman jelajah), bukan di dalam kolom formulir yang melebar penuh. */
 .control-inline { width: auto; min-width: 11rem; }

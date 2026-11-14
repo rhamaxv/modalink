@@ -107,9 +107,58 @@ async function unggah(jalur: string, berkas: File): Promise<void> {
   }
 }
 
+// Pengajuan proposal: satu bagian JSON dan satu bagian berkas dalam satu
+// permintaan. Terpisah dari `unggah` di atas karena bentuknya memang beda --
+// metodenya POST, bagiannya dua, dan ia mengembalikan proposal yang baru
+// dibuat alih-alih 204 -- tapi alasan ia tidak lewat `minta` sama persis:
+// Content-Type untuk FormData harus ditulis browser sendiri beserta
+// boundary-nya.
+async function kirimProposal<T>(
+  jalur: string,
+  muatan: unknown,
+  dokumen: File,
+): Promise<T> {
+  const form = new FormData();
+  // Bagian JSON dikirim sebagai string, bukan sebagai beberapa field form
+  // terpisah: milestone adalah daftar objek, dan memecahnya menjadi
+  // milestones[0][amount] dan seterusnya berarti menulis ulang aturan
+  // validasi Pydantic di sisi klien.
+  form.append("payload", JSON.stringify(muatan));
+  form.append("document", dokumen, dokumen.name);
+
+  const header: Record<string, string> = {};
+  const token = getToken();
+  if (token) header.Authorization = `Bearer ${token}`;
+
+  let respons: Response;
+  try {
+    respons = await fetch(`${BASIS}${jalur}`, { method: "POST", headers: header, body: form });
+  } catch {
+    throw new ApiError(
+      "jaringan_bermasalah",
+      "Koneksi ke server bermasalah. Periksa jaringan lalu coba lagi.",
+      0,
+    );
+  }
+  if (!respons.ok) {
+    const isi: unknown = await respons.json().catch(() => null);
+    const e = (isi as { error?: Record<string, unknown> } | null)?.error;
+    throw new ApiError(
+      typeof e?.code === "string" ? e.code : "galat_tak_dikenal",
+      typeof e?.message === "string"
+        ? e.message
+        : "Terjadi kesalahan di server. Coba lagi sebentar lagi.",
+      respons.status,
+      (e?.detail as Record<string, unknown>) ?? {},
+    );
+  }
+  return respons.json();
+}
+
 export const api = {
   get: <T>(jalur: string) => minta<T>("GET", jalur),
   unggah,
+  kirimProposal,
   post: <T>(jalur: string, body?: unknown) => minta<T>("POST", jalur, body),
   patch: <T>(jalur: string, body?: unknown) => minta<T>("PATCH", jalur, body),
   del: <T>(jalur: string) => minta<T>("DELETE", jalur),

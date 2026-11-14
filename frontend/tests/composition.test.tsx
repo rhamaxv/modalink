@@ -73,7 +73,7 @@ function stubFetchWithProposals() {
                 campaign_id: "c1",
                 umkm_id: "u1",
                 business_name: "Kopi Senja",
-                business_profile_excerpt:
+                business_summary:
                   "Usaha kopi rumahan yang sudah berjalan tiga tahun dan ingin memperluas kapasitas produksi.",
                 requested_amount: 25_000_000,
                 collected_amount: 5_000_000,
@@ -88,7 +88,7 @@ function stubFetchWithProposals() {
                 campaign_id: "c1",
                 umkm_id: "u2",
                 business_name: "Batik Lereng",
-                business_profile_excerpt: "Usaha batik tulis.",
+                business_summary: "Usaha batik tulis.",
                 requested_amount: 15_000_000,
                 collected_amount: 9_000_000,
                 status: "partially_funded",

@@ -56,11 +56,15 @@ export default function ProposalBaru() {
     muat();
   }, [muat]);
 
-  async function handleSubmit(activeCampaignId: string, payload: ProposalSubmission) {
+  async function handleSubmit(
+    activeCampaignId: string,
+    payload: ProposalSubmission,
+    dokumen: File,
+  ) {
     setSubmitError(null);
     setSubmitting(true);
     try {
-      await api.post(`/campaigns/${activeCampaignId}/proposals`, payload);
+      await api.kirimProposal(`/campaigns/${activeCampaignId}/proposals`, payload, dokumen);
       router.push("/umkm/beranda");
     } catch (error) {
       setSubmitError(
@@ -89,7 +93,8 @@ export default function ProposalBaru() {
       <div className="max-w-measure">
         <h1 className="font-display text-page text-ink">Ajukan proposal</h1>
         <p className="mt-space-3 text-body text-muted">
-          Isi selengkap dan sespesifik mungkin. AI menilai berdasarkan isian field-field ini.
+          Unggah dokumen proposal Anda sebagai PDF. AI membaca dokumen itu untuk menilai,
+          dan investor membacanya sebelum memutuskan ikut mendanai.
         </p>
       </div>
 
@@ -125,7 +130,7 @@ export default function ProposalBaru() {
             maxAmount={campaign.target_amount}
             disabledReason={disabledReason}
             submitting={submitting}
-            onSubmit={(payload) => handleSubmit(campaign.id, payload)}
+            onSubmit={(payload, dokumen) => handleSubmit(campaign.id, payload, dokumen)}
           />
         </>
       )}

@@ -12,16 +12,17 @@ function formatDate(iso: string): string {
 }
 
 // GET /campaigns/{id}/proposals mengembalikan ProposalWithSignalsOut
-// (backend/app/schemas/proposal.py): ProposalOut lengkap, business_profile
-// PENUH, ditambah total_score dan vote_count. Bukan ProposalListItemOut
-// yang dipakai GET /proposals (sudah dipotong server jadi
-// business_profile_excerpt). Dua kontrak berbeda untuk dua endpoint berbeda,
-// dan field inilah sumber mismatch itu: dipetakan ke bentuk Proposal lewat
-// petakeProposal di bawah, bukan dipaksa cocok lewat cast.
+// (backend/app/schemas/proposal.py): ProposalOut lengkap ditambah
+// total_score dan vote_count. Dulu di sini ada pemotongan teks, karena
+// endpoint ini mengirim business_profile penuh sementara ProposalCard
+// mengharapkan cuplikan yang sudah dipotong server. Keduanya sekarang
+// mengirim field yang sama, business_summary, yang memang sudah pendek
+// sejak di tepi (maksimal 500 karakter), jadi tidak ada lagi yang perlu
+// dipotong di sini.
 type ProposalMasuk = {
   id: string;
   business_name: string;
-  business_profile: string;
+  business_summary: string;
   requested_amount: number;
   // ProposalWithSignalsOut mewarisi ProposalOut, jadi field ini memang ikut
   // terkirim oleh GET /campaigns/{id}/proposals; sebelumnya cuma tidak
@@ -33,23 +34,11 @@ type ProposalMasuk = {
   created_at: string;
 };
 
-const PANJANG_CUPLIKAN = 160;
-
-// Memotong business_profile PENUH jadi cuplikan di klien, meniru persis apa
-// yang backend lakukan untuk GET /proposals (lihat komentar
-// ProposalListItemOut di backend/app/schemas/proposal.py). Ini bukan
-// mengarang data (R-17/R-38): isinya tetap kalimat nyata dari proposal,
-// cuma dipotong supaya ProposalCard (yang mengharapkan bentuk ringkas)
-// tetap bisa dipakai apa adanya tanpa diubah.
 function petakeProposal(p: ProposalMasuk, sektorCampaign: string | null): Proposal {
-  const cuplikan =
-    p.business_profile.length > PANJANG_CUPLIKAN
-      ? `${p.business_profile.slice(0, PANJANG_CUPLIKAN)}...`
-      : p.business_profile;
   return {
     id: p.id,
     business_name: p.business_name,
-    business_profile_excerpt: cuplikan,
+    business_summary: p.business_summary,
     requested_amount: p.requested_amount,
     collected_amount: p.collected_amount,
     cover_updated_at: p.cover_updated_at ?? null,

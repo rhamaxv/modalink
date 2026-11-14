@@ -14,18 +14,20 @@ import {
 // sama tanpa mengetik ulang angkanya.
 export const MIN_BUSINESS_NAME = 3;
 export const MAX_BUSINESS_NAME = 120;
-export const MIN_BUSINESS_PROFILE = 100;
-export const MIN_FUND_USAGE_PLAN = 100;
-export const MIN_BUSINESS_PROJECTION = 50;
+export const MIN_BUSINESS_SUMMARY = 30;
+export const MAX_BUSINESS_SUMMARY = 500;
 // BR-12: requested_amount minimal Rp500.000.
 export const MIN_REQUESTED_AMOUNT = 500_000;
+// Harus sama dengan MAX_DOCUMENT_BYTES di backend/app/models/
+// proposal_document.py. Diperiksa di sini supaya berkas 40 MB ditolak
+// sebelum diunggah, bukan setelah UMKM menunggu unggahannya selesai di
+// jaringan seluler.
+export const MAX_DOCUMENT_BYTES = 5_242_880;
 
 export type ProposalSubmission = {
   business_name: string;
-  business_profile: string;
+  business_summary: string;
   requested_amount: number;
-  fund_usage_plan: string;
-  business_projection: string;
   milestones: { seq: number; title: string; description: string; amount: number }[];
 };
 
@@ -40,7 +42,10 @@ type ProposalFormProps = {
    *  request dikirim, bukan menunggu jawaban server. */
   disabledReason?: string;
   submitting?: boolean;
-  onSubmit?: (payload: ProposalSubmission) => void;
+  /** Dokumen dikirim terpisah dari payload, bukan diselipkan ke dalamnya:
+   *  permintaannya multipart, dan berkas bukan sesuatu yang bisa ikut
+   *  JSON.stringify. */
+  onSubmit?: (payload: ProposalSubmission, dokumen: File) => void;
 };
 
 function kurangKarakter(nilai: string, minimum: number): number {
@@ -55,12 +60,11 @@ export function ProposalForm({
   onSubmit,
 }: ProposalFormProps) {
   const [businessName, setBusinessName] = useState("");
-  const [businessProfile, setBusinessProfile] = useState("");
+  const [businessSummary, setBusinessSummary] = useState("");
   const [requestedAmountInput, setRequestedAmountInput] = useState(
     requestedAmount !== undefined ? String(requestedAmount) : "",
   );
-  const [fundUsagePlan, setFundUsagePlan] = useState("");
-  const [businessProjection, setBusinessProjection] = useState("");
+  const [dokumen, setDokumen] = useState<File | null>(null);
   const [milestones, setMilestones] = useState<MilestoneDraft[]>(
     Array.from({ length: MIN_MILESTONES }, () => ({ title: "", description: "", amount: "" })),
   );
@@ -69,9 +73,9 @@ export function ProposalForm({
   const milestoneTotal = totalMilestone(milestones);
   const milestoneCocok = milestoneTotal === requestedAmountValue;
 
-  const kurangFundUsagePlan = kurangKarakter(fundUsagePlan, MIN_FUND_USAGE_PLAN);
-  const kurangBusinessProfile = kurangKarakter(businessProfile, MIN_BUSINESS_PROFILE);
-  const kurangBusinessProjection = kurangKarakter(businessProjection, MIN_BUSINESS_PROJECTION);
+  const kurangBusinessSummary = kurangKarakter(businessSummary, MIN_BUSINESS_SUMMARY);
+  const ringkasanTerlaluPanjang = businessSummary.trim().length > MAX_BUSINESS_SUMMARY;
+  const dokumenTerlaluBesar = dokumen !== null && dokumen.size > MAX_DOCUMENT_BYTES;
   const namaUsahaKurangPanjang = businessName.trim().length < MIN_BUSINESS_NAME;
   const namaUsahaTerlaluPanjang = businessName.trim().length > MAX_BUSINESS_NAME;
   const jumlahDimintaTerlaluKecil = requestedAmountValue < MIN_REQUESTED_AMOUNT;
@@ -81,11 +85,12 @@ export function ProposalForm({
   const formValid =
     !namaUsahaKurangPanjang &&
     !namaUsahaTerlaluPanjang &&
-    kurangBusinessProfile === 0 &&
+    kurangBusinessSummary === 0 &&
+    !ringkasanTerlaluPanjang &&
+    dokumen !== null &&
+    !dokumenTerlaluBesar &&
     !jumlahDimintaTerlaluKecil &&
     !jumlahDimintaMelebihiTarget &&
-    kurangFundUsagePlan === 0 &&
-    kurangBusinessProjection === 0 &&
     milestoneCocok;
 
   const tidakBisaDikirim = Boolean(disabledReason) || !formValid || submitting;
@@ -100,34 +105,30 @@ export function ProposalForm({
       : namaUsahaTerlaluPanjang
         ? `Nama usaha maksimal ${MAX_BUSINESS_NAME} karakter.`
         : undefined;
-  const errorProfilUsaha =
-    businessProfile.length > 0 && kurangBusinessProfile > 0
-      ? `Profil usaha masih kurang ${kurangBusinessProfile} karakter dari minimum ${MIN_BUSINESS_PROFILE}.`
-      : undefined;
+  const errorRingkasan =
+    businessSummary.length > 0 && kurangBusinessSummary > 0
+      ? `Ringkasan masih kurang ${kurangBusinessSummary} karakter dari minimum ${MIN_BUSINESS_SUMMARY}.`
+      : ringkasanTerlaluPanjang
+        ? `Ringkasan maksimal ${MAX_BUSINESS_SUMMARY} karakter. Uraian lengkapnya taruh di dokumen.`
+        : undefined;
+  const errorDokumen = dokumenTerlaluBesar
+    ? `Ukuran dokumen maksimal ${MAX_DOCUMENT_BYTES / 1024 / 1024} MB.`
+    : undefined;
   const errorJumlahDiminta =
     requestedAmountInput.length > 0 && jumlahDimintaTerlaluKecil
       ? "Dana yang diminta minimal Rp500.000."
       : requestedAmountInput.length > 0 && jumlahDimintaMelebihiTarget
         ? "Dana yang diminta tidak boleh melebihi target campaign."
         : undefined;
-  const errorRencanaDana =
-    fundUsagePlan.length > 0 && kurangFundUsagePlan > 0
-      ? `Rencana penggunaan dana masih kurang ${kurangFundUsagePlan} karakter dari minimum ${MIN_FUND_USAGE_PLAN}.`
-      : undefined;
-  const errorProyeksi =
-    businessProjection.length > 0 && kurangBusinessProjection > 0
-      ? `Proyeksi usaha masih kurang ${kurangBusinessProjection} karakter dari minimum ${MIN_BUSINESS_PROJECTION}.`
-      : undefined;
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (tidakBisaDikirim) return;
-    onSubmit?.({
+    if (tidakBisaDikirim || dokumen === null) return;
+    onSubmit?.(
+      {
       business_name: businessName,
-      business_profile: businessProfile,
+      business_summary: businessSummary,
       requested_amount: requestedAmountValue,
-      fund_usage_plan: fundUsagePlan,
-      business_projection: businessProjection,
       // seq (1-indeks urutan tahap) wajib diisi: backend/app/schemas/
       // proposal.py MilestoneIn tidak punya default untuk field ini. Tanpa
       // ini, POST /campaigns/{id}/proposals selalu gagal 422 "Field
@@ -141,7 +142,9 @@ export function ProposalForm({
         description: m.description,
         amount: Number(m.amount) || 0,
       })),
-    });
+      },
+      dokumen,
+    );
   }
 
   return (
@@ -164,11 +167,11 @@ export function ProposalForm({
       />
 
       <TextAreaField
-        label="Profil usaha"
-        hint="Jenis usaha, lama berjalan, lokasi, jumlah pekerja."
-        value={businessProfile}
-        onChange={setBusinessProfile}
-        error={errorProfilUsaha}
+        label="Ringkasan usaha"
+        hint={`Satu-dua kalimat untuk kartu di halaman jelajah. Maksimal ${MAX_BUSINESS_SUMMARY} karakter; uraian lengkapnya taruh di dokumen.`}
+        value={businessSummary}
+        onChange={setBusinessSummary}
+        error={errorRingkasan}
         required
       />
 
@@ -180,22 +183,10 @@ export function ProposalForm({
         required
       />
 
-      <TextAreaField
-        label="Rencana penggunaan dana"
-        hint="Rincian penggunaan dana per pos."
-        value={fundUsagePlan}
-        onChange={setFundUsagePlan}
-        error={errorRencanaDana}
-        required
-      />
-
-      <TextAreaField
-        label="Proyeksi usaha"
-        hint="Proyeksi omzet atau dampak."
-        value={businessProjection}
-        onChange={setBusinessProjection}
-        error={errorProyeksi}
-        required
+      <DocumentField
+        value={dokumen}
+        onChange={setDokumen}
+        error={errorDokumen}
       />
 
       <div>
@@ -310,6 +301,58 @@ function TextAreaField({ label, hint, value, onChange, error, required }: TextAr
         rows={4}
         className="control"
       />
+      {error && (
+        <p id={errorId} role="alert" className="text-label text-danger">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+type DocumentFieldProps = {
+  value: File | null;
+  onChange: (berkas: File | null) => void;
+  error?: string;
+};
+
+// Memakai kelas `.control` yang sama dengan seluruh kontrol lain; tombol
+// "Choose file" bawaan browser ditata lewat ::file-selector-button di
+// globals.css, karena itu satu-satunya pintu masuk ke elemen yang dirender
+// browser sendiri itu.
+function DocumentField({ value, onChange, error }: DocumentFieldProps) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const describedBy = [hintId, error ? errorId : null].filter(Boolean).join(" ");
+  return (
+    <div className="flex flex-col gap-space-1">
+      <label htmlFor={id} className="text-label font-medium text-muted">
+        Dokumen proposal (PDF)
+        <span aria-hidden="true"> *</span>
+      </label>
+      <p id={hintId} className="text-label text-muted">
+        Inilah isi proposal yang dinilai AI dan dibaca investor: profil usaha, rincian
+        penggunaan dana, dan proyeksinya. Maksimal {MAX_DOCUMENT_BYTES / 1024 / 1024} MB
+        dan 20 halaman.
+      </p>
+      <input
+        id={id}
+        type="file"
+        // accept hanya menyaring dialog berkas, tidak menjamin apa pun:
+        // tipe sesungguhnya ditentukan server dari byte berkasnya.
+        accept="application/pdf,.pdf"
+        required
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+        className="control"
+      />
+      {value && !error && (
+        <p className="text-label text-muted">
+          {value.name} — {(value.size / 1024).toFixed(0)} KB
+        </p>
+      )}
       {error && (
         <p id={errorId} role="alert" className="text-label text-danger">
           {error}

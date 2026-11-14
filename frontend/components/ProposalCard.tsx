@@ -27,7 +27,7 @@ export type Proposal = {
   business_name: string;
   // Cuplikan, bukan profil penuh: GET /proposals sengaja tidak lagi
   // mengirim rencana bisnis lengkap, dan pemotongannya dilakukan server.
-  business_profile_excerpt: string;
+  business_summary: string;
   requested_amount: number;
   // BR-51/D-03: selalu dijumlahkan dari ledger, tidak pernah kolom tersimpan.
   // Sudah ada di ProposalOut sejak Task 1 tapi belum pernah dibaca daftar
@@ -101,7 +101,7 @@ export function ProposalCard({ proposal, featured = false, index }: ProposalCard
       />
       {featured && (
         <p className="max-w-measure text-body text-muted">
-          {proposal.business_profile_excerpt}
+          {proposal.business_summary}
         </p>
       )}
       {proposal.scoring_status === "failed" && (
@@ -281,7 +281,7 @@ function ProposalRow({ proposal, index }: { proposal: Proposal; index: number })
             <span className="shrink-0">{SECTOR_LABEL[proposal.sector] ?? proposal.sector}</span>
           )}
           {proposal.sector && <span aria-hidden="true">·</span>}
-          <span className="line-clamp-1">{proposal.business_profile_excerpt}</span>
+          <span className="line-clamp-1">{proposal.business_summary}</span>
         </span>
       </span>
 

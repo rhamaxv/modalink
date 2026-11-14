@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, api: { get: vi.fn(), post: vi.fn() } };
+  return { ...actual, api: { get: vi.fn(), post: vi.fn(), kirimProposal: vi.fn() } };
 });
 
 import { api } from "@/lib/api";
@@ -168,24 +168,51 @@ describe("umkm proposal submission", () => {
     await screen.findByRole("heading", { name: /ajukan proposal/i });
     expect(screen.getByRole("alert").textContent).toMatch(/tenggat/i);
     expect(screen.getByRole("button", { name: /kirim proposal/i })).toBeDisabled();
-    expect(api.post).not.toHaveBeenCalled();
+    expect(api.kirimProposal).not.toHaveBeenCalled();
   });
 
-  it("rejects a fund usage plan shorter than the minimum, stating how many more characters are needed", async () => {
+  it("rejects a summary shorter than the minimum, stating how many more characters are needed", async () => {
+    mockCampaigns();
+    render(<ProposalBaru />);
+    await screen.findByRole("heading", { name: /ajukan proposal/i });
+
+    await userEvent.type(screen.getByLabelText(/^nama usaha/i), "Warung Kopi Berkah");
+    await userEvent.type(screen.getByLabelText(/^ringkasan usaha/i), "warung kopi");
+
+    await waitFor(() => {
+      expect(screen.getByText(/ringkasan masih kurang \d+ karakter/i)).toBeInTheDocument();
+    });
+    expect(api.kirimProposal).not.toHaveBeenCalled();
+  });
+
+  it("keeps submission disabled until a document is attached", async () => {
+    // Dokumen adalah isi proposalnya, bukan lampiran: tanpa berkas, tidak
+    // ada yang bisa dinilai AI maupun dibaca investor, jadi formulirnya
+    // tidak boleh bisa dikirim betapa pun lengkap sisanya.
     mockCampaigns();
     render(<ProposalBaru />);
     await screen.findByRole("heading", { name: /ajukan proposal/i });
 
     await userEvent.type(screen.getByLabelText(/^nama usaha/i), "Warung Kopi Berkah");
     await userEvent.type(
-      screen.getByLabelText(/^profil usaha/i),
-      "Usaha warung kopi rumahan yang sudah berjalan tiga tahun di Bandung dengan dua orang pekerja tetap dan omzet stabil setiap bulannya.",
+      screen.getByLabelText(/^ringkasan usaha/i),
+      "Warung kopi rumahan di Bandung, tiga tahun berjalan, dua pekerja tetap.",
     );
-    await userEvent.type(screen.getByLabelText(/^rencana penggunaan dana/i), "beli mesin kopi");
 
-    await waitFor(() => {
-      expect(screen.getByText(/rencana penggunaan dana masih kurang \d+ karakter/i)).toBeInTheDocument();
-    });
-    expect(api.post).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /kirim proposal/i })).toBeDisabled();
+    expect(api.kirimProposal).not.toHaveBeenCalled();
+  });
+
+  it("asks for the document as a pdf and says what it is for", async () => {
+    mockCampaigns();
+    render(<ProposalBaru />);
+    await screen.findByRole("heading", { name: /ajukan proposal/i });
+
+    const berkas = screen.getByLabelText(/dokumen proposal/i);
+    expect(berkas).toHaveAttribute("type", "file");
+    expect(berkas.getAttribute("accept")).toMatch(/pdf/);
+    // Keterangannya menyebut siapa yang membacanya, bukan sekadar "unggah
+    // berkas": itulah yang menentukan seberapa serius UMKM menyiapkannya.
+    expect(screen.getByText(/dinilai AI dan dibaca investor/i)).toBeInTheDocument();
   });
 });

@@ -14,9 +14,7 @@ async function mockProposalLengkap(page: Page, status: "listed" | "funded" = "li
     campaign_id: "c1",
     umkm_id: "u-umkm-1",
     business_name: "Kopi Rakyat Nusantara",
-    business_profile: "Usaha kopi rakyat yang sudah berjalan tiga tahun di Yogyakarta.",
-    fund_usage_plan: "60% mesin roasting, 40% kemasan dan distribusi ke tiga kota baru.",
-    business_projection: "Omzet diproyeksikan naik dua kali lipat dalam satu tahun.",
+    business_summary: "Usaha kopi rakyat yang sudah berjalan tiga tahun di Yogyakarta.",
     requested_amount: 10_000_000,
     // Field ini SELALU dikirim backend sungguhan (ProposalOut di
     // backend/app/schemas/proposal.py). Dulu tidak ada di stub ini, dan

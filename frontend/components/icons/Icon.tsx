@@ -37,7 +37,8 @@ export type IconName =
   | "arrow-right"
   | "arrow-left"
   | "upload"
-  | "image";
+  | "image"
+  | "dokumen";
 
 // Jalur digambar pada grid 24x24. Ditulis sebagai data, bukan sebagai satu
 // komponen React per ikon: daftar ini dipakai juga oleh pagar di
@@ -93,6 +94,12 @@ const JALUR: Record<IconName, string> = {
   upload: "M12 15.6V3.8M7.8 8l4.2-4.2L16.2 8M4 15v4.2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V15",
   image:
     "M3.6 7a2.4 2.4 0 0 1 2.4-2.4h12a2.4 2.4 0 0 1 2.4 2.4v10a2.4 2.4 0 0 1-2.4 2.4H6A2.4 2.4 0 0 1 3.6 17zM9 11.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4ZM4 17l5.2-4.7 4.3 3.9 2.8-2.4L20 17",
+  // Lembar dengan sudut terlipat dan tiga baris teks. Lipatannya digambar
+  // sebagai dua garis (tepi miring lalu sisi dalamnya), bukan satu, supaya
+  // ia terbaca sebagai halaman kertas dan bukan sekadar kotak yang sudutnya
+  // terpotong.
+  dokumen:
+    "M13.4 3.4H6.8a1.8 1.8 0 0 0-1.8 1.8v13.6a1.8 1.8 0 0 0 1.8 1.8h10.4a1.8 1.8 0 0 0 1.8-1.8V8.8zM13.4 3.4v5.4h5.6M8.6 13h6.8M8.6 16.6h6.8",
 };
 
 type IconProps = Omit<SVGProps<SVGSVGElement>, "name"> & {
