@@ -32,6 +32,16 @@ services:
       # Default, bukan diteruskan kosong: variabel yang tidak diset tapi tetap
       # diteruskan tiba sebagai string kosong dan menimpa default di config.py.
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      # Keduanya sempat tidak ada di daftar ini sama sekali, dan akibatnya
+      # halus justru karena tidak ada yang gagal: .env di server menyetel
+      # JWT_TTL_HOURS=12 dan GEMINI_TIMEOUT_S=30, container tidak pernah
+      # melihat keduanya, dan produksi diam-diam berjalan dengan default
+      # config.py (24 jam dan 60 detik). Token hidup dua kali lebih lama
+      # daripada yang dikira operator, dan nilai yang ditulis di .env tidak
+      # berarti apa-apa -- bentuk kebohongan konfigurasi yang persis sama
+      # dengan yang dicegah penjaga `:?` di atas.
+      JWT_TTL_HOURS: ${JWT_TTL_HOURS:-24}
+      GEMINI_TIMEOUT_S: ${GEMINI_TIMEOUT_S:-60}
     depends_on:
       db: { condition: service_healthy }
     restart: unless-stopped

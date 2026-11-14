@@ -31,6 +31,10 @@ const teks = localFont({
   display: "swap",
 });
 
+// Ikon tidak didaftarkan di sini: Next.js App Router menemukan app/icon.png
+// dan app/apple-icon.png dari namanya sendiri, lalu menerbitkan <link> beserta
+// hash isi berkasnya. Mendaftarkannya manual di metadata.icons justru
+// menghasilkan dua <link> yang saling bersaing.
 export const metadata: Metadata = {
   title: "Modalink",
   description: "Platform pendanaan UMKM: investor mendanai, UMKM mengajukan proposal.",

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Logo } from "@/components/brand/Logo";
 import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NavRole, NavLink } from "@/components/NavRole";
@@ -98,9 +99,13 @@ export function AppHeader() {
         */}
         <Link
           href="/"
-          className="font-display text-card-title font-bold tracking-tight text-ink"
+          className="flex items-center gap-space-2 font-display text-card-title font-bold tracking-tight text-ink"
           onClick={tutupMenu}
         >
+          {/* aria-hidden (bawaan Logo tanpa prop title): teks "Modalink" di
+              sebelahnya sudah menjadi nama tautan ini, dan lambang yang ikut
+              diumumkan akan membuat pembaca layar menyebutnya dua kali. */}
+          <Logo className="h-[1.35em] w-[1.35em] shrink-0" />
           Modalink
         </Link>
         <button
