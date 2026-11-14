@@ -1,0 +1,21 @@
+# Override untuk server yang port 80/443-nya sudah dipegang nginx.
+#
+# Dipakai bersama docker-compose.prod.yml, bukan menggantikannya:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.nginx.yml up -d
+#
+# Di deploy modalink.rhamaxv.com, nginx yang menerima 443 (lewat stream/SNI)
+# dan memegang sertifikatnya; Caddy tinggal jadi router /api vs frontend di
+# belakangnya. Karena itu Caddy di sini tidak lagi mengurus TLS: DOMAIN diisi
+# ":80" supaya ia melayani HTTP polos, dan tanpa itu Caddy akan mencoba
+# menerbitkan sertifikat untuk nama yang sertifikatnya sudah dipegang nginx,
+# lalu gagal ACME berulang-ulang karena port 80 bukan miliknya.
+#
+# Binding-nya 127.0.0.1, bukan 0.0.0.0: tanpa alamat itu Docker membuka port
+# ke seluruh internet dan menembus ufw, sehingga situs yang sama bisa diakses
+# tanpa TLS lewat IP:8091 sekaligus lewat HTTPS di domainnya.
+services:
+  caddy:
+    environment:
+      DOMAIN: ":80"
+    ports: !override ["127.0.0.1:8091:80"]
