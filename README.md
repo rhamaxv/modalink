@@ -8,10 +8,8 @@ Dikerjakan untuk **Logicodix 2026**, subtema **Local MSME & Creative Economy**, 
 **Onde Mande Dinamika**.
 
 > Status dokumen ini: ditulis selama Hacking Week, mengikuti kode yang ada pada saat
-> penulisan. Beberapa bagian ditandai **[ISI SEBELUM SUBMIT]** karena nilainya belum ada
-> (URL deploy, akun demo) atau belum selesai dikerjakan (lihat [Yang belum
-> dibangun](#yang-belum-dibangun)). Bagian itu sengaja dikosongkan, bukan diisi nilai
-> contoh, supaya tidak ada yang keliru menganggapnya nyata.
+> penulisan. Yang belum dikerjakan didaftar apa adanya di [Yang belum
+> dibangun](#yang-belum-dibangun), bukan dihaluskan.
 
 ## Daftar isi
 
@@ -35,20 +33,17 @@ Dikerjakan untuk **Logicodix 2026**, subtema **Local MSME & Creative Economy**, 
 
 **Onde Mande Dinamika**
 
-| # | Nama | Peran di pengembangan |
-| --- | --- | --- |
-| 1 | Janzen Firdaus Al Zam Zami | **[ISI SEBELUM SUBMIT]** |
-| 2 | Rhama Damarwijaya | Ketua tim. **[ISI SEBELUM SUBMIT]** |
-| 3 | Moch Hanafi Gus Ageng Manik | **[ISI SEBELUM SUBMIT]** |
-| 4 | Naufal Ardallah Budianto | **[ISI SEBELUM SUBMIT]** |
+| # | Nama |
+| --- | --- |
+| 1 | Janzen Firdaus Al Zam Zami |
+| 2 | Rhama Damarwijaya (ketua tim) |
+| 3 | Moch Hanafi Gus Ageng Manik |
+| 4 | Naufal Ardallah Budianto |
 
 Seluruh commit pada riwayat repositori ini berasal dari satu akun GitHub anggota terdaftar
 (`rhamaxv`, Rhama Damarwijaya). Ini sah menurut aturan panitia, yang mensyaratkan asal commit
-dari akun anggota terdaftar, bukan pemerataan jumlah commit per anggota. Pembagian kerja
-nyata selama Hacking Week (ideasi dan pemetaan masalah, desain UI/UX, penulisan kode,
-pengujian, video demo) tidak tercermin satu-satu dari riwayat commit, dan kolom kedua di
-atas wajib diisi pemilik project sebelum submission supaya itu terlihat jelas tanpa harus
-ditanyakan juri. Cara memverifikasi asal commit:
+dari akun anggota terdaftar, bukan pemerataan jumlah commit per anggota. Cara memverifikasi
+asal commit:
 
 ```bash
 git log --format='%an <%ae>' | sort -u
@@ -299,12 +294,12 @@ Rencana penuh produk ada di `.claude/prd/` dan `.claude/plan/` kalau ingin diban
 - [Google Gemini](https://ai.google.dev/) (`gemini-2.5-flash`) untuk penilaian proposal
   berbasis AI. Lihat [Dokumentasi penggunaan AI](#dokumentasi-penggunaan-ai).
 
-**Infrastruktur deploy** (disiapkan, lihat [Deploy](#deploy))
+**Infrastruktur deploy** (lihat [Deploy](#deploy))
 
 - [Docker](https://www.docker.com/) + [Docker Compose](https://docs.docker.com/compose/)
   untuk menjalankan Postgres, backend, dan frontend sebagai container terpisah.
-- [Caddy 2](https://caddyserver.com/) sebagai reverse proxy, mengurus sertifikat HTTPS
-  (Let's Encrypt) secara otomatis.
+- [Caddy 2](https://caddyserver.com/) sebagai reverse proxy di dalam stack, memilah
+  `/api/*` ke backend dan sisanya ke frontend.
 
 ## Arsitektur sistem dan alur data
 
@@ -530,7 +525,7 @@ Sesuai `.env.example` di direktori utama:
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Kredensial database Postgres untuk container `db` (data pengembangan/produksi). |
 | `POSTGRES_TEST_DB` | Nama database pada container `db-test`, terpisah dari data dev. |
 | `DOMAIN` | Nama domain publik, dipakai `docker-compose.prod.yml` dan `Caddyfile` untuk sertifikat HTTPS otomatis. |
-| `NEXT_PUBLIC_API_BASE` | Didaftarkan di `.env.example` dan diteruskan ke image frontend saat build produksi, **tapi kode frontend saat ini membaca `NEXT_PUBLIC_API_URL`, bukan nama ini**. Selama keduanya belum disamakan, variabel ini tidak berefek; frontend produksi berjalan karena fallback path relatif `/api/v1` kebetulan benar ketika Caddy menaruh frontend dan backend di balik satu domain yang sama. |
+| `NEXT_PUBLIC_API_URL` | Basis URL API, dibaca `frontend/lib/api.ts` dan diteruskan sebagai build arg ke image frontend. Sengaja dikosongkan pada deploy produksi: kode jatuh ke path relatif `/api/v1`, yang benar karena Caddy menaruh frontend dan backend di balik satu domain. Isi hanya kalau keduanya dilayani dari origin berbeda. |
 
 Tidak ada API key atau kredensial yang di-hardcode di kode sumber. `.env` ada di
 `.gitignore`; nilai asli hanya pernah ada di `.env` lokal dan di environment variable
@@ -713,26 +708,44 @@ unique index dan `CHECK` constraint yang dipakai proyek ini.
 
 ## Deploy
 
-**[ISI SEBELUM SUBMIT: URL aplikasi yang sudah di-deploy dan bisa diakses juri lewat
-browser. Belum ada pada saat dokumen ini ditulis.]**
+**<https://modalink.rhamaxv.com>** — terbuka tanpa pembayaran, tanpa undangan, tanpa VPN.
+Akun untuk mencobanya ada di [Akun demonstrasi](#akun-demonstrasi).
 
-Aturan panitia mewajibkan aplikasi web sudah di-deploy dan bisa diakses juri tanpa
-pembayaran atau akses khusus. Konfigurasi untuk itu sudah ada di repositori
-(`docker-compose.prod.yml`, `Caddyfile`, `backend/Dockerfile`, `frontend/Dockerfile`):
-satu VPS menjalankan Postgres, backend, dan frontend sebagai container terpisah, dengan
-Caddy sebagai reverse proxy yang mengurus sertifikat HTTPS otomatis lewat Let's Encrypt.
-Proses deploy itu sendiri belum dijalankan pada saat dokumen ini ditulis.
+Satu VPS Ubuntu 24.04 menjalankan empat container dari `docker-compose.prod.yml`:
+Postgres 16, backend FastAPI, frontend Next.js, dan Caddy sebagai router di antaranya.
+Backend menjalankan `alembic upgrade head` saat start, jadi skema database selalu ikut
+versi image yang sedang jalan.
+
+Server itu sudah lebih dulu melayani aplikasi lain, dan nginx di sana memegang port 80
+dan 443. Karena itu Caddy di deployment ini tidak mengurus TLS: `docker-compose.nginx.yml`
+menimpa binding-nya menjadi `127.0.0.1:8091` dan menyetel `DOMAIN=":80"`, sehingga ia
+melayani HTTP polos di dalam mesin saja. nginx yang menerima 443, membaca SNI, memegang
+sertifikat Let's Encrypt, lalu meneruskan ke Caddy. Pembagian itu disengaja: dua proses
+yang sama-sama mencoba menerbitkan sertifikat untuk nama yang sama akan saling
+menggagalkan tantangan ACME.
+
+```
+docker compose -f docker-compose.prod.yml -f docker-compose.nginx.yml up -d --build
+docker compose -f docker-compose.prod.yml -f docker-compose.nginx.yml exec backend python -m app.seed
+```
+
+Di server yang port 80 dan 443-nya memang kosong, `docker-compose.nginx.yml` tidak perlu
+dipakai sama sekali: `docker-compose.prod.yml` sendirian sudah membuat Caddy mengurus
+sertifikatnya langsung.
 
 | | |
 | --- | --- |
-| URL aplikasi | **[ISI]** |
-| Status | Belum di-deploy |
+| URL aplikasi | <https://modalink.rhamaxv.com> |
+| Scoring AI | Gemini sungguhan (`SCORING_ENGINE=gemini`), bukan mock |
+| Data | Hasil `python -m app.seed`; lihat [Akun demonstrasi](#akun-demonstrasi) |
 
 ## Atribusi pihak ketiga
 
 Tidak ada template aplikasi, aset visual (gambar, ikon, dataset), atau kode pihak lain
-yang disalin ke dalam repositori ini. Seluruh gambar/ikon: **tidak ada**, antarmuka
-dibangun tanpa aset gambar, hanya tipografi, warna, dan tata letak (lihat `DESIGN.md`).
+yang disalin ke dalam repositori ini. Ikon antarmuka adalah SVG yang digambar sendiri di
+`frontend/components/icons/Icon.tsx`, bukan dari pustaka ikon mana pun; selebihnya
+antarmuka dibangun dari tipografi, warna, dan tata letak (lihat `DESIGN.md`). Foto sampul
+proposal diunggah pengguna, tidak ada yang dibundel di repositori.
 
 Framework, library, dan layanan pihak ketiga yang dipakai (lisensi open-source masing-masing,
 tidak dimodifikasi):
