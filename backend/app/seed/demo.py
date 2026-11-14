@@ -53,6 +53,7 @@ from app.schemas.auth import RegisterIn
 from app.schemas.campaign import CampaignIn
 from app.schemas.kyc import KycIn
 from app.schemas.proposal import MilestoneIn, ProposalIn
+from app.seed.pdf import buat_pdf
 from app.services.auth import register_user
 from app.services.campaign import create_campaign
 from app.services.community import create_comment, toggle_vote
@@ -89,10 +90,11 @@ SEEDED_CAMPAIGN_TITLES = (
 
 _ENGINE = MockScoringEngine()
 
-# Ditambahkan ke setiap business_profile, terpisah dari penanda mock engine
-# yang ditaruh di business_projection (lihat _ProposalSpec di bawah): data
-# buatan tidak apa-apa selama disebut apa adanya, dan kalimat ini membuatnya
-# terlihat di mana pun business_profile ditampilkan, tanpa butuh kolom API baru.
+# Ditempelkan ke setiap ringkasan DAN ke bagian terakhir setiap PDF, terpisah
+# dari penanda mock engine di `proyeksi` (lihat _ProposalSpec di bawah): data
+# buatan tidak apa-apa selama disebut apa adanya. Di dua tempat karena
+# keduanya dibaca orang yang berbeda -- ringkasan terlihat di kartu daftar
+# tanpa membuka apa pun, dokumen terlihat oleh yang sungguh membacanya.
 _DISCLAIMER = (
     "Profil usaha ini adalah data contoh untuk demonstrasi Logicodix 2026, "
     "bukan usaha sungguhan."
@@ -173,15 +175,27 @@ class _MilestoneSpec:
 
 @dataclass(frozen=True, slots=True)
 class _ProposalSpec:
-    """Isi satu proposal demo. `business_projection` membawa penanda mock
-    engine (lihat docstring modul) supaya skornya persis dan tidak berubah
-    antar-pemutaran demo."""
+    """Isi satu proposal demo.
+
+    Ketiga bagian naratif (`profil_usaha`, `rencana_dana`, `proyeksi`) bukan
+    lagi kolom di tabel proposals: ia dirangkai menjadi berkas PDF yang
+    diunggah bersama proposalnya, karena itulah bentuk proposal sekarang.
+    Dulu ketiganya kolom tersendiri, dan nama field di sini sengaja ikut
+    berubah supaya tidak ada yang mengira kolom itu masih ada.
+
+    `proyeksi` membawa penanda mock engine (lihat docstring modul) supaya
+    skornya persis dan tidak berubah antar-pemutaran demo. Penanda itu ikut
+    tercetak ke dalam PDF, dan MockScoringEngine membacanya dari teks yang
+    diekstrak kembali dari berkas itu -- jalur yang sama persis dengan
+    dokumen sungguhan.
+    """
 
     owner: User
     business_name: str
-    business_profile: str
-    fund_usage_plan: str
-    business_projection: str
+    ringkasan: str
+    profil_usaha: str
+    rencana_dana: str
+    proyeksi: str
     requested_amount: int
     milestones: Sequence[_MilestoneSpec]
 
@@ -191,9 +205,7 @@ async def _submit_and_score(
 ) -> Proposal:
     body = ProposalIn(
         business_name=spec.business_name,
-        business_profile=f"{spec.business_profile} {_DISCLAIMER}",
-        fund_usage_plan=spec.fund_usage_plan,
-        business_projection=spec.business_projection,
+        business_summary=f"{spec.ringkasan} {_DISCLAIMER}",
         requested_amount=spec.requested_amount,
         milestones=[
             MilestoneIn(
@@ -202,7 +214,24 @@ async def _submit_and_score(
             for i, m in enumerate(spec.milestones)
         ],
     )
-    proposal = await submit_proposal(session, spec.owner, campaign, body, clock)
+    dokumen = buat_pdf(
+        f"Proposal Usaha {spec.business_name}",
+        [
+            ("Profil Usaha", spec.profil_usaha),
+            ("Rencana Penggunaan Dana", spec.rencana_dana),
+            ("Proyeksi Usaha", spec.proyeksi),
+            ("Catatan", _DISCLAIMER),
+        ],
+    )
+    proposal = await submit_proposal(
+        session,
+        spec.owner,
+        campaign,
+        body,
+        dokumen,
+        f"proposal-{spec.business_name.lower().replace(' ', '-')}.pdf",
+        clock,
+    )
     # Lewat orkestrasi sungguhan (run_scoring), bukan status yang
     # ditulis langsung: data demo harus tunduk pada aturan yang sama dengan
     # data produksi (BR-73), termasuk ScoringResult yang tercatat di baliknya.
@@ -222,20 +251,25 @@ def _proposal_specs(
         _ProposalSpec(
             owner=umkm1,
             business_name="Warung Kopi Mbak Sri",
-            business_profile=(
+            ringkasan=(
+                "Kedai kopi rumahan di Condongcatur, Sleman, tiga tahun "
+                "berjalan, mencari modal untuk renovasi gerobak dan mesin "
+                "seduh."
+            ),
+            profil_usaha=(
                 "Warung Kopi Mbak Sri adalah kedai kopi rumahan di kawasan "
                 "Condongcatur, Sleman, yang sudah berjalan selama tiga tahun "
                 "dengan pelanggan tetap dari mahasiswa dan pekerja kantoran di "
                 "sekitar kampus. Menu andalan adalah kopi susu gula aren dan "
                 "camilan tradisional buatan sendiri."
             ),
-            fund_usage_plan=(
+            rencana_dana=(
                 "Dana akan dipakai untuk merenovasi gerobak jualan agar lebih "
                 "kokoh dan tahan cuaca, menambah satu mesin seduh espresso "
                 "sederhana, serta membeli stok biji kopi dan gula aren untuk "
                 "tiga bulan operasional pertama."
             ),
-            business_projection=(
+            proyeksi=(
                 "Dengan peralatan baru dan jam buka yang lebih panjang, warung "
                 "menargetkan kenaikan transaksi harian dari sekitar 60 menjadi "
                 "90 cangkir dalam enam bulan ke depan. [[SCORE:82]]"
@@ -258,20 +292,24 @@ def _proposal_specs(
         _ProposalSpec(
             owner=umkm2,
             business_name="Kerajinan Rotan Pak Dedi",
-            business_profile=(
+            ringkasan=(
+                "Perajin rotan di Cirebon yang mengerjakan pesanan furnitur dan "
+                "anyaman, mencari modal untuk bahan baku dan alat."
+            ),
+            profil_usaha=(
                 "Kerajinan Rotan Pak Dedi memproduksi kursi dan keranjang "
                 "anyaman rotan di sebuah bengkel kecil di pinggiran Cirebon, "
                 "dikerjakan oleh empat pengrajin tetap. Produk dijual ke toko "
                 "furnitur lokal dan lewat pesanan langsung dari tetangga "
                 "sekitar."
             ),
-            fund_usage_plan=(
+            rencana_dana=(
                 "Dana dipakai untuk membeli bahan rotan dan rangka kayu dalam "
                 "jumlah lebih besar, serta menyewa tambahan tenaga kerja "
                 "musiman untuk mempercepat produksi batch pertama pesanan "
                 "besar."
             ),
-            business_projection=(
+            proyeksi=(
                 "Dengan bahan baku yang cukup, bengkel ini menargetkan "
                 "penyelesaian satu batch 40 unit kursi dalam dua bulan, "
                 "dibanding kemampuan saat ini yang hanya 15 unit per bulan. "
@@ -296,19 +334,23 @@ def _proposal_specs(
         _ProposalSpec(
             owner=umkm3,
             business_name="Katering Bu Yanti",
-            business_profile=(
+            ringkasan=(
+                "Katering rumahan untuk kantor dan acara keluarga di Semarang, "
+                "mencari modal untuk peralatan dapur dan armada antar."
+            ),
+            profil_usaha=(
                 "Katering Bu Yanti melayani pesanan nasi kotak dan tumpeng "
                 "untuk acara kantor dan hajatan kecil di wilayah Bekasi, "
                 "dengan dapur produksi di rumah sendiri dan dua karyawan "
                 "tetap. Usaha ini sudah berjalan lebih dari lima tahun."
             ),
-            fund_usage_plan=(
+            rencana_dana=(
                 "Dana dipakai membeli peralatan dapur berkapasitas lebih "
                 "besar, menambah stok bahan baku untuk menerima pesanan dalam "
                 "jumlah lebih banyak, serta menambah satu armada motor untuk "
                 "pengantaran."
             ),
-            business_projection=(
+            proyeksi=(
                 "Dengan peralatan dan armada tambahan, katering ini "
                 "menargetkan kenaikan kapasitas pesanan dari 50 menjadi 120 "
                 "kotak per hari untuk acara besar dalam waktu empat bulan. "
@@ -337,19 +379,24 @@ def _proposal_specs(
         _ProposalSpec(
             owner=umkm4,
             business_name="Bengkel Las Mas Tono",
-            business_profile=(
+            ringkasan=(
+                "Bengkel las pagar dan teralis di pinggiran Surabaya, "
+                "dijalankan pemiliknya sendiri, mencari modal untuk mesin dan "
+                "bahan."
+            ),
+            profil_usaha=(
                 "Bengkel Las Mas Tono mengerjakan pagar, teralis, dan pesanan "
                 "las custom untuk rumah tangga di kawasan pinggiran Surabaya. "
                 "Bengkel ini dijalankan sendiri oleh pemiliknya dibantu satu "
                 "asisten paruh waktu."
             ),
-            fund_usage_plan=(
+            rencana_dana=(
                 "Dana dipakai untuk membeli mesin las dan alat potong besi "
                 "yang lebih baik, serta menambah stok besi dan bahan baku "
                 "agar bisa menerima pesanan dalam jumlah lebih banyak "
                 "sekaligus."
             ),
-            business_projection=(
+            proyeksi=(
                 "Dengan mesin yang lebih baik, waktu pengerjaan satu pesanan "
                 "pagar rumah menurun dari lima hari menjadi tiga hari, "
                 "memungkinkan lebih banyak pesanan diterima dalam sebulan. "
@@ -374,18 +421,22 @@ def _proposal_specs(
         _ProposalSpec(
             owner=umkm1,
             business_name="Toko Kelontong Bu Imah",
-            business_profile=(
+            ringkasan=(
+                "Toko kelontong di permukiman padat Bekasi, mencari modal untuk "
+                "menambah stok dan rak penyimpanan."
+            ),
+            profil_usaha=(
                 "Toko Kelontong Bu Imah menjual sembako dan kebutuhan harian "
                 "di sebuah kios kecil pinggir jalan kampung di Tasikmalaya. "
                 "Toko ini baru berjalan beberapa bulan dan belum punya "
                 "pencatatan keuangan yang rapi."
             ),
-            fund_usage_plan=(
+            rencana_dana=(
                 "Dana rencananya dipakai untuk menambah rak dan etalase toko, "
                 "serta menambah stok sembako awal agar barang dagangan tidak "
                 "cepat kosong saat pembeli ramai."
             ),
-            business_projection=(
+            proyeksi=(
                 "Belum ada perkiraan kenaikan penjualan yang jelas karena "
                 "toko ini masih sangat baru dan pemiliknya belum pernah "
                 "membuat proyeksi usaha sebelumnya. [[SCORE:48]]"
@@ -405,14 +456,18 @@ def _proposal_specs(
         _ProposalSpec(
             owner=umkm2,
             business_name="Peternakan Lele Instan",
-            business_profile=(
+            ringkasan=(
+                "Usaha budidaya lele yang baru dirintis, mencari modal untuk "
+                "kolam terpal dan bibit tahap pertama."
+            ),
+            profil_usaha=(
                 "Peternakan Lele Instan mengelola delapan kolam terpal di "
                 "pinggiran Kediri untuk membesarkan lele konsumsi, dengan "
                 "hasil panen dijual ke pengepul dan warung pecel lele di "
                 "sekitar kota. Usaha ini sudah berjalan dua tahun dengan "
                 "hasil panen yang stabil setiap siklusnya."
             ),
-            fund_usage_plan=(
+            rencana_dana=(
                 "Dana akan dipakai untuk membangun empat kolam terpal "
                 "tambahan di lahan yang sudah tersedia, membeli bibit lele "
                 "dalam jumlah besar untuk seluruh kolam baru dan kolam lama "
@@ -423,7 +478,7 @@ def _proposal_specs(
                 "sirkulasi agar kualitas air tetap terjaga sepanjang masa "
                 "pembesaran."
             ),
-            business_projection=(
+            proyeksi=(
                 "Dengan penambahan kolam ini, peternakan menargetkan hasil "
                 "panen naik sepuluh kali lipat dalam tiga bulan dan setiap "
                 "kolam dijanjikan selalu berhasil panen penuh tanpa kematian "

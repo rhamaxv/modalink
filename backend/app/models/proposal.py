@@ -63,16 +63,8 @@ class Proposal(SQLModel, table=True):
         # bisa dilewati pemanggil yang menyusun Proposal langsung tanpa
         # lewat skema (fixture test, service lain), batas database tidak.
         CheckConstraint(
-            "length(business_profile) BETWEEN 100 AND 5000",
-            name="ck_proposals_business_profile_length",
-        ),
-        CheckConstraint(
-            "length(fund_usage_plan) BETWEEN 100 AND 5000",
-            name="ck_proposals_fund_usage_plan_length",
-        ),
-        CheckConstraint(
-            "length(business_projection) BETWEEN 50 AND 3000",
-            name="ck_proposals_business_projection_length",
+            "length(business_summary) BETWEEN 30 AND 500",
+            name="ck_proposals_business_summary_length",
         ),
         # Mirror dari index partial di migrasi b7d1fab085fd (BR-13). Index itu
         # sendiri sudah ada di database; baris ini hanya supaya metadata
@@ -93,9 +85,12 @@ class Proposal(SQLModel, table=True):
     campaign_id: UUID = Field(foreign_key="campaigns.id", index=True)
     umkm_id: UUID = Field(foreign_key="users.id", index=True)
     business_name: str
-    business_profile: str
-    fund_usage_plan: str
-    business_projection: str
+    # Ringkasan satu-dua kalimat, BUKAN rencana bisnisnya. Uraian lengkapnya
+    # ada di PDF yang wajib diunggah (models/proposal_document.py); field ini
+    # hanya yang tampil di kartu daftar dan di kepala halaman proposal.
+    # Menggantikan business_profile/fund_usage_plan/business_projection yang
+    # dulu menampung seluruh narasi sebagai tiga textarea.
+    business_summary: str
     # sa_column=Column(BigInteger) wajib: SQLModel memetakan int ke INTEGER
     # secara default, dan INTEGER meluap di Rp2,1 miliar (BR-50).
     requested_amount: int = Field(sa_column=Column(BigInteger, nullable=False))

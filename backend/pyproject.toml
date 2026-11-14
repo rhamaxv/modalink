@@ -37,6 +37,10 @@ dependencies = [
   # mendeklarasikannya sebagai extra opsional, jadi tanpa baris ini endpoint
   # unggah gagal dengan RuntimeError saat dipanggil, bukan saat instalasi.
   "python-multipart>=0.0.20",
+  # Menghitung halaman dan menarik lapisan teks dari dokumen proposal
+  # (services/document.py). Teksnya tidak dikirim ke Gemini -- model membaca
+  # PDF-nya sendiri -- melainkan dipakai memverifikasi kutipan red flag.
+  "pypdf>=5.1",
 ]
 
 [project.optional-dependencies]

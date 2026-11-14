@@ -45,16 +45,12 @@ class ProposalWithMilestones:
 
 
 @pytest.fixture
-async def failed_proposal(client, db, campaign, umkm, majukan, body_proposal):
+async def failed_proposal(client, db, campaign, umkm, majukan, kirim_proposal):
     """Proposal `failed` sungguhan lewat jalur HTTP asli (submit -> listed
     lewat scoring mock -> deadline lewat tanpa satu pledge pun), bukan status
     yang diset langsung -- sama alasannya dengan fixture lain di
     tests/conftest.py."""
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
+    res = await kirim_proposal(campaign.id, headers=umkm.headers)
     pid = UUID(res.json()["id"])
 
     await majukan(hari=30)  # funding_deadline campaign fixture jatuh di hari ke-21
@@ -172,18 +168,10 @@ async def test_r4_pledge_exceeding_remaining_includes_correct_remaining_amount(
 
 
 async def test_r4_second_proposal_in_same_campaign_rejected(
-    client, umkm, campaign, body_proposal
+    client, umkm, campaign, kirim_proposal
 ):
-    await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
+    await kirim_proposal(campaign.id, headers=umkm.headers)
+    res = await kirim_proposal(campaign.id, headers=umkm.headers)
     assert res.status_code == 409
 
 

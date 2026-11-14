@@ -130,15 +130,11 @@ class TestSubmission:
 
 class TestGate:
     async def test_an_unverified_umkm_cannot_submit_a_proposal(
-        self, client, db, campaign, buat_akun, body_proposal
+        self, client, db, campaign, buat_akun, kirim_proposal
     ):
         akun = await buat_akun(db, "umkm-belum-verifikasi@contoh.id", Role.UMKM)
         await _tanpa_verifikasi(db, akun)
-        r = await client.post(
-            f"/api/v1/campaigns/{campaign.id}/proposals",
-            json=body_proposal(),
-            headers=akun.headers,
-        )
+        r = await kirim_proposal(campaign.id, headers=akun.headers)
         assert r.status_code == 403
         assert r.json()["error"]["code"] == "belum_terverifikasi"
         # Pesannya menyebut APA yang harus dilakukan: pengguna yang ditolak

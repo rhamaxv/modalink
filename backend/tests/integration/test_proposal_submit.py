@@ -1,167 +1,221 @@
-async def test_umkm_can_submit_proposal(client, umkm, campaign, body_proposal):
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
+"""Submit proposal: aturan bisnisnya, dan pemeriksaan dokumen yang wajib.
+
+Seluruh berkas ini memakai fixture `kirim_proposal`, bukan client.post(json=)
+langsung: pengajuan proposal berbentuk multipart sejak uraiannya pindah ke
+PDF, dan mengeja bentuk permintaan itu di tiap test berarti perubahan kontrak
+berikutnya harus disentuh belasan kali.
+"""
+
+import pytest
+
+from app.seed.pdf import buat_pdf
+
+
+async def test_umkm_can_submit_proposal(kirim_proposal, umkm, campaign):
+    res = await kirim_proposal(campaign.id, headers=umkm.headers)
     assert res.status_code == 201
     data = res.json()
     assert data["status"] == "submitted"
     assert data["scoring_status"] in {"pending", "processing", "done"}
 
 
-async def test_br10_fund_usage_plan_under_100_characters_rejected(
+async def test_submitted_document_is_readable_back(
+    kirim_proposal, umkm, campaign, client
+):
+    """Dokumen yang diunggah harus bisa dibaca kembali apa adanya, bukan
+    sekadar diterima: proposal yang dokumennya tidak bisa dibuka investor
+    sama tidak bergunanya dengan proposal tanpa dokumen."""
+    pdf = buat_pdf("Proposal Uji Baca", [("Uraian", "Kalimat penanda unik 48217.")])
+    res = await kirim_proposal(campaign.id, headers=umkm.headers, pdf=pdf)
+    assert res.status_code == 201
+
+    unduh = await client.get(
+        f"/api/v1/proposals/{res.json()['id']}/document", headers=umkm.headers
+    )
+    assert unduh.status_code == 200
+    assert unduh.headers["content-type"].startswith("application/pdf")
+    assert unduh.headers["x-content-type-options"] == "nosniff"
+    assert unduh.content == pdf
+
+
+# ------------------------------------------------------- dokumen wajib & sah
+
+
+async def test_submit_without_a_document_is_rejected(
     client, umkm, campaign, body_proposal
 ):
-    """04-feature-umkm.md menetapkan minimal 100 karakter (BR-10). Rubrik
-    skoring AI menilai kelengkapan isian di field ini, jadi minimumnya
-    tidak boleh diam-diam dilonggarkan demi fixture test."""
+    """Tanpa bagian `document` sama sekali. 422 dari FastAPI, bukan 201
+    dengan proposal yang tidak punya isi."""
+    import json
+
     res = await client.post(
         f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
-        json=body_proposal(fund_usage_plan="x" * 99),
+        data={"payload": json.dumps(body_proposal())},
     )
     assert res.status_code == 422
 
 
-async def test_c26_fund_usage_plan_exactly_100_characters_accepted(
-    client, umkm, campaign, body_proposal
+@pytest.mark.parametrize(
+    ("isi", "kode"),
+    [
+        (b"", "berkas_kosong"),
+        (b"\x89PNG\r\n\x1a\nbukan pdf sama sekali", "format_tidak_didukung"),
+        # Diawali %PDF- supaya sidik bytenya lolos, tapi isinya bukan PDF:
+        # inilah yang membedakan pemeriksaan sungguhan dari pemeriksaan
+        # header belaka.
+        (b"%PDF-1.4\nisi yang tidak bisa diurai sama sekali", "pdf_tidak_terbaca"),
+    ],
+)
+async def test_invalid_documents_are_rejected_before_any_row_is_written(
+    kirim_proposal, client, umkm, campaign, isi, kode
 ):
-    """Batas tepat di 100 belum pernah diuji sebelumnya: 99 ditolak dan 162
-    (fixture) diterima, tapi off-by-one di validator bisa lolos tanpa
-    kasus batas ini."""
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
+    res = await kirim_proposal(campaign.id, headers=umkm.headers, pdf=isi)
+    assert res.status_code == 422
+    assert res.json()["error"]["code"] == kode
+
+    # Tidak ada proposal yang tertinggal: penolakan dokumen terjadi sebelum
+    # satu baris pun ditulis, bukan sesudahnya.
+    milik = await client.get("/api/v1/proposals/mine", headers=umkm.headers)
+    assert milik.json() == []
+
+
+async def test_a_document_longer_than_the_page_cap_is_rejected(
+    kirim_proposal, umkm, campaign
+):
+    """Batas halaman melindungi biaya pemanggilan Gemini, yang naik seiring
+    jumlah halaman."""
+    tebal = buat_pdf("Proposal Terlalu Tebal", [("Uraian", "x " * 45_000)])
+    res = await kirim_proposal(campaign.id, headers=umkm.headers, pdf=tebal)
+    assert res.status_code == 422
+    assert res.json()["error"]["code"] == "pdf_terlalu_panjang"
+
+
+async def test_uploaded_filename_is_sanitised_before_it_is_served_back(
+    kirim_proposal, client, umkm, campaign
+):
+    """Nama berkas datang dari pengunggah dan ikut ke header
+    Content-Disposition. Tanda kutip dan pemisah jalur di dalamnya harus
+    sudah hilang sebelum sampai ke sana."""
+    res = await kirim_proposal(
+        campaign.id,
         headers=umkm.headers,
-        json=body_proposal(fund_usage_plan="x" * 100),
+        nama_berkas='../../etc/pas"swd.pdf',
+    )
+    assert res.status_code == 201
+
+    unduh = await client.get(
+        f"/api/v1/proposals/{res.json()['id']}/document", headers=umkm.headers
+    )
+    disposisi = unduh.headers["content-disposition"]
+    assert ".." not in disposisi
+    assert "/" not in disposisi.split("filename=")[1]
+    assert disposisi.count('"') == 2
+
+
+# ------------------------------------------------------------ aturan bisnis
+
+
+async def test_business_summary_under_30_characters_rejected(
+    kirim_proposal, umkm, campaign
+):
+    res = await kirim_proposal(
+        campaign.id, headers=umkm.headers, business_summary="x" * 29
+    )
+    assert res.status_code == 422
+    assert res.json()["error"]["code"] == "payload_tidak_valid"
+
+
+async def test_business_summary_exactly_30_characters_accepted(
+    kirim_proposal, umkm, campaign
+):
+    """Batas tepat, bukan hanya satu di bawah dan satu jauh di atas:
+    off-by-one di validator lolos tanpa kasus ini."""
+    res = await kirim_proposal(
+        campaign.id, headers=umkm.headers, business_summary="x" * 30
     )
     assert res.status_code == 201
 
 
-async def test_br11_funds_exceeding_campaign_target_rejected(
-    client, umkm, campaign, body_proposal
+async def test_business_summary_over_500_characters_rejected(
+    kirim_proposal, umkm, campaign
 ):
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
+    """Batas atasnya kecil dengan sengaja: field yang muat satu halaman akan
+    dipakai sebagai satu halaman, dan proposal kembali terbelah antara
+    formulir dan dokumen."""
+    res = await kirim_proposal(
+        campaign.id, headers=umkm.headers, business_summary="x" * 501
+    )
+    assert res.status_code == 422
+
+
+async def test_br11_funds_exceeding_campaign_target_rejected(
+    kirim_proposal, umkm, campaign
+):
+    res = await kirim_proposal(
+        campaign.id,
         headers=umkm.headers,
-        json=body_proposal(
-            requested_amount=campaign.target_amount + 1,
-            milestones=[
-                {
-                    "seq": 1,
-                    "title": "a",
-                    "description": "x" * 20,
-                    "amount": campaign.target_amount + 1,
-                }
-            ],
-        ),
+        requested_amount=campaign.target_amount + 1,
+        milestones=[
+            {
+                "seq": 1,
+                "title": "a",
+                "description": "x" * 20,
+                "amount": campaign.target_amount + 1,
+            }
+        ],
     )
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "dana_melebihi_target_campaign"
 
 
 async def test_br14_milestone_amount_mismatch_rejected_with_difference(
-    client, umkm, campaign, body_proposal
+    kirim_proposal, umkm, campaign
 ):
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
+    res = await kirim_proposal(
+        campaign.id,
         headers=umkm.headers,
-        json=body_proposal(
-            milestones=[
-                {"seq": 1, "title": "a", "description": "x" * 20, "amount": 5_000_000},
-                {"seq": 2, "title": "b", "description": "x" * 20, "amount": 4_000_000},
-            ]
-        ),
+        milestones=[
+            {"seq": 1, "title": "a", "description": "x" * 20, "amount": 5_000_000},
+            {"seq": 2, "title": "b", "description": "x" * 20, "amount": 4_000_000},
+        ],
     )
     assert res.status_code == 422
     assert "Rp1.000.000" in res.json()["error"]["message"]
 
 
-async def test_br12_funds_below_minimum_rejected(client, umkm, campaign, body_proposal):
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
+async def test_br12_funds_below_minimum_rejected(kirim_proposal, umkm, campaign):
+    res = await kirim_proposal(
+        campaign.id,
         headers=umkm.headers,
-        json=body_proposal(
-            requested_amount=400_000,
-            milestones=[
-                {"seq": 1, "title": "a", "description": "x" * 20, "amount": 200_000},
-                {"seq": 2, "title": "b", "description": "x" * 20, "amount": 200_000},
-            ],
-        ),
+        requested_amount=400_000,
+        milestones=[
+            {"seq": 1, "title": "a", "description": "x" * 20, "amount": 200_000},
+            {"seq": 2, "title": "b", "description": "x" * 20, "amount": 200_000},
+        ],
     )
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "dana_di_bawah_minimum"
 
 
 async def test_br13_second_proposal_to_same_campaign_rejected_409(
-    client, umkm, campaign, body_proposal
+    kirim_proposal, umkm, campaign
 ):
-    await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
+    await kirim_proposal(campaign.id, headers=umkm.headers)
+    res = await kirim_proposal(campaign.id, headers=umkm.headers)
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "proposal_aktif_sudah_ada"
 
 
 async def test_br17_campaign_past_apply_deadline_rejects(
-    client, umkm, campaign_kedaluwarsa, body_proposal
+    kirim_proposal, umkm, campaign_kedaluwarsa
 ):
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign_kedaluwarsa.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
+    res = await kirim_proposal(campaign_kedaluwarsa.id, headers=umkm.headers)
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "pengajuan_ditutup"
 
 
-async def test_t3_business_profile_over_5000_characters_rejected(
-    client, umkm, campaign, body_proposal
-):
-    """Review keamanan: business_profile lolos sampai 5 MB tanpa batas atas
-    sebelum ini. 5.000 karakter dipilih longgar -- kira-kira satu-dua
-    halaman, jauh di atas rencana bisnis UMKM mana pun yang wajar -- supaya
-    batas ini menolak payload raksasa tanpa pernah menolak isian sungguhan."""
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(business_profile="x" * 5_001),
-    )
-    assert res.status_code == 422
-
-
-async def test_t3_fund_usage_plan_over_5000_characters_rejected(
-    client, umkm, campaign, body_proposal
-):
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(fund_usage_plan="x" * 5_001),
-    )
-    assert res.status_code == 422
-
-
-async def test_t3_business_projection_over_3000_characters_rejected(
-    client, umkm, campaign, body_proposal
-):
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(business_projection="x" * 3_001),
-    )
-    assert res.status_code == 422
-
-
-async def test_t3_more_than_30_milestones_rejected(
-    client, umkm, campaign, body_proposal
-):
+async def test_t3_more_than_30_milestones_rejected(kirim_proposal, umkm, campaign):
     """Review keamanan: 50.000 item milestone lolos tanpa batas atas sebelum
     ini. 30 tahap jauh di atas rencana pendanaan bertahap mana pun yang
     wajar (seed data terpanjang hanya dua tahap)."""
@@ -169,12 +223,29 @@ async def test_t3_more_than_30_milestones_rejected(
         {"seq": i, "title": f"Tahap {i}", "description": "x" * 20, "amount": 100_000}
         for i in range(1, 32)
     ]
+    res = await kirim_proposal(
+        campaign.id,
+        headers=umkm.headers,
+        requested_amount=31 * 100_000,
+        milestones=banyak,
+    )
+    assert res.status_code == 422
+
+
+async def test_malformed_payload_json_is_rejected_as_a_product_error(
+    client, umkm, campaign, dokumen_proposal
+):
+    """Bagian `payload` diurai sendiri oleh endpoint, bukan oleh FastAPI,
+    jadi JSON rusak harus tetap keluar dalam bentuk error produk ini dan
+    bukan sebagai 500."""
     res = await client.post(
         f"/api/v1/campaigns/{campaign.id}/proposals",
         headers=umkm.headers,
-        json=body_proposal(requested_amount=31 * 100_000, milestones=banyak),
+        data={"payload": "{bukan json"},
+        files={"document": ("p.pdf", dokumen_proposal(), "application/pdf")},
     )
     assert res.status_code == 422
+    assert res.json()["error"]["code"] == "payload_tidak_valid"
 
 
 async def test_br18_no_endpoint_to_update_proposal(app):

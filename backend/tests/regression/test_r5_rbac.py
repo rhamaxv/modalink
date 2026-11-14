@@ -149,6 +149,11 @@ RBAC_MATRIX: list[tuple[str, str, str | None, int]] = [
     # sudah cukup karena literal "{proposal_id}" gagal UUID untuk siapa pun.
     # Kasus visibilitas sungguhan ada di test_read_endpoints.py.
     ("GET", "/api/v1/proposals/{proposal_id}/milestones", None, 422),
+    # Dokumen proposal mewarisi aturan akses proposalnya persis, sama seperti
+    # milestone: ia isi proposal itu, bukan sumber daya dengan visibilitas
+    # sendiri. 422 di sini karena matriks ini tidak mengganti {proposal_id};
+    # cakupan aksesnya yang sesungguhnya ada di test_proposal_submit.py.
+    ("GET", "/api/v1/proposals/{proposal_id}/document", None, 422),
     # Tidak ada pemeriksaan peran sama sekali (lihat docstring
     # app/api/v1/internal.py): literal "{proposal_id}" tetap gagal UUID
     # untuk siapa pun, jadi satu baris anonim ini sudah cukup representatif.

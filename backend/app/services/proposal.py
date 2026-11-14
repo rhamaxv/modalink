@@ -25,6 +25,7 @@ from app.models.proposal import (
 from app.models.user import User
 from app.schemas.proposal import ProposalIn, ProposalSort
 from app.services.campaign import PUBLIC_PROPOSAL_STATUSES
+from app.services.document import periksa_pdf, simpan_dokumen
 from app.services.expiry import evaluate_expiry_many
 from app.services.ledger import collected_amount_subquery
 
@@ -62,24 +63,24 @@ class ProposalWithCollectedAmount:
     def __getattr__(self, name: str):
         return getattr(self.proposal, name)
 
-    @property
-    def business_profile_excerpt(self) -> str:
-        """Cuplikan profil usaha untuk kartu di endpoint daftar.
-
-        Dipotong di sini, bukan di browser: memotong di klien berarti seluruh
-        rencana bisnis tetap dikirim, dan itu justru yang membuat respons
-        daftar mencapai 7,2 MB untuk dua belas proposal."""
-        penuh = self.proposal.business_profile
-        return penuh if len(penuh) <= 200 else penuh[:200].rstrip() + "..."
-
 
 async def submit_proposal(
     session: AsyncSession,
     umkm: User,
     campaign: Campaign,
     body: ProposalIn,
+    dokumen: bytes,
+    nama_dokumen: str | None,
     clock: Clock,
 ) -> Proposal:
+    # PDF diperiksa paling awal, sebelum tenggat campaign dan sebelum nominal:
+    # pemeriksaan ini satu-satunya yang menolak berkas yang sudah terlanjur
+    # terkirim seluruhnya lewat jaringan, dan menaruhnya di belakang berarti
+    # UMKM dengan koneksi seluler menunggu unggahan lima megabyte selesai
+    # hanya untuk diberi tahu soal hal lain. Hasilnya dibawa sampai ke
+    # simpan_dokumen di bawah supaya berkasnya tidak diurai dua kali.
+    terperiksa = periksa_pdf(dokumen)
+
     if (
         campaign.status is CampaignStatus.CLOSED
         or clock.now() >= campaign.apply_deadline
@@ -111,9 +112,7 @@ async def submit_proposal(
         campaign_id=campaign.id,
         umkm_id=umkm.id,
         business_name=body.business_name,
-        business_profile=body.business_profile,
-        fund_usage_plan=body.fund_usage_plan,
-        business_projection=body.business_projection,
+        business_summary=body.business_summary,
         requested_amount=body.requested_amount,
         status=ProposalStatus.SUBMITTED,
         scoring_status=ScoringStatus.PENDING,
@@ -129,6 +128,8 @@ async def submit_proposal(
             "proposal_aktif_sudah_ada",
             "Anda sudah punya proposal aktif di campaign ini.",
         ) from None
+
+    await simpan_dokumen(session, proposal.id, dokumen, nama_dokumen, clock, terperiksa)
 
     for draft in drafts:
         session.add(

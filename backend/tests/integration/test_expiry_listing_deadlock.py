@@ -25,6 +25,7 @@ from datetime import timedelta
 from uuid import uuid4
 
 import pytest
+from dokumen_uji import dokumen_untuk
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
@@ -155,30 +156,28 @@ async def dua_proposal_kedaluwarsa_overlap(investor, investor_pledge, umkm, umkm
             campaign_id=campaign.id,
             umkm_id=umkm.id,
             business_name="Warung Kopi Skor Tinggi",
-            business_profile="x" * 110 + " [[SCORE:90]]",
-            fund_usage_plan="x" * 110,
-            business_projection="x" * 60,
+            business_summary="x" * 40,
             requested_amount=10_000_000,
             status=ProposalStatus.SUBMITTED,
             scoring_status=ScoringStatus.PENDING,
             created_at=mulai,
         )
         session.add(p1)
+        session.add(dokumen_untuk(p1, "x" * 110 + " [[SCORE:90]]"))
         await session.flush()
 
         p2 = Proposal(
             campaign_id=campaign.id,
             umkm_id=umkm_kedua.id,
             business_name="Warung Kopi Skor Rendah",
-            business_profile="x" * 110 + " [[SCORE:10]]",
-            fund_usage_plan="x" * 110,
-            business_projection="x" * 60,
+            business_summary="x" * 40,
             requested_amount=10_000_000,
             status=ProposalStatus.SUBMITTED,
             scoring_status=ScoringStatus.PENDING,
             created_at=mulai + timedelta(seconds=1),
         )
         session.add(p2)
+        session.add(dokumen_untuk(p2, "x" * 110 + " [[SCORE:10]]"))
         await session.flush()
 
         await run_scoring(session, p1.id, MockScoringEngine(), clock)

@@ -104,7 +104,7 @@ def clock():
 
 
 @pytest.fixture
-async def listed_proposal_committed(investor_a, investor_b, clock):
+async def listed_proposal_committed(investor_a, investor_b, clock, dokumen_untuk):
     """Proposal `listed` sungguhan, ter-commit ke Postgres lewat SessionLocal
     terpisah (bukan fixture `db`), sehingga terlihat dari dua sesi lain yang
     dibuka test ini secara konkuren.
@@ -139,15 +139,16 @@ async def listed_proposal_committed(investor_a, investor_b, clock):
             campaign_id=campaign.id,
             umkm_id=umkm.id,
             business_name="Warung Kopi Uji Konkurensi",
-            business_profile="x" * 110 + " [[SCORE:80]]",  # threshold campaign 60
-            fund_usage_plan="x" * 110,
-            business_projection="x" * 60,
+            business_summary="x" * 40,
             requested_amount=10_000_000,
             status=ProposalStatus.SUBMITTED,
             scoring_status=ScoringStatus.PENDING,
             created_at=started_at,
         )
         session.add(proposal)
+        # threshold campaign 60. Penanda skor tinggal di dokumen, bukan di
+        # kolom proposals: di situlah mesin skoring membacanya sekarang.
+        session.add(dokumen_untuk(proposal, "x" * 110 + " [[SCORE:80]]"))
         await session.flush()
         await run_scoring(session, proposal.id, MockScoringEngine(), clock)
         await session.commit()

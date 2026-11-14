@@ -31,6 +31,7 @@ from app.seed.demo import (
     SEEDED_BUSINESS_NAMES,
     SEEDED_CAMPAIGN_TITLES,
 )
+from app.services.document import ambil_dokumen
 from app.services.ledger import compute_balance, total_raised
 
 
@@ -229,13 +230,17 @@ async def test_seed_ledger_invariants_hold_for_every_seeded_proposal(client, db)
         assert len(kunci) == len(set(kunci))
 
 
-async def test_seed_labels_every_proposal_as_example_data_in_its_profile(client, db):
+async def test_seed_labels_every_proposal_as_example_data(client, db):
     """Data buatan tidak apa-apa selama disebut apa adanya (brief Fase 13
-    Task 1): setiap business_profile seed membawa label ini, bukan hanya
-    dipercaya bahwa frontend akan menandainya."""
+    Task 1). Labelnya diperiksa di DUA tempat karena dibaca dua orang yang
+    berbeda: ringkasan terlihat di kartu daftar tanpa membuka apa pun, dan
+    dokumen terlihat oleh yang sungguh membacanya."""
     await client.post("/api/v1/internal/seed")
     for p in await _proposal_seed(db):
-        assert "data contoh" in p.business_profile
+        assert "data contoh" in p.business_summary
+        dok = await ambil_dokumen(db, p.id)
+        assert dok is not None, "setiap proposal seed harus punya dokumen"
+        assert "data contoh" in dok.extracted_text
 
 
 async def test_seed_pledges_go_through_the_real_pledge_service(client, db):

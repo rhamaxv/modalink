@@ -15,7 +15,7 @@ from uuid import UUID
 
 from sqlalchemy import desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
 
 from app.ai.engine import CampaignLike, ScoringEngine
 from app.db.session import SessionLocal
@@ -24,8 +24,14 @@ from app.domain.transitions import IllegalTransition, ProposalEvent, ScoringEven
 from app.domain.verdict import Verdict, decide_verdict, total_score
 from app.errors import ConflictError, NotFoundError
 from app.models.campaign import Campaign
-from app.models.proposal import Proposal, ProposalStatus, ScoringStatus
+from app.models.proposal import (
+    Proposal,
+    ProposalMilestone,
+    ProposalStatus,
+    ScoringStatus,
+)
 from app.models.scoring import ScoringResult, ScoringVerdict
+from app.services.document import ambil_dokumen
 from app.services.status import advance_proposal, advance_scoring
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
@@ -49,13 +55,37 @@ async def run_scoring(
         advance_scoring(proposal, ScoringEvent.GAGAL)  # T-52
         await session.flush()
         return
+    dokumen = await ambil_dokumen(session, proposal.id)
+    if dokumen is None:
+        # Tidak seharusnya terjadi: dokumen wajib dan ditulis dalam transaksi
+        # yang sama dengan proposalnya (services/proposal.py). Kalau toh
+        # terjadi, ia kegagalan teknis yang sama seperti exception di bawah
+        # -- dinilai tanpa isi proposal berarti memberi skor pada formulir
+        # kosong, dan skor itu akan terlihat sah di hadapan investor.
+        advance_scoring(proposal, ScoringEvent.GAGAL)  # T-52
+        await session.flush()
+        return
+    # Query langsung, bukan lewat list_proposal_milestones di
+    # services/proposal.py: fungsi itu ikut menarik laporan terbaru per
+    # tahap lewat DISTINCT ON, dan engine skoring tidak membaca satu pun
+    # dari kolom itu.
+    milestones = list(
+        await session.scalars(
+            select(ProposalMilestone)
+            .where(ProposalMilestone.proposal_id == proposal.id)
+            .order_by(col(ProposalMilestone.seq))
+        )
+    )
+
     mulai = clock.now()
     try:
         # cast, bukan perbaikan tipe: Campaign.sector bertipe Sector, subclass
         # str yang benar secara runtime, tapi mypy memeriksa atribut Protocol
         # secara invarian sehingga Sector tidak dianggap cocok dengan
         # CampaignLike.sector: str apa adanya.
-        skor = await engine.score(proposal, cast(CampaignLike, campaign))
+        skor = await engine.score(
+            proposal, cast(CampaignLike, campaign), dokumen, milestones
+        )
     except Exception:  # noqa: BLE001
         # Blind kecuali disengaja: timeout, error jaringan, ValueError validasi
         # schema, atau RuntimeError kunci API tidak ada semuanya harus jatuh

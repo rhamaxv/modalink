@@ -5,6 +5,7 @@ di level modul: engine_gemini.py akan mengimpor ScoringEngine dari sini untuk
 anotasi tipe, dan import di level modul pada kedua arah akan jadi lingkaran.
 """
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from app.ai.models import ProposalScore
@@ -20,13 +21,43 @@ class ProposalLike(Protocol):
     Proposal sungguhan, dan Any membuat mypy tidak melihatnya. Protocol ini
     hanya menyebut field yang benar-benar dipakai salah satu engine, supaya
     nama field yang salah tertangkap saat type-check, bukan saat runtime.
+
+    Daftarnya pendek sekarang karena uraian proposal sudah pindah ke PDF
+    (DocumentLike di bawah); yang tersisa di sini hanya yang diketik UMKM
+    sebagai metadata.
     """
 
     business_name: str
-    business_profile: str
-    fund_usage_plan: str
-    business_projection: str
+    business_summary: str
     requested_amount: int
+
+
+class MilestoneLike(Protocol):
+    """Satu tahap pencairan, apa adanya dari rencana yang didaftarkan pengaju.
+
+    Ikut dikirim ke model supaya ia bisa membandingkan rencana tahapan
+    terhadap isi dokumen: rencana yang nominalnya tidak muncul di mana pun
+    pada dokumen adalah justru pola yang red flag `angka_tidak_konsisten`
+    cari, dan tanpa daftar ini model tidak punya sisi kedua untuk
+    dibandingkan.
+    """
+
+    seq: int
+    title: str
+    amount: int
+
+
+class DocumentLike(Protocol):
+    """Dokumen proposal yang dibaca engine skoring.
+
+    `data` adalah byte PDF-nya, dikirim apa adanya ke model yang membacanya
+    secara native. `extracted_text` TIDAK dikirim ke model; ia dipakai
+    memeriksa bahwa kutipan pada red flag sungguh ada di dokumen. Lihat
+    app/models/proposal_document.py untuk alasan keduanya hidup berdampingan.
+    """
+
+    data: bytes
+    extracted_text: str
 
 
 class CampaignLike(Protocol):
@@ -48,7 +79,11 @@ class ScoringEngine(Protocol):
     model: str
 
     async def score(
-        self, proposal: ProposalLike, campaign: CampaignLike
+        self,
+        proposal: ProposalLike,
+        campaign: CampaignLike,
+        document: DocumentLike,
+        milestones: Sequence[MilestoneLike],
     ) -> ProposalScore: ...
 
 

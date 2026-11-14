@@ -28,6 +28,7 @@ from datetime import timedelta
 from uuid import uuid4
 
 import pytest
+from dokumen_uji import dokumen_untuk
 from sqlalchemy import func, select, text
 
 from app.ai.mock_engine import MockScoringEngine
@@ -118,15 +119,16 @@ async def _buat_proposal_siap_race(
             campaign_id=campaign.id,
             umkm_id=umkm.id,
             business_name="Warung Kopi Uji Race Dua Milestone",
-            business_profile="x" * 110 + " [[SCORE:80]]",
-            fund_usage_plan="x" * 110,
-            business_projection="x" * 60,
+            business_summary="x" * 40,
             requested_amount=REQUESTED_AMOUNT,
             status=ProposalStatus.SUBMITTED,
             scoring_status=ScoringStatus.PENDING,
             created_at=started_at,
         )
         session.add(proposal)
+        # Penanda skor tinggal di dokumen, bukan di kolom proposals: di
+        # situlah mesin skoring membacanya sekarang.
+        session.add(dokumen_untuk(proposal, "x" * 110 + " [[SCORE:80]]"))
         await session.flush()
         await run_scoring(session, proposal.id, MockScoringEngine(), clock)
 

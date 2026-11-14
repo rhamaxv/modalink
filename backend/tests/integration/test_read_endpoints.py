@@ -1,3 +1,5 @@
+from dokumen_uji import dokumen_untuk
+
 """Empat endpoint baca yang dipakai frontend tapi tidak dimiliki task mana
 pun (10-api-contract.md baris 57, 67, 73, 96)."""
 
@@ -23,13 +25,12 @@ async def test_br_mine_returns_only_current_umkm_own_proposals(
         campaign_id=campaign.id,
         umkm_id=umkm_lain.user.id,
         business_name="Warung Kopi Tetangga",
-        business_profile="x" * 100,
-        fund_usage_plan="x" * 100,
-        business_projection="x" * 50,
+        business_summary="x" * 40,
         requested_amount=8_000_000,
         status=ProposalStatus.LISTED,
     )
     db.add(milik_umkm_lain)
+    db.add(dokumen_untuk(milik_umkm_lain))
     await db.flush()
 
     res = await client.get("/api/v1/proposals/mine", headers=umkm.headers)
@@ -403,15 +404,15 @@ async def test_t1_proposal_list_collected_amount_has_no_n_plus_1(
             campaign_id=campaign.id,
             umkm_id=umkm_id,
             business_name=f"Warung uji N+1 {i}",
-            business_profile="x" * 110,
-            fund_usage_plan="x" * 110,
-            business_projection="x" * 60,
+            business_summary="x" * 40,
             requested_amount=10_000_000,
             status=ProposalStatus.LISTED,
         )
 
     satu = await buat_akun(db, "t1-n-plus-1-satu@contoh.id", Role.UMKM)
-    db.add(_proposal(0, satu.user.id))
+    p_satu = _proposal(0, satu.user.id)
+    db.add(p_satu)
+    db.add(dokumen_untuk(p_satu))
     await db.flush()
 
     async def _hitung_query() -> int:
@@ -455,18 +456,16 @@ async def test_t4_proposal_list_pagination_shape_and_server_enforced_max(
 
     for i in range(3):
         akun = await buat_akun(db, f"t4-pagination-{i}@contoh.id", Role.UMKM)
-        db.add(
-            Proposal(
-                campaign_id=campaign.id,
-                umkm_id=akun.user.id,
-                business_name=f"Warung uji paginasi {i}",
-                business_profile="x" * 110,
-                fund_usage_plan="x" * 110,
-                business_projection="x" * 60,
-                requested_amount=10_000_000,
-                status=ProposalStatus.LISTED,
-            )
+        halaman_p = Proposal(
+            campaign_id=campaign.id,
+            umkm_id=akun.user.id,
+            business_name=f"Warung uji paginasi {i}",
+            business_summary="x" * 40,
+            requested_amount=10_000_000,
+            status=ProposalStatus.LISTED,
         )
+        db.add(halaman_p)
+        db.add(dokumen_untuk(halaman_p))
     await db.flush()
 
     res = await client.get("/api/v1/proposals", params={"page": 1, "page_size": 2})

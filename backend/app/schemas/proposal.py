@@ -46,19 +46,28 @@ class MilestoneIn(BaseModel):
 
 
 class ProposalIn(BaseModel):
-    # Panjang sesuai form di 04-feature-umkm.md. Batas atas (review
-    # keamanan: 5 MB lolos tanpa batas atas sebelum ini) dipilih longgar --
-    # 5.000 karakter kira-kira satu-dua halaman, jauh lebih panjang dari
-    # rencana bisnis UMKM mana pun yang wajar -- dan dipagari lagi di
-    # database lewat CHECK (migrasi fase ini), bukan hanya di sini, karena
-    # fixture test dan kode lain bisa menyusun Proposal langsung tanpa
-    # pernah lewat ProposalIn.
+    """Bagian JSON dari permintaan pengajuan proposal.
+
+    Ini bukan lagi seluruh proposal. Uraian usahanya ada pada berkas PDF yang
+    wajib diunggah bersama bagian ini dalam satu permintaan multipart; yang
+    tinggal di sini hanyalah metadata yang perlu dibaca sistem sendiri, yaitu
+    yang dipakai mencari, mengurutkan, menghitung uang, dan menyusun jadwal
+    pencairan. Ketiga textarea lama (business_profile, fund_usage_plan,
+    business_projection) dihapus karena memaksa UMKM mengetik ulang dokumen
+    yang sudah mereka punya, dan karena hasil ketikannya kehilangan tabel,
+    rincian biaya, serta foto yang justru bagian paling bisa dinilai.
+    """
+
     business_name: str = Field(min_length=3, max_length=120)
-    business_profile: Annotated[str, Field(min_length=100, max_length=5_000)]
+    # Satu-dua kalimat untuk kartu di halaman daftar, bukan rencana bisnis.
+    # Batas atasnya kecil dengan sengaja: field yang muat satu halaman akan
+    # dipakai sebagai satu halaman, dan proposal kembali terbelah dua tempat.
+    # Dipagari lagi di database lewat CHECK, bukan hanya di sini, karena
+    # fixture test dan kode lain bisa menyusun Proposal langsung tanpa
+    # pernah lewat skema ini.
+    business_summary: Annotated[str, Field(min_length=30, max_length=500)]
     # strict=True: tanpa itu Pydantic membulatkan nominal pecahan diam-diam.
     requested_amount: int = Field(strict=True, gt=0)
-    fund_usage_plan: Annotated[str, Field(min_length=100, max_length=5_000)]
-    business_projection: Annotated[str, Field(min_length=50, max_length=3_000)]
     # max_length=30 (jumlah tahap, bukan panjang teks): diulang sebagai
     # MAKSIMAL_MILESTONE di domain/milestone_plan.py untuk pemanggil yang
     # tidak lewat skema ini sama sekali (review keamanan: 50.000 item lolos
@@ -90,9 +99,7 @@ class ProposalOut(BaseModel):
     campaign_id: UUID
     umkm_id: UUID
     business_name: str
-    business_profile: str
-    fund_usage_plan: str
-    business_projection: str
+    business_summary: str
     requested_amount: int
     # BR-51, D-03: selalu dijumlahkan dari ledger (services/ledger.py), tidak
     # pernah disimpan sebagai kolom. Task 1: tanpa ini halaman proposal
@@ -128,10 +135,14 @@ class ProposalOut(BaseModel):
 
 class ProposalListItemOut(BaseModel):
     """Proyeksi ringkas untuk GET /proposals (Task 4, publik, dipanggil
-    landing page): tanpa business_profile/fund_usage_plan/business_projection.
-    Review keamanan mengukur 7.2 MB untuk dua belas proposal seeded karena
-    ketiga field itu ikut terbawa verbatim di endpoint daftar; rencana bisnis
-    lengkap milik GET /proposals/{id}, bukan daftar."""
+    landing page).
+
+    Sejarahnya layak disimpan: review keamanan pernah mengukur 7,2 MB untuk
+    dua belas proposal karena tiga field narasi ikut terbawa verbatim di
+    endpoint daftar. Ketiga field itu sekarang sudah tidak ada sama sekali --
+    uraiannya pindah ke PDF, yang memang tidak pernah ikut di respons mana
+    pun -- tapi proyeksi terpisah ini tetap dipertahankan supaya penambahan
+    kolom panjang berikutnya tidak diam-diam masuk lagi ke daftar."""
 
     model_config = {"from_attributes": True}
 
@@ -139,11 +150,11 @@ class ProposalListItemOut(BaseModel):
     campaign_id: UUID
     umkm_id: UUID
     business_name: str
-    # Cuplikan, bukan field penuh: kartu proposal di daftar memang menampilkan
-    # ringkasan usaha, dan tanpa field ini kartunya kehilangan deskripsinya.
-    # Dipotong di server supaya respons daftar tidak kembali membesar seiring
-    # panjang rencana bisnis, yang justru alasan ketiga field panjang dibuang.
-    business_profile_excerpt: str
+    # Nama lamanya `business_profile_excerpt`, dan pemotongan di server sudah
+    # tidak diperlukan lagi: yang dikirim sekarang adalah ringkasan yang
+    # memang sudah dibatasi 500 karakter di tepi, bukan potongan dari rencana
+    # bisnis sepanjang lima ribu karakter.
+    business_summary: str
     requested_amount: int
     collected_amount: int
     status: ProposalStatus

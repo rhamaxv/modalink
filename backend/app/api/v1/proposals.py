@@ -6,7 +6,18 @@ dengan tidak pernah menulisnya, bukan dengan menolaknya di runtime.
 
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.engine import ScoringEngine
@@ -21,10 +32,11 @@ from app.api.deps import (
 )
 from app.db.session import get_session
 from app.domain.clock import Clock
-from app.errors import NotFoundError
+from app.errors import NotFoundError, UnprocessableError
 from app.jobs.inline import InlineRunner
 from app.models.campaign import Sector
 from app.models.proposal import Proposal
+from app.models.proposal_document import MAX_DOCUMENT_BYTES
 from app.models.scoring import ScoringResult
 from app.models.user import Role, User
 from app.schemas.proposal import (
@@ -37,6 +49,7 @@ from app.schemas.proposal import (
 from app.schemas.scoring import ScoringResultOut
 from app.services.campaign import get_campaign
 from app.services.cover import ambil_cover, cover_versions
+from app.services.document import ambil_dokumen
 from app.services.expiry import evaluate_expiry
 from app.services.kyc import require_verified
 from app.services.ledger import collected_amount_for_proposal
@@ -63,6 +76,30 @@ from app.services.termination import request_termination
 router = APIRouter(tags=["proposals"])
 
 
+# Dibaca sepotong-sepotong, bukan sekaligus lewat `await berkas.read()`.
+# Alasannya sama dengan di api/v1/covers.py: membaca sekaligus berarti
+# unggahan 500 MB tetap ditulis penuh ke berkas sementara lebih dulu, lalu
+# baru ditolak.
+UKURAN_POTONGAN = 64 * 1024
+
+
+async def _baca_dokumen_terbatas(berkas: UploadFile) -> bytes:
+    potongan: list[bytes] = []
+    terkumpul = 0
+    while True:
+        bagian = await berkas.read(UKURAN_POTONGAN)
+        if not bagian:
+            break
+        terkumpul += len(bagian)
+        if terkumpul > MAX_DOCUMENT_BYTES:
+            raise UnprocessableError(
+                "berkas_terlalu_besar",
+                f"Ukuran dokumen maksimal {MAX_DOCUMENT_BYTES // 1024 // 1024} MB.",
+            )
+        potongan.append(bagian)
+    return b"".join(potongan)
+
+
 @router.post(
     "/api/v1/campaigns/{campaign_id}/proposals",
     status_code=status.HTTP_201_CREATED,
@@ -70,22 +107,55 @@ router = APIRouter(tags=["proposals"])
 )
 async def submit_proposal_endpoint(
     campaign_id: UUID,
-    body: ProposalIn,
     background_tasks: BackgroundTasks,
+    payload: str = Form(
+        ...,
+        description="Bagian JSON berisi ProposalIn.",
+    ),
+    document: UploadFile = File(..., description="Dokumen proposal, PDF."),
     umkm: User = Depends(require_role(Role.UMKM)),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     engine: ScoringEngine = Depends(get_scoring_engine),
     session_factory: SessionFactory = Depends(get_session_factory),
 ) -> ProposalWithCollectedAmount:
+    """multipart/form-data, bukan JSON: proposalnya adalah dokumen, dan
+    dokumen itu wajib.
+
+    Satu permintaan, bukan dua langkah "buat proposal lalu unggah
+    dokumennya". Dua langkah akan meninggalkan proposal tanpa dokumen setiap
+    kali langkah kedua gagal, dan baris semacam itu tidak bisa dinilai
+    sekaligus tidak bisa dibedakan dari proposal yang sah.
+
+    Bagian `payload` berisi JSON ProposalIn sebagai string karena satu
+    permintaan multipart tidak bisa sekaligus punya body JSON. Ia diurai di
+    sini, bukan oleh FastAPI, jadi error bentuknya harus diterjemahkan
+    sendiri ke bentuk error produk ini.
+    """
     # Gerbang identitas SEBELUM apa pun yang lain, termasuk sebelum mencari
     # campaign-nya: pengaju yang belum terverifikasi tidak perlu diberi tahu
     # campaign mana yang ada dan mana yang tidak.
     await require_verified(session, umkm, "mengajukan proposal")
+    try:
+        body = ProposalIn.model_validate_json(payload)
+    except ValidationError as exc:
+        raise UnprocessableError(
+            "payload_tidak_valid",
+            "Isian proposal tidak lolos pemeriksaan.",
+            detail={"errors": exc.errors(include_url=False, include_context=False)},
+        ) from None
     campaign = await get_campaign(session, campaign_id)
     if campaign is None:
         raise NotFoundError("campaign_tidak_ada", "Campaign tidak ditemukan.")
-    proposal = await submit_proposal(session, umkm, campaign, body, clock)
+    proposal = await submit_proposal(
+        session,
+        umkm,
+        campaign,
+        body,
+        await _baca_dokumen_terbatas(document),
+        document.filename,
+        clock,
+    )
     # Proposal masuk langsung dinilai, tanpa menunggu AI sebelum 201 dikirim
     # (10-api-contract.md): job jalan di latar belakang lewat JobRunner.
     InlineRunner(background_tasks, session).submit(
@@ -207,6 +277,50 @@ async def get_scoring_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> ScoringResult:
     return await get_latest_scoring(session, proposal_id)
+
+
+@router.get("/api/v1/proposals/{proposal_id}/document")
+async def get_proposal_document_endpoint(
+    proposal_id: UUID,
+    user: User | None = Depends(optional_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Dokumen proposal, dilayani dari database.
+
+    Aturan aksesnya mewarisi proposalnya persis, sama seperti milestone:
+    dokumen bukan sumber daya dengan visibilitas sendiri, ia isi proposal
+    itu. Proposal yang sudah publik berarti dokumennya ikut publik, dan
+    memang itu yang diharapkan -- investor menilai dari dokumen ini, dan
+    menyembunyikannya berarti meminta mereka mendanai berdasarkan skor saja.
+    """
+    proposal = await get_proposal(session, proposal_id)
+    if proposal is None:
+        raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
+    campaign = await get_campaign(session, proposal.campaign_id)
+    if campaign is None or not can_view(proposal, campaign, user):
+        raise NotFoundError("proposal_tidak_ada", "Proposal tidak ditemukan.")
+    dokumen = await ambil_dokumen(session, proposal_id)
+    if dokumen is None:
+        raise NotFoundError("dokumen_tidak_ada", "Dokumen proposal tidak ditemukan.")
+    return Response(
+        content=dokumen.data,
+        media_type=dokumen.content_type,
+        headers={
+            # Tipe hasil pemeriksaan byte, dan nosniff memastikan browser
+            # tidak menebak tipe lain dari isinya sendiri.
+            "X-Content-Type-Options": "nosniff",
+            # inline: dokumen ini memang untuk dibaca di tempat, dan pembaca
+            # PDF bawaan browser sudah cukup. filename* diisi nama yang
+            # SUDAH dibersihkan (services/document.py bersihkan_nama), bukan
+            # nama mentah dari pengunggah -- nama mentah bisa menyelundupkan
+            # tanda kutip dan baris baru ke dalam header ini.
+            "Content-Disposition": f'inline; filename="{dokumen.original_filename}"',
+            # Tanpa kunci versi di URL, jadi cachenya pendek: dokumen bisa
+            # diunggah ulang oleh UMKM dan pembaca tidak boleh terjebak
+            # versi lama berhari-hari.
+            "Cache-Control": "private, max-age=60",
+        },
+    )
 
 
 @router.get(

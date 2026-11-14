@@ -4,16 +4,13 @@ from sqlalchemy import func, select
 
 from app.models.proposal import ProposalStatus, ScoringStatus
 from app.models.scoring import ScoringResult
+from app.services.document import ambil_dokumen
 
 
 async def test_submitted_proposal_gets_scored_immediately(
-    client, umkm, campaign, body_proposal
+    client, kirim_proposal, umkm, campaign
 ):
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
+    res = await kirim_proposal(campaign.id, headers=umkm.headers)
     pid = res.json()["id"]
     detail = (await client.get(f"/api/v1/proposals/{pid}", headers=umkm.headers)).json()
     assert detail["scoring_status"] == "done"
@@ -21,14 +18,15 @@ async def test_submitted_proposal_gets_scored_immediately(
 
 
 async def test_br73_score_below_threshold_becomes_rejected(
-    client, umkm, campaign, body_proposal
+    client, kirim_proposal, dokumen_proposal, umkm, campaign
 ):
-    body = body_proposal()
-    body["business_profile"] += " [[SCORE:40]]"  # threshold campaign 60
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
+    """Penanda skor ditaruh di dalam dokumen, bukan di field formulir: sejak
+    uraian proposal pindah ke PDF, di situlah mesin skoring membacanya."""
+    res = await kirim_proposal(
+        campaign.id,
         headers=umkm.headers,
-        json=body,
+        # threshold campaign 60
+        pdf=dokumen_proposal("Uraian singkat. [[SCORE:40]]"),
     )
     pid = res.json()["id"]
     detail = (await client.get(f"/api/v1/proposals/{pid}", headers=umkm.headers)).json()
@@ -79,7 +77,11 @@ async def test_br76_two_real_scoring_attempts_leave_two_rows(
     submitted_proposal.status = ProposalStatus.SUBMITTED
     # Penanda skor berbeda dari skor dasar baris pertama supaya kedua baris
     # terbukti dibedakan oleh total_score, bukan cuma oleh id.
-    submitted_proposal.business_profile += " [[SCORE:80]]"
+    # Teks dokumennya yang diganti, bukan kolom di proposals: mesin skoring
+    # membaca penanda dari dokumen sekarang.
+    dok = await ambil_dokumen(db, submitted_proposal.id)
+    dok.extracted_text += " [[SCORE:80]]"
+    db.add(dok)
     await db.flush()
     await run_scoring(db, submitted_proposal.id, engine_mock, clock)
 

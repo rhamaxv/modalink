@@ -77,17 +77,13 @@ async def test_list_campaign_proposals_hides_not_yet_listed(
 
 
 async def test_already_closed_campaign_rejects_new_proposal(
-    client, investor, campaign, umkm, body_proposal
+    client, investor, campaign, umkm, kirim_proposal
 ):
     """Ditunda dari fase 03 karena endpoint POST proposal baru lahir di sini."""
     await client.post(
         f"/api/v1/campaigns/{campaign.id}/close", headers=investor.headers
     )
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
+    res = await kirim_proposal(campaign.id, headers=umkm.headers)
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "pengajuan_ditutup"
 

@@ -10,6 +10,7 @@ satu halaman, sisanya praktis tidak terjangkau.
 from datetime import timedelta
 
 import pytest
+from dokumen_uji import dokumen_untuk
 
 from app.domain.clock import SystemClock
 from app.models.campaign import Campaign, CampaignStatus, Sector
@@ -45,14 +46,17 @@ async def _listed(db, buat_akun, campaign: Campaign, nama: str, nominal: int):
         campaign_id=campaign.id,
         umkm_id=akun.user.id,
         business_name=nama,
-        business_profile="x" * 110,
-        fund_usage_plan="x" * 110,
-        business_projection="x" * 60,
+        business_summary="x" * 40,
         requested_amount=nominal,
         status=ProposalStatus.LISTED,
         scoring_status=ScoringStatus.DONE,
     )
     db.add(p)
+    # Dokumen tetap ditulis meski berkas ini tidak menjalankan mesin skoring:
+    # proposal tanpa dokumen adalah keadaan yang tidak bisa dicapai lewat API
+    # mana pun, dan fixture yang membuatnya menguji bentuk data yang tidak
+    # pernah ada di produksi.
+    db.add(dokumen_untuk(p))
     await db.flush()
     return p
 

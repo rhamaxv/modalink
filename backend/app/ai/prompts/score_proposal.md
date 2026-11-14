@@ -1,7 +1,12 @@
 Anda menilai satu proposal pendanaan UMKM untuk sebuah campaign crowdfunding.
 Tugas Anda hanya menilai, bukan memutuskan apakah proposal ini lolos atau
 ditolak; keputusan itu dibuat oleh sistem lain dari hasil penilaian Anda.
-Jangan mengarang angka, fakta, atau kutipan yang tidak ada di isi proposal.
+
+Isi proposal ada pada **dokumen PDF yang dilampirkan bersama pesan ini**.
+Baca dokumen itu sebagai sumber utama. Keterangan di bawah hanyalah metadata
+yang diketik UMKM pada formulir, bukan pengganti dokumennya.
+
+Jangan mengarang angka, fakta, atau kutipan yang tidak ada di dokumen.
 
 ## Kriteria campaign
 
@@ -10,13 +15,14 @@ Jangan mengarang angka, fakta, atau kutipan yang tidak ada di isi proposal.
 - Deskripsi: {deskripsi_campaign}
 - Dana target: {target_amount_campaign}
 
-## Isi proposal
+## Metadata proposal
 
 - Nama usaha: {business_name}
-- Profil usaha (business_profile): {business_profile}
+- Ringkasan yang diketik pengaju: {business_summary}
 - Dana yang diminta: {requested_amount}
-- Rencana penggunaan dana (fund_usage_plan): {fund_usage_plan}
-- Proyeksi usaha (business_projection): {business_projection}
+- Rencana milestone yang didaftarkan pengaju:
+
+{rencana_milestone}
 
 ## Rubrik
 
@@ -30,10 +36,12 @@ campaign.
 - 20 sampai 31: sektor berdekatan, atau dana diminta jauh dari kisaran wajar campaign.
 - 0 sampai 19: sektor tidak relevan, atau proposal jelas salah alamat.
 
-Kualitas data (0 sampai 30): seberapa lengkap dan konsisten isian proposal,
-bukan seberapa bagus usahanya.
+Kualitas data (0 sampai 30): seberapa lengkap dan konsisten isi dokumen,
+bukan seberapa bagus usahanya. Dokumen yang memuat angka penjualan, rincian
+biaya per pos, dan keterangan operasional yang spesifik bernilai tinggi;
+dokumen yang hanya berisi kalimat umum bernilai rendah, sepanjang apa pun ia.
 
-- 24 sampai 30: semua field terisi spesifik, angka saling konsisten, rencana penggunaan dana terinci.
+- 24 sampai 30: angka saling konsisten, rincian biaya per pos ada, keterangan usaha spesifik.
 - 15 sampai 23: terisi tapi umum, atau ada angka yang tidak saling mendukung.
 - 0 sampai 14: terasa template, banyak kalimat tanpa isi, atau angka saling bertentangan.
 
@@ -50,12 +58,14 @@ Tandai red flag bila Anda menemukan salah satu dari pola berikut, pakai kode
 yang tetap supaya bisa dirujuk:
 
 - `projeksi_tidak_realistis` (critical): proyeksi pendapatan melonjak jauh di luar skala usaha yang dijelaskan.
-- `angka_tidak_konsisten` (critical): angka di proyeksi bertentangan dengan angka di profil atau rencana dana.
-- `isian_template` (warning): isian terasa generik, tidak menyebut hal spesifik tentang usaha ini.
-- `rencana_dana_kabur` (warning): rencana penggunaan dana tidak merinci porsi per pos.
+- `angka_tidak_konsisten` (critical): angka di dokumen bertentangan satu sama lain, atau bertentangan dengan dana yang diminta dan rencana milestone di atas.
+- `isian_template` (warning): dokumen terasa generik, tidak menyebut hal spesifik tentang usaha ini.
+- `rencana_dana_kabur` (warning): dokumen tidak merinci porsi dana per pos.
 - `sektor_tidak_cocok` (warning): jenis usaha tidak sesuai sektor campaign.
-- `profil_tipis` (info): profil usaha memenuhi panjang minimum tapi sedikit isinya.
+- `dokumen_tipis` (info): dokumen memenuhi syarat tapi sedikit isinya.
 
-Setiap red flag wajib membawa `evidence` berupa kutipan persis dari isi
-proposal di atas, bukan parafrase. Kutipan yang tidak bisa ditemukan kata per
-kata di isi proposal tidak boleh ditulis.
+Setiap red flag wajib membawa `evidence` berupa kutipan persis dari **teks di
+dalam dokumen PDF**, bukan parafrase, dan bukan dari metadata di atas.
+Kutipan yang tidak bisa ditemukan kata per kata di dokumen tidak boleh
+ditulis; kutipan semacam itu akan dibuang oleh sistem sebelum sampai ke
+pengaju, jadi menuliskannya hanya menghilangkan red flag yang mungkin benar.

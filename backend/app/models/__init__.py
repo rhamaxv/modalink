@@ -15,6 +15,7 @@ from app.models.proposal import (
     ProposalStatus,
     ScoringStatus,
 )
+from app.models.proposal_document import ProposalDocument
 from app.models.scoring import ScoringResult, ScoringVerdict
 from app.models.system_clock import SystemClockRow
 from app.models.user import Role, User
@@ -36,6 +37,7 @@ __all__ = [
     "Pledge",
     "PledgeStatus",
     "Proposal",
+    "ProposalDocument",
     "ProposalMilestone",
     "ProposalStatus",
     "Role",

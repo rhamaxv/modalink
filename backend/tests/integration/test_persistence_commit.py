@@ -10,6 +10,7 @@ yang hanya bisa melihat baris yang sudah benar-benar ter-commit ke Postgres,
 bukan yang sekadar di-flush dalam transaksi yang belum ditutup.
 """
 
+import json
 import uuid
 from datetime import timedelta
 
@@ -19,6 +20,7 @@ from sqlalchemy import text
 from app.db.session import SessionLocal
 from app.domain.clock import SystemClock
 from app.main import create_app
+from app.seed.pdf import buat_pdf
 
 
 async def test_register_endpoint_really_commits_to_database() -> None:
@@ -142,42 +144,62 @@ async def test_c31_background_scoring_job_really_commits_to_database() -> None:
             assert res_campaign.status_code == 201
             campaign_id = res_campaign.json()["id"]
 
+            # Penanda skor ada di dalam PDF, bukan di payload: itulah yang
+            # dibaca mesin skoring, dan test ini memang menuntut proposalnya
+            # lolos ambang supaya status `listed` yang di-commit bisa dibaca
+            # kembali dari koneksi lain.
+            dokumen_persistence = buat_pdf(
+                "Proposal Uji Persistence",
+                [
+                    (
+                        "Uraian",
+                        (
+                            "Warung kopi rumahan di Jakarta Timur, berjalan 3 tahun, "
+                            "2 pekerja, omzet rata-rata Rp12 juta per bulan. Rp6 juta "
+                            "untuk mesin kopi semi-otomatis, Rp3 juta untuk bahan baku "
+                            "biji dan susu selama tiga bulan, dan Rp1 juta untuk "
+                            "memperbaiki etalase depan yang sudah lapuk. Omzet "
+                            "diperkirakan naik ke Rp18 juta per bulan dalam 6 bulan "
+                            "setelah mesin baru dipakai. [[SCORE:80]]"
+                        ),
+                    )
+                ],
+            )
+            muatan_proposal = {
+                "business_name": "Warung Kopi Uji Persistence",
+                "business_summary": (
+                    "Warung kopi rumahan di Jakarta Timur, berjalan 3 tahun, "
+                    "2 pekerja, omzet rata-rata Rp12 juta per bulan."
+                ),
+                "requested_amount": 10_000_000,
+                "milestones": [
+                    {
+                        "seq": 1,
+                        "title": "Beli mesin",
+                        "description": "x" * 20,
+                        "amount": 5_000_000,
+                    },
+                    {
+                        "seq": 2,
+                        "title": "Bahan baku",
+                        "description": "x" * 20,
+                        "amount": 5_000_000,
+                    },
+                ],
+            }
             res_proposal = await client.post(
                 f"/api/v1/campaigns/{campaign_id}/proposals",
                 headers={"Authorization": f"Bearer {token_umkm}"},
-                json={
-                    "business_name": "Warung Kopi Uji Persistence",
-                    "business_profile": (
-                        "Warung kopi rumahan di Jakarta Timur, berjalan 3 tahun, "
-                        "2 pekerja, omzet rata-rata Rp12 juta per bulan."
-                    ),
-                    "requested_amount": 10_000_000,
-                    "fund_usage_plan": (
-                        "Rp6 juta untuk mesin kopi semi-otomatis, Rp3 juta untuk "
-                        "bahan baku biji dan susu selama tiga bulan, dan Rp1 juta "
-                        "untuk memperbaiki etalase depan yang sudah lapuk."
-                    ),
-                    "business_projection": (
-                        "Omzet diperkirakan naik ke Rp18 juta per bulan dalam 6 "
-                        "bulan setelah mesin baru dipakai."
-                    ),
-                    "milestones": [
-                        {
-                            "seq": 1,
-                            "title": "Beli mesin",
-                            "description": "x" * 20,
-                            "amount": 5_000_000,
-                        },
-                        {
-                            "seq": 2,
-                            "title": "Bahan baku",
-                            "description": "x" * 20,
-                            "amount": 5_000_000,
-                        },
-                    ],
+                data={"payload": json.dumps(muatan_proposal)},
+                files={
+                    "document": (
+                        "proposal.pdf",
+                        dokumen_persistence,
+                        "application/pdf",
+                    )
                 },
             )
-            assert res_proposal.status_code == 201
+            assert res_proposal.status_code == 201, res_proposal.text
             proposal_id = uuid.UUID(res_proposal.json()["id"])
 
         async with SessionLocal() as sesi_terpisah:

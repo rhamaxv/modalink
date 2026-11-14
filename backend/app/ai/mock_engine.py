@@ -2,11 +2,17 @@
 
 Penanda [[SCORE:n]] dan [[RED_FLAG:level]] hanya dikenali di sini,
 tidak pernah dikirim ke Gemini.
+
+Penandanya dibaca dari `document.extracted_text`, bukan dari field di
+formulir: sejak uraian proposal pindah ke PDF, di situlah satu-satunya tempat
+teks sepanjang itu bisa tinggal. Test yang ingin memaksa skor menyiapkan
+dokumen yang teksnya memuat penanda, bukan mengetiknya ke ringkasan.
 """
 
 import re
+from collections.abc import Sequence
 
-from app.ai.engine import CampaignLike, ProposalLike
+from app.ai.engine import CampaignLike, DocumentLike, MilestoneLike, ProposalLike
 from app.ai.models import Brief, ProposalScore, RedFlag
 
 PENANDA_SKOR = re.compile(r"\[\[SCORE:(\d+)\]\]")
@@ -18,14 +24,16 @@ class MockScoringEngine:
     model = "mock-v1"
 
     async def score(
-        self, proposal: ProposalLike, campaign: CampaignLike
+        self,
+        proposal: ProposalLike,
+        campaign: CampaignLike,
+        document: DocumentLike,
+        milestones: Sequence[MilestoneLike],
     ) -> ProposalScore:
-        # f-string, bukan " ".join([...]) seperti di draft brief: isinya sama,
-        # tapi gerbang ruff proyek ini menandai join daftar literal (FLY002).
-        teks = (
-            f"{proposal.business_profile} {proposal.fund_usage_plan} "
-            f"{proposal.business_projection}"
-        )
+        # Ringkasan ikut dibaca, bukan dokumen saja: sebagian test lebih
+        # mudah ditulis dengan menaruh penanda di ringkasan yang pendek
+        # daripada menyusun PDF hanya untuk satu angka.
+        teks = f"{proposal.business_summary}\n{document.extracted_text}"
 
         flags = [
             RedFlag(
@@ -49,15 +57,20 @@ class MockScoringEngine:
                 brief=self._brief(proposal),
             )
 
-        # Skor dasar dari kelengkapan isian, dibatasi rentangnya. Kecocokan
+        # Skor dasar dari kelengkapan dokumen, dibatasi rentangnya. Kecocokan
         # diukur dari porsi dana yang diminta terhadap target campaign, bukan
         # dari sektor: Proposal tidak punya kolom sector, hanya Campaign yang
         # punya, sehingga membandingkan keduanya melempar AttributeError
         # begitu baris Proposal sungguhan masuk (lihat plan fase ini).
         porsi = proposal.requested_amount / campaign.target_amount
         fit = 40 if porsi <= 0.5 else (30 if porsi <= 0.8 else 22)
-        data = min(len(proposal.fund_usage_plan) // 10, 30)
-        impact = min(len(proposal.business_projection) // 10, 30)
+        # Panjang teks dokumen dan jumlah tahap, bukan panjang dua textarea
+        # yang sudah tidak ada. Dibagi 40, bukan 10, karena dokumen sungguhan
+        # jauh lebih panjang daripada field formulir yang digantikannya, dan
+        # pembagi lama membuat hampir semua dokumen langsung menyentuh batas
+        # atas sehingga skornya berhenti membedakan apa pun.
+        data = min(len(document.extracted_text) // 40, 30)
+        impact = min(len(milestones) * 8, 30)
         return ProposalScore(
             fit_score=fit,
             data_quality_score=data,

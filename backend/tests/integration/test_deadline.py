@@ -93,15 +93,11 @@ async def test_evaluation_is_idempotent_does_not_refund_twice(
 
 
 async def test_br65_proposal_submitted_just_before_apply_deadline_still_has_funding_window(
-    client, db, campaign, umkm, investor, majukan, body_proposal
+    client, db, campaign, umkm, investor, majukan, kirim_proposal
 ):
     """Proposal masuk sehari sebelum apply_deadline, lalu didanai setelahnya (D-16)."""
     await majukan(hari=6)  # apply_deadline hari ke-7, funding_deadline hari ke-21
-    res = await client.post(
-        f"/api/v1/campaigns/{campaign.id}/proposals",
-        headers=umkm.headers,
-        json=body_proposal(),
-    )
+    res = await kirim_proposal(campaign.id, headers=umkm.headers)
     pid = res.json()["id"]
 
     await majukan(hari=5)  # hari ke-11, masih di dalam jendela pendanaan

@@ -8,31 +8,59 @@ from app.config import settings
 from app.domain.verdict import total_score
 
 
-async def test_mock_is_deterministic(proposal_draft, campaign_draft):
+async def test_mock_is_deterministic(
+    proposal_draft, campaign_draft, document_draft, milestones_draft
+):
     engine = MockScoringEngine()
-    a = await engine.score(proposal_draft, campaign_draft)
-    b = await engine.score(proposal_draft, campaign_draft)
+    a = await engine.score(
+        proposal_draft, campaign_draft, document_draft, milestones_draft
+    )
+    b = await engine.score(
+        proposal_draft, campaign_draft, document_draft, milestones_draft
+    )
     assert a == b
 
 
-async def test_score_marker_forces_total(proposal_draft, campaign_draft):
-    proposal_draft.business_profile += " [[SCORE:59]]"
-    skor = await MockScoringEngine().score(proposal_draft, campaign_draft)
+async def test_score_marker_in_the_document_forces_total(
+    proposal_draft, campaign_draft, document_draft, milestones_draft
+):
+    """Penanda dibaca dari teks dokumen, bukan dari field formulir: di situlah
+    isi proposal tinggal sejak ia berbentuk PDF."""
+    document_draft.extracted_text += " [[SCORE:59]]"
+    skor = await MockScoringEngine().score(
+        proposal_draft, campaign_draft, document_draft, milestones_draft
+    )
     assert total_score(skor) == 59
 
 
-async def test_red_flag_marker_produces_critical_flag(proposal_draft, campaign_draft):
-    proposal_draft.business_projection += " [[RED_FLAG:critical]]"
-    skor = await MockScoringEngine().score(proposal_draft, campaign_draft)
+async def test_red_flag_marker_produces_critical_flag(
+    proposal_draft, campaign_draft, document_draft, milestones_draft
+):
+    document_draft.extracted_text += " [[RED_FLAG:critical]]"
+    skor = await MockScoringEngine().score(
+        proposal_draft, campaign_draft, document_draft, milestones_draft
+    )
     assert any(f.severity == "critical" for f in skor.red_flags)
 
 
-async def test_complete_proposal_scores_higher_than_thin_one(
-    proposal_draft, proposal_draft_tipis, campaign_draft
+async def test_complete_document_scores_higher_than_a_thin_one(
+    proposal_draft,
+    campaign_draft,
+    document_draft,
+    document_draft_tipis,
+    milestones_draft,
 ):
     engine = MockScoringEngine()
-    lengkap = total_score(await engine.score(proposal_draft, campaign_draft))
-    tipis = total_score(await engine.score(proposal_draft_tipis, campaign_draft))
+    lengkap = total_score(
+        await engine.score(
+            proposal_draft, campaign_draft, document_draft, milestones_draft
+        )
+    )
+    tipis = total_score(
+        await engine.score(
+            proposal_draft, campaign_draft, document_draft_tipis, milestones_draft
+        )
+    )
     assert lengkap > tipis
 
 

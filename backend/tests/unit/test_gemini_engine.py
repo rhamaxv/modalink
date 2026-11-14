@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 import pytest
+from instructor.v2.core.multimodal import PDF
 
 from app.ai.gemini_engine import (
     DailyQuotaExceeded,
@@ -95,7 +96,7 @@ class _StubCompletions:
 
     def __init__(self, hasil: ProposalScore) -> None:
         self._hasil = hasil
-        self.messages_terkirim: list[dict[str, str]] | None = None
+        self.messages_terkirim: list[dict[str, object]] | None = None
 
     async def create(self, *, model, response_model, max_retries, messages):
         self.messages_terkirim = messages
@@ -155,7 +156,7 @@ def _bangun_engine_dengan_stub(
 
 
 async def test_score_calls_stub_and_drops_hallucinated_evidence(
-    proposal_draft, campaign_gemini_draft
+    proposal_draft, campaign_gemini_draft, document_draft, milestones_draft
 ):
     hasil_mentah = ProposalScore(
         fit_score=30,
@@ -166,7 +167,7 @@ async def test_score_calls_stub_and_drops_hallucinated_evidence(
                 code="angka_tidak_konsisten",
                 severity="critical",
                 message="genuine",
-                # Persis ada di proposal_draft.business_profile (unit/conftest.py).
+                # Persis ada di document_draft.extracted_text (unit/conftest.py).
                 evidence="omzet rata-rata Rp12 juta per bulan",
             ),
             RedFlag(
@@ -181,20 +182,32 @@ async def test_score_calls_stub_and_drops_hallucinated_evidence(
     stub = _StubClient(hasil_mentah)
     engine = _bangun_engine_dengan_stub(stub)
 
-    skor = await engine.score(proposal_draft, campaign_gemini_draft)
+    skor = await engine.score(
+        proposal_draft, campaign_gemini_draft, document_draft, milestones_draft
+    )
 
     assert [f.code for f in skor.red_flags] == ["angka_tidak_konsisten"]
 
-    prompt_terkirim = stub.chat.completions.messages_terkirim[0]["content"]
+    # content adalah daftar [teks prompt, PDF], bukan satu string: itulah
+    # satu-satunya bentuk yang diterima provider gemini milik Instructor.
+    isi = stub.chat.completions.messages_terkirim[0]["content"]
+    prompt_terkirim, lampiran = isi
     assert proposal_draft.business_name in prompt_terkirim
-    assert proposal_draft.business_profile in prompt_terkirim
-    assert proposal_draft.fund_usage_plan in prompt_terkirim
-    assert proposal_draft.business_projection in prompt_terkirim
+    assert proposal_draft.business_summary in prompt_terkirim
     assert str(proposal_draft.requested_amount) in prompt_terkirim
+    # Rencana milestone ikut dikirim supaya model bisa membandingkannya
+    # terhadap angka di dalam dokumen.
+    for m in milestones_draft:
+        assert m.title in prompt_terkirim
+        assert str(m.amount) in prompt_terkirim
+    # Dokumen dikirim sebagai lampiran, dan isinya TIDAK ikut ditempel ke
+    # dalam teks prompt: menempelkannya berarti mengirim dokumen dua kali.
+    assert document_draft.extracted_text not in prompt_terkirim
+    assert isinstance(lampiran, PDF)
 
 
 async def test_rf2_score_rejects_a_prompt_larger_than_the_configured_cap(
-    proposal_draft, campaign_gemini_draft
+    proposal_draft, campaign_gemini_draft, document_draft, milestones_draft
 ):
     """Review keamanan Finding 2: batas prompt ditegakkan SEBELUM panggilan
     jaringan terjadi, bukan sesudahnya. stub tidak pernah terpanggil kalau
@@ -203,7 +216,9 @@ async def test_rf2_score_rejects_a_prompt_larger_than_the_configured_cap(
     engine = _bangun_engine_dengan_stub(stub, max_prompt_chars=10)
 
     with pytest.raises(PromptTooLarge):
-        await engine.score(proposal_draft, campaign_gemini_draft)
+        await engine.score(
+            proposal_draft, campaign_gemini_draft, document_draft, milestones_draft
+        )
 
     assert stub.chat.completions.messages_terkirim is None, (
         "panggilan model tidak boleh terjadi saat prompt melebihi batas"
@@ -211,17 +226,18 @@ async def test_rf2_score_rejects_a_prompt_larger_than_the_configured_cap(
 
 
 async def test_rf2_score_is_rejected_once_the_daily_budget_is_exhausted(
-    proposal_draft, campaign_gemini_draft
+    proposal_draft, campaign_gemini_draft, document_draft, milestones_draft
 ):
     """Kuota harian gagal tertutup: panggilan ke-(limit+1) harus ditolak
     tanpa pernah menyentuh stub/jaringan, bukan diam-diam lolos."""
     stub = _StubClient(skor_dengan("evidence apa pun"))
     engine = _bangun_engine_dengan_stub(stub, daily_budget=2)
 
-    await engine.score(proposal_draft, campaign_gemini_draft)
-    await engine.score(proposal_draft, campaign_gemini_draft)
+    argumen = (proposal_draft, campaign_gemini_draft, document_draft, milestones_draft)
+    await engine.score(*argumen)
+    await engine.score(*argumen)
     with pytest.raises(DailyQuotaExceeded):
-        await engine.score(proposal_draft, campaign_gemini_draft)
+        await engine.score(*argumen)
 
 
 def test_rf2_daily_budget_resets_on_a_new_day():
@@ -242,3 +258,17 @@ def test_rf2_daily_budget_resets_on_a_new_day():
         anggaran.use()  # tidak melempar: hari baru, hitungan direset
     finally:
         modul_gemini._clock = asli
+
+
+def test_rf3_empty_evidence_is_dropped_even_when_the_source_is_empty():
+    """Dokumen hasil pindai tidak punya lapisan teks, jadi sumber kutipannya
+    kosong. Tanpa penjagaan khusus, red flag dengan evidence kosong lolos
+    selalu -- "" adalah substring dari string apa pun, termasuk "" -- dan
+    itu persis tuduhan tanpa bukti yang RF-3 ada untuk mencegah."""
+    hasil = drop_hallucinated_evidence(skor_dengan(""), "")
+    assert hasil.red_flags == []
+
+
+def test_rf3_every_red_flag_is_dropped_when_the_document_has_no_text_layer():
+    hasil = drop_hallucinated_evidence(skor_dengan("Omzet Rp12 juta"), "")
+    assert hasil.red_flags == []

@@ -4,18 +4,28 @@ proyek ini yang boleh memanggil jaringan untuk menilai proposal.
 RF-3 ditegakkan di sini: evidence yang tidak ada di isi proposal adalah
 kutipan halusinasi, dan drop_hallucinated_evidence() membuangnya sebelum hasil
 dipakai, supaya tidak pernah ditampilkan ke UMKM sebagai alasan penolakan.
+
+Isi proposal sekarang adalah PDF, dikirim apa adanya lewat instructor PDF
+(`PDF.from_raw_base64`) dan dibaca Gemini secara native -- tidak ada langkah
+OCR terpisah, termasuk untuk dokumen hasil pindai. Yang dicocokkan
+drop_hallucinated_evidence bukan PDF itu melainkan `extracted_text` miliknya,
+dan untuk dokumen pindai teks itu kosong sehingga seluruh red flag terbuang.
+Arah kegagalannya disengaja; lihat app/models/proposal_document.py.
 """
 
+import base64
 import re
+from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
-from typing import Self
+from typing import Any, Self, cast
 
 import instructor
 from google import genai
 from google.genai import types
+from instructor.v2.core.multimodal import PDF
 
-from app.ai.engine import CampaignLike, ProposalLike
+from app.ai.engine import CampaignLike, DocumentLike, MilestoneLike, ProposalLike
 from app.ai.models import ProposalScore
 from app.config import Settings
 from app.domain.clock import SystemClock
@@ -84,6 +94,22 @@ def _normalize(teks: str) -> str:
     return re.sub(r"\s+", " ", teks).strip().casefold()
 
 
+def _format_milestone(milestones: Sequence[MilestoneLike]) -> str:
+    """Rencana tahapan sebagai daftar baris, diurutkan sesuai `seq`.
+
+    Diurutkan di sini dan tidak dipercayakan pada urutan baris dari
+    database: model diminta memeriksa konsistensi nominal antar-tahap, dan
+    tahap yang tiba dengan urutan acak membuat pemeriksaan itu menilai
+    rencana yang bukan rencana pengaju.
+    """
+    if not milestones:
+        return "(tidak ada tahap yang didaftarkan)"
+    return "\n".join(
+        f"  {m.seq}. {m.title} — {m.amount}"
+        for m in sorted(milestones, key=lambda m: m.seq)
+    )
+
+
 def drop_hallucinated_evidence(
     score: ProposalScore, isi_proposal: str
 ) -> ProposalScore:
@@ -95,7 +121,18 @@ def drop_hallucinated_evidence(
     jadi listed; itu konsekuensi yang disengaja, bukan efek samping.
     """
     sumber = _normalize(isi_proposal)
-    bersih = [f for f in score.red_flags if _normalize(f.evidence) in sumber]
+    # `kutipan and` wajib ada di depan, dan bukan detail gaya: tanpa itu red
+    # flag dengan evidence kosong lolos selalu, karena "" adalah substring
+    # dari string apa pun termasuk sumber yang juga kosong. Lubang ini sudah
+    # ada sejak RF-3 ditulis, tapi baru bisa dipicu sekarang: dokumen hasil
+    # pindai tidak punya lapisan teks, sumbernya kosong, dan satu-satunya
+    # kutipan yang bisa "cocok" adalah kutipan yang tidak mengutip apa pun --
+    # persis alasan tuduhan tanpa bukti yang pagar ini ada untuk mencegah.
+    bersih = [
+        f
+        for f in score.red_flags
+        if (kutipan := _normalize(f.evidence)) and kutipan in sumber
+    ]
     return score.model_copy(update={"red_flags": bersih})
 
 
@@ -166,9 +203,13 @@ class GeminiEngine:
         )
 
     async def score(
-        self, proposal: ProposalLike, campaign: CampaignLike
+        self,
+        proposal: ProposalLike,
+        campaign: CampaignLike,
+        document: DocumentLike,
+        milestones: Sequence[MilestoneLike],
     ) -> ProposalScore:
-        isi = self._assemble_content(proposal, campaign)
+        isi = self._assemble_content(proposal, campaign, milestones)
         panjang_prompt = len(PROMPT.format(**isi))
         if panjang_prompt > self._max_prompt_chars:
             # Review keamanan Finding 2: proposal bisa diterima apa adanya
@@ -191,26 +232,48 @@ class GeminiEngine:
             # di level client, worst case satu pemanggilan score() bisa
             # menggantung sampai hampir 3x gemini_timeout_s sebelum menyerah.
             max_retries=2,
-            messages=[{"role": "user", "content": PROMPT.format(**isi)}],
+            # Daftar [teks, PDF], bukan satu string: inilah satu-satunya
+            # bentuk yang diterima provider gemini milik Instructor. Part
+            # mentah dari google-genai maupun dict gaya OpenAI sama-sama
+            # ditolak dengan "Unsupported content item type" -- isi daftarnya
+            # harus str atau instance Image/Audio/PDF miliknya sendiri.
+            # cast, dan alasannya ada di pustakanya, bukan di kode ini:
+            # tipe `messages` milik Instructor disalin dari OpenAI, yang
+            # `content`-nya hanya string atau potongan teks/gambar. Daftar
+            # berisi instance PDF adalah bentuk yang provider gemini-nya
+            # sendiri tuntut (instructor/v2/providers/gemini/utils.py), jadi
+            # anotasinya yang tidak menyusul, bukan pemanggilan ini yang
+            # salah.
+            messages=cast(
+                list[Any],
+                [
+                    {
+                        "role": "user",
+                        "content": [
+                            PROMPT.format(**isi),
+                            PDF.from_raw_base64(
+                                base64.b64encode(document.data).decode("ascii")
+                            ),
+                        ],
+                    }
+                ],
+            ),
         )
-        return drop_hallucinated_evidence(hasil, isi["isi_proposal"])
+        return drop_hallucinated_evidence(hasil, document.extracted_text)
 
     def _assemble_content(
-        self, proposal: ProposalLike, campaign: CampaignLike
+        self,
+        proposal: ProposalLike,
+        campaign: CampaignLike,
+        milestones: Sequence[MilestoneLike],
     ) -> dict[str, str]:
-        isi_proposal = (
-            f"{proposal.business_profile} {proposal.fund_usage_plan} "
-            f"{proposal.business_projection}"
-        )
         return {
             "judul_campaign": campaign.title,
             "sektor_campaign": campaign.sector,
             "deskripsi_campaign": campaign.description,
             "target_amount_campaign": str(campaign.target_amount),
             "business_name": proposal.business_name,
-            "business_profile": proposal.business_profile,
+            "business_summary": proposal.business_summary,
             "requested_amount": str(proposal.requested_amount),
-            "fund_usage_plan": proposal.fund_usage_plan,
-            "business_projection": proposal.business_projection,
-            "isi_proposal": isi_proposal,
+            "rencana_milestone": _format_milestone(milestones),
         }

@@ -13,8 +13,10 @@ kedaluwarsa -- itu cakupan R4.
 """
 
 import itertools
+import json
 
 from app.models.ledger import EntryType
+from app.seed.pdf import buat_pdf
 
 AMOUNT_MILESTONE_1 = 5_000_000
 AMOUNT_MILESTONE_2 = 5_000_000
@@ -85,34 +87,60 @@ async def _buat_campaign(client, investor: dict, mulai, title: str) -> dict:
 
 
 async def _submit_proposal(client, umkm: dict, campaign_id: str, diminta: int):
+    # multipart, bukan JSON: proposal berbentuk dokumen, dan R3 harus
+    # menempuh jalur yang sama persis dengan pengguna sungguhan. Penanda
+    # [[SCORE:80]] tinggal di dalam PDF-nya, bukan di payload.
+    dokumen = buat_pdf(
+        "Proposal Usaha Warung Kopi R3",
+        [
+            (
+                "Profil Usaha",
+                (
+                    "Warung kopi rumahan di Jakarta Timur, berjalan 3 tahun, 2 "
+                    "pekerja, omzet rata-rata Rp12 juta per bulan. [[SCORE:80]]"
+                ),
+            ),
+            (
+                "Rencana Penggunaan Dana",
+                (
+                    "Rp5 juta untuk mesin kopi semi-otomatis, Rp5 juta untuk bahan "
+                    "baku biji dan susu selama tiga bulan ke depan."
+                ),
+            ),
+            (
+                "Proyeksi Usaha",
+                (
+                    "Omzet diperkirakan naik ke Rp18 juta per bulan dalam 6 bulan "
+                    "setelah mesin baru dipakai."
+                ),
+            ),
+        ],
+    )
+    muatan = {
+        "business_name": "Warung Kopi R3",
+        "business_summary": "Warung kopi rumahan di Jakarta Timur, berjalan 3 "
+        "tahun, 2 pekerja, omzet rata-rata Rp12 juta per bulan.",
+        "requested_amount": diminta,
+        "milestones": [
+            {
+                "seq": 1,
+                "title": "Beli mesin",
+                "description": "Mesin kopi semi-otomatis untuk mempercepat produksi.",
+                "amount": AMOUNT_MILESTONE_1,
+            },
+            {
+                "seq": 2,
+                "title": "Bahan baku",
+                "description": "Stok biji kopi dan susu untuk tiga bulan.",
+                "amount": AMOUNT_MILESTONE_2,
+            },
+        ],
+    }
     res = await client.post(
         f"/api/v1/campaigns/{campaign_id}/proposals",
         headers=umkm["headers"],
-        json={
-            "business_name": "Warung Kopi R3",
-            "business_profile": "Warung kopi rumahan di Jakarta Timur, berjalan 3 "
-            "tahun, 2 pekerja, omzet rata-rata Rp12 juta per bulan. "
-            "[[SCORE:80]]",
-            "requested_amount": diminta,
-            "fund_usage_plan": "Rp5 juta untuk mesin kopi semi-otomatis, Rp5 juta "
-            "untuk bahan baku biji dan susu selama tiga bulan ke depan.",
-            "business_projection": "Omzet diperkirakan naik ke Rp18 juta per bulan "
-            "dalam 6 bulan setelah mesin baru dipakai.",
-            "milestones": [
-                {
-                    "seq": 1,
-                    "title": "Beli mesin",
-                    "description": "Mesin kopi semi-otomatis untuk mempercepat produksi.",
-                    "amount": AMOUNT_MILESTONE_1,
-                },
-                {
-                    "seq": 2,
-                    "title": "Bahan baku",
-                    "description": "Stok biji kopi dan susu untuk tiga bulan.",
-                    "amount": AMOUNT_MILESTONE_2,
-                },
-            ],
-        },
+        data={"payload": json.dumps(muatan)},
+        files={"document": ("proposal-r3.pdf", dokumen, "application/pdf")},
     )
     assert res.status_code == 201, res.text
     return res.json()
